@@ -218,18 +218,6 @@ local RULE_DEFS = {
         end,
     },
 
-    -- ── No Repeat Claims ────────────────────────────────────────────────────
-    -- Not event-driven.  Checked programmatically via Rules:CheckRepeatClaim()
-    -- before any tier claim is submitted.  See below for the helper function.
-    {
-        id          = "no_repeat_claims",
-        name        = "No Repeat Tier Claims",
-        description = "Prevents a character from claiming the same tier reward more than once.",
-        default     = true,
-        severity    = "warn",
-        events      = {},       -- programmatic; no WoW event subscription
-        handler     = nil,
-    },
     {
         id          = "white_green_only",
         name        = "White/Green Gear Only",
@@ -346,20 +334,17 @@ function Rules:GetDef(ruleId)
     return ruleById[ruleId]
 end
 
--- ── no_repeat_claims integration ──────────────────────────────────────────────
+-- ── Claimed reward guard ─────────────────────────────────────────────────────
 -- Called by Tab_NewRun / Requests before a claim is submitted.
--- Returns true  → claim is permitted (rule off, or tier not yet claimed).
--- Returns false → rule is on and tier has already been claimed; log + warn emitted.
+-- Returns true when the tier is new; returns false when it was already claimed.
 
-function Rules:CheckRepeatClaim(characterKey, tierId)
-    if not self:IsEnabled("no_repeat_claims") then return true end
+function Rules:CheckTierClaimAvailable(characterKey, tierId)
     if not ns.Database:HasClaimedTier(characterKey, tierId) then return true end
 
-    -- Tier was already claimed and rule is active.
     local detail = ("Duplicate claim attempted for tier %s"):format(tostring(tierId))
-    self:Log("no_repeat_claims", "tainted", detail)
+    self:Log("duplicate_reward_claim", "tainted", detail)
     ns:Print(
-        "|cffff6060[Rule] No Repeat Claims:|r Tier %s has already been claimed" ..
+        "|cffff6060[Reward Already Claimed]:|r Tier %s has already been claimed" ..
         " by this character.",
         tostring(tierId))
     return false

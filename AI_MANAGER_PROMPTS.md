@@ -389,7 +389,6 @@ Requirements:
   - custom
 - Profiles should only set configuration values. They must not create separate logic paths.
 - Include settings for:
-  - allowRepeatClaims
   - allowBankRewards
   - announceDeaths
   - rule toggles placeholder table
@@ -432,7 +431,6 @@ Add modular rule detection with toggleable behavior and persistent logs.
 - no_trade_except_bank
 - no_grouping
 - no_dungeon_repeats
-- no_repeat_claims
 
 ## Prompt
 
@@ -459,7 +457,6 @@ Requirements:
   - For AH/mail/trade/group/dungeon events, warn and log.
   - Where safe and allowed by API, close frames for blocked rules, but do not depend on closure as enforcement.
   - Never attempt server-side enforcement.
-- Integrate no_repeat_claims with Step 2 claim tracking.
 - Make all rules toggleable.
 
 Acceptance checks:
@@ -510,7 +507,7 @@ Requirements:
   - Custom
 - Show individual rule toggles with name, short description, enabled state, and severity.
 - Toggling any individual rule should switch profile to Custom.
-- Include settings toggles for death announcements, bank rewards, and repeat claims if present.
+- Include settings toggles for death announcements and bank rewards if present.
 - Show current character taint count and recent rule log entries.
 - Follow the existing UI style. Do not introduce a new visual framework.
 - Ensure text does not overflow existing 780x480 frame.

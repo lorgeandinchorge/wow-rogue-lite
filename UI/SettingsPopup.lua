@@ -132,19 +132,11 @@ function Popup:Init()
     self.optBank:SetPoint("TOPLEFT", options, "BOTTOMLEFT", 0, -8)
     self.optBank:SetPoint("RIGHT", content, "RIGHT", 0, 0)
 
-    self.optRepeat = buildToggle(content, Theme, "Allow repeat reward claims", function()
-        ns.Settings:Set("allowRepeatClaims", not (ns.Settings:Get("allowRepeatClaims", false) == true))
-        Popup:Refresh()
-        if ns.MainFrame then ns.MainFrame:RefreshCurrentTab() end
-    end)
-    self.optRepeat:SetPoint("TOPLEFT", self.optBank, "BOTTOMLEFT", 0, -2)
-    self.optRepeat:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-
     self.optSoftDeaths = buildToggle(content, Theme, "Announce soft deaths locally", function()
         ns.Settings:Set("announceSoftDeaths", not (ns.Settings:Get("announceSoftDeaths", false) == true))
         Popup:Refresh()
     end)
-    self.optSoftDeaths:SetPoint("TOPLEFT", self.optRepeat, "BOTTOMLEFT", 0, -2)
+    self.optSoftDeaths:SetPoint("TOPLEFT", self.optBank, "BOTTOMLEFT", 0, -2)
     self.optSoftDeaths:SetPoint("RIGHT", content, "RIGHT", 0, 0)
 
     self.note = Theme:Text(content, 10, Theme.c.fg2)
@@ -178,7 +170,7 @@ function Popup:Refresh()
                         ns:Print("UI theme set to %s. Reload UI to apply it fully.", itemLabel)
                         Popup:Refresh()
                     elseif reason == "gw2_unavailable" then
-                        ns:Print("GW2 UI theme requires the GW2_UI addon to be installed and enabled.")
+                        ns:Print("GW2 UI theme requires GW2 UI or GW2 UI TBC to be installed and enabled.")
                     end
                 end
                 UIDropDownMenu_AddButton(info, level)
@@ -216,7 +208,6 @@ function Popup:Refresh()
     dropdownSetText(self.deathDropdown, DEATH_LABELS[death] or tostring(death))
 
     setToggle(self.optBank, ns.Settings:Get("allowBankRewards", true) == true, Theme)
-    setToggle(self.optRepeat, ns.Settings:Get("allowRepeatClaims", false) == true, Theme)
     setToggle(self.optSoftDeaths, ns.Settings:Get("announceSoftDeaths", false) == true, Theme)
 
     local gw2Note = ns.Theme:IsThemeAvailable("gw2") and "GW2 UI detected." or "GW2 UI is not detected yet."

@@ -115,7 +115,6 @@ SlashCmdList["WRL"] = function(msg)
         local s = WRL_DB and WRL_DB.settings
         if not s then ns:Print("Settings not yet initialised."); return end
         ns:Print("=== Settings (profile: %s) ===", s.profile or "?")
-        ns:Print("  allowRepeatClaims = %s", tostring(s.allowRepeatClaims))
         ns:Print("  allowBankRewards  = %s", tostring(s.allowBankRewards))
         ns:Print("  announceDeaths     = %s", tostring(s.announceDeaths))
         ns:Print("  announceSoftDeaths = %s", tostring(s.announceSoftDeaths))
@@ -204,7 +203,7 @@ SlashCmdList["WRL"] = function(msg)
                     ns.MainFrame:RefreshCurrentTab()
                 end
             elseif reason == "gw2_unavailable" then
-                ns:Print("GW2 UI theme requires the GW2_UI addon to be installed and enabled.")
+                ns:Print("GW2 UI theme requires GW2 UI or GW2 UI TBC to be installed and enabled.")
             else
                 ns:Print("Unknown theme %q. Use classic, dark, or gw2.", themeId)
             end

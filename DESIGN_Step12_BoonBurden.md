@@ -224,7 +224,7 @@ This re-applies burden rules each login so a player who selected burdens before 
 
 ## 5. Rules.lua addition: `white_green_only`
 
-Add one entry to `RULE_DEFS` in `Core/Rules.lua`. It is **programmatic only** (no WoW event subscription) — the same pattern as `no_repeat_claims`. Automated detection of equipped item quality on every equip event is complex and deferred; this burden is logged/advisory for now.
+Add one entry to `RULE_DEFS` in `Core/Rules.lua`. It is **programmatic only** (no WoW event subscription). Automated detection of equipped item quality on every equip event is complex and deferred; this burden is logged/advisory for now.
 
 ```lua
 {

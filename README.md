@@ -77,7 +77,7 @@ Tune these in `Core/LegacyUnlocks.lua` and `Core/Rewards.lua`.
 /wrl theme          - show the current UI theme
 /wrl theme classic  - use the Classic WoW parchment/brown theme
 /wrl theme dark     - use the neutral dark theme
-/wrl theme gw2      - use the GW2 UI theme when GW2_UI is installed/enabled
+/wrl theme gw2      - use the GW2 UI theme when GW2 UI is installed/enabled
 /wrl debug          - toggle debug logging
 /wrl reset confirm  - wipe saved data (cannot be undone)
 ```
@@ -88,7 +88,7 @@ Open `/wrl` and click the gear button near **Close** to choose the account-wide 
 
 - `classic` is the default Classic WoW-style theme.
 - `dark` is a restrained neutral dark theme.
-- `gw2` uses the addon's GW2-inspired palette and is selectable only when [GW2 UI](https://github.com/Mortalknight/GW2_UI) is installed and enabled.
+- `gw2` uses the addon's GW2-inspired palette and is selectable only when [GW2 UI](https://github.com/Mortalknight/GW2_UI), including the TBC flavor, is installed and enabled.
 
 Reload the UI after changing themes so already-built frames pick up the new palette everywhere.
 

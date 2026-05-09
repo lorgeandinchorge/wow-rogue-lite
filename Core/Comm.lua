@@ -81,7 +81,7 @@ function C:SendRequest(bankCharKey, tierIds, note)
     local filtered = {}
     for _, id in ipairs(tierIds or {}) do
         local tid = tonumber(id) or id
-        if ns.Database:AllowRepeatClaims() or not ns.Database:HasClaimedTier(fromKey, tid) then
+        if not ns.Database:HasClaimedTier(fromKey, tid) then
             filtered[#filtered + 1] = tid
         end
     end

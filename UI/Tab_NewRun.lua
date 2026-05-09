@@ -239,10 +239,10 @@ local function buildModifierRow(content, Theme)
     return r
 end
 
-local function selectionCount(selected, displayTiers, charKey, allowRepeat)
+local function selectionCount(selected, displayTiers, charKey)
     local picked = 0
     for _, t in ipairs(displayTiers or {}) do
-        local claimed = ns.Database:HasClaimedTier(charKey, t.id) and not allowRepeat
+        local claimed = ns.Database:HasClaimedTier(charKey, t.id)
         if not claimed and selected[t.id] then
             picked = picked + 1
         end
@@ -250,10 +250,10 @@ local function selectionCount(selected, displayTiers, charKey, allowRepeat)
     return picked
 end
 
-local function countClaimable(displayTiers, charKey, allowRepeat)
+local function countClaimable(displayTiers, charKey)
     local n = 0
     for _, t in ipairs(displayTiers or {}) do
-        local claimed = ns.Database:HasClaimedTier(charKey, t.id) and not allowRepeat
+        local claimed = ns.Database:HasClaimedTier(charKey, t.id)
         if not claimed then n = n + 1 end
     end
     return n
@@ -431,19 +431,18 @@ function Tab:Refresh()
     local legacyAvailable = ns.LegacyUnlocks and ns.LegacyUnlocks:AvailableBudget() or total
 
     local charKey = ns:UnitKey()
-    local allowRepeat = ns.Database:AllowRepeatClaims()
 
     local displayTiers = activeLegacyRows()
 
     for _, t in ipairs(displayTiers) do
-        local claimed = ns.Database:HasClaimedTier(charKey, t.id) and not allowRepeat
+        local claimed = ns.Database:HasClaimedTier(charKey, t.id)
         if claimed then
             self.selected[t.id] = nil
         end
     end
 
-    local claimableCount = countClaimable(displayTiers, charKey, allowRepeat)
-    local selectedCount = selectionCount(self.selected, displayTiers, charKey, allowRepeat)
+    local claimableCount = countClaimable(displayTiers, charKey)
+    local selectedCount = selectionCount(self.selected, displayTiers, charKey)
     local modifiersLocked = not (ns.Boons and ns.Boons.IsLocked) or ns.Boons:IsLocked(charKey)
     local rec = ns.Database and ns.Database:GetCharacter(charKey)
 
@@ -670,7 +669,7 @@ function Tab:Refresh()
         row:SetScript("OnClick", function()
             local tier = row._tier
             if not tier then return end
-            local claimed = ns.Database:HasClaimedTier(charKey, tier.id) and not ns.Database:AllowRepeatClaims()
+            local claimed = ns.Database:HasClaimedTier(charKey, tier.id)
             if claimed then return end
             self.selected[tier.id] = not self.selected[tier.id] or nil
             Tab:Refresh()
@@ -682,7 +681,7 @@ function Tab:Refresh()
     local y = 0
     for i, t in ipairs(displayTiers) do
         local row = self.rows[i]
-        local claimed = ns.Database:HasClaimedTier(charKey, t.id) and not allowRepeat
+        local claimed = ns.Database:HasClaimedTier(charKey, t.id)
         local selected = self.selected[t.id] == true and not claimed
         row._tier = t
         row:ClearAllPoints()
@@ -723,9 +722,9 @@ function Tab:SelectedRewardIds()
     for tierId, picked in pairs(self.selected or {}) do
         if picked then
             local allowed = true
-            if ns.Rules and ns.Rules.CheckRepeatClaim then
-                allowed = ns.Rules:CheckRepeatClaim(charKey, tierId)
-            elseif not ns.Database:AllowRepeatClaims() and ns.Database:HasClaimedTier(charKey, tierId) then
+            if ns.Rules and ns.Rules.CheckTierClaimAvailable then
+                allowed = ns.Rules:CheckTierClaimAvailable(charKey, tierId)
+            elseif ns.Database:HasClaimedTier(charKey, tierId) then
                 allowed = false
             end
             if allowed then

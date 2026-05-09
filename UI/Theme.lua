@@ -59,7 +59,7 @@ local PALETTES = {
     gw2 = {
         id = "gw2",
         label = "GW2 UI",
-        requiresAddon = "GW2_UI",
+        requiresAddon = { kind = "gw2ui" },
         c = {
             bg0   = {0.055, 0.055, 0.063, 0.97},
             bg1   = {0.110, 0.110, 0.122, 1.00},
@@ -76,6 +76,11 @@ local PALETTES = {
 }
 
 local THEME_ORDER = { "classic", "dark", "gw2" }
+local GW2_UI_ADDON_IDS = {
+    "GW2_UI",
+    "GW2_UI_TBC",
+    "GW2_UI_Classic",
+}
 
 Theme.palettes = PALETTES
 Theme.themeOrder = THEME_ORDER
@@ -87,18 +92,52 @@ local FONT_HEADER  = "Fonts\\MORPHEUS.TTF"
 if not CreateFont then -- defensive; only true in non-WoW env
 elseif not (MORPHEUS_FONT or true) then FONT_HEADER = FONT_BODY end
 
-local function isAddonEnabled(addonName)
-    if not addonName then return true end
+local function addonEnabledById(addonName)
     if not GetAddOnInfo or not GetAddOnInfo(addonName) then return false end
     if not GetAddOnEnableState then return true end
     return (GetAddOnEnableState("player", addonName) or 0) > 0
+end
+
+local function normalizeAddonTitle(value)
+    value = tostring(value or ""):lower()
+    value = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    value = value:gsub("[^%w]+", " ")
+    return value:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function addonTitleLooksLikeGW2UI(title)
+    local normalized = normalizeAddonTitle(title)
+    return normalized == "gw2 ui" or normalized:match("^gw2 ui ")
+end
+
+local function findEnabledGW2UIAddon()
+    for _, addonName in ipairs(GW2_UI_ADDON_IDS) do
+        if addonEnabledById(addonName) then return addonName end
+    end
+
+    if not GetNumAddOns or not GetAddOnInfo then return nil end
+    for i = 1, GetNumAddOns() do
+        local name, title = GetAddOnInfo(i)
+        if name and addonTitleLooksLikeGW2UI(title or name) and addonEnabledById(name) then
+            return name
+        end
+    end
+    return nil
+end
+
+local function isAddonEnabled(addonName)
+    if not addonName then return true end
+    if type(addonName) == "table" and addonName.kind == "gw2ui" then
+        return findEnabledGW2UIAddon() ~= nil
+    end
+    return addonEnabledById(addonName)
 end
 
 function Theme:Init()
     self:ApplyConfiguredTheme()
     if ns.On then
         ns:On("ADDON_LOADED", function(addonName)
-            if addonName == "GW2_UI" then
+            if addonName == "GW2_UI" or addonTitleLooksLikeGW2UI(addonName) then
                 self:RefreshAvailability()
             end
         end)
@@ -109,7 +148,7 @@ function Theme:Init()
 end
 
 function Theme:HasGW2UI()
-    return isAddonEnabled("GW2_UI")
+    return findEnabledGW2UIAddon() ~= nil
 end
 
 function Theme:IsThemeAvailable(themeId)

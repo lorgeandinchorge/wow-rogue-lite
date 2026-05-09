@@ -394,22 +394,6 @@ function D:ClaimedTierIds(characterKey)
     return ids
 end
 
--- Account-wide setting from Core/Settings.lua: when false, claimed tiers cannot
--- be requested again unless the no_repeat_claims rule is disabled separately.
-function D:AllowRepeatClaims()
-    if ns.Settings and ns.Settings.Get then
-        if ns.Settings:Get("allowRepeatClaims", false) == true then return true end
-        if ns.Rules and ns.Rules.IsEnabled then
-            return not ns.Rules:IsEnabled("no_repeat_claims")
-        end
-        if ns.Settings.GetRuleEnabled then
-            return ns.Settings:GetRuleEnabled("no_repeat_claims") == false
-        end
-        return false
-    end
-    return WRL_DB.settings and WRL_DB.settings.allowRepeatClaims == true
-end
-
 -- Append a fulfillment receipt from Core/Requests.lua (bank-side audit trail).
 function D:AppendFulfillmentReceipt(fulfillment)
     if not fulfillment then return end

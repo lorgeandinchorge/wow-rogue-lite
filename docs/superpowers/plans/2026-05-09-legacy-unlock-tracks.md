@@ -54,7 +54,7 @@
 
 - [ ] Replace manual tier selection with a read-only active starter kit built from `LegacyUnlocks:ActiveNodes()`.
 - [ ] Send a request containing all currently active unlocked node IDs.
-- [ ] Keep claimed tracking so a run cannot request the same unlocked node bundle repeatedly unless repeat claims are allowed.
+- [ ] Keep claimed tracking so a run cannot request the same unlocked node bundle repeatedly.
 
 ### Task 5: Docs And Verification
 

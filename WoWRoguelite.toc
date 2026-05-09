@@ -6,7 +6,7 @@
 ## IconTexture: Interface\AddOns\WoWRoguelite\WRL_MinimapIcon.png
 ## SavedVariables: WRL_DB
 ## SavedVariablesPerCharacter: WRL_CharDB
-## OptionalDeps: GW2_UI
+## OptionalDeps: GW2_UI, GW2_UI_TBC, GW2_UI_Classic
 
 # --- Bootstrap ---
 WoWRoguelite.lua

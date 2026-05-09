@@ -1,4 +1,6 @@
 local addonEnabled = false
+local addonId = "GW2_UI"
+local addonTitle = "GW2 UI"
 
 local function resetHarness(savedTheme)
     WRL_DB = {
@@ -7,16 +9,19 @@ local function resetHarness(savedTheme)
     }
 
     _G.GetAddOnInfo = function(name)
-        if name == "GW2_UI" then
-            return "GW2 UI"
+        if name == addonId or name == 1 then
+            return addonId, addonTitle
         end
         return nil
     end
     _G.GetAddOnEnableState = function(_, name)
-        if name == "GW2_UI" and addonEnabled then
+        if name == addonId and addonEnabled then
             return 2
         end
         return 0
+    end
+    _G.GetNumAddOns = function()
+        return 1
     end
     _G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 
@@ -51,6 +56,8 @@ end
 
 local function testClassicIsDefault()
     addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
     local ns = resetHarness()
 
     assertEqual(ns.Settings:Get("uiTheme"), "classic", "settings default theme")
@@ -60,6 +67,8 @@ end
 
 local function testGw2CannotBeSelectedWhenUnavailable()
     addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
     local ns = resetHarness()
 
     local ok, reason = ns.Theme:SetTheme("gw2")
@@ -71,6 +80,8 @@ end
 
 local function testUnknownThemeIsRejected()
     addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
     local ns = resetHarness()
 
     local ok, reason = ns.Theme:SetTheme("neon")
@@ -82,6 +93,8 @@ end
 
 local function testSavedGw2FallsBackToDarkWhenUnavailable()
     addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
     local ns = resetHarness("gw2")
 
     assertEqual(ns.Theme:GetSelectedThemeId(), "gw2", "saved gw2 preference is preserved")
@@ -90,6 +103,8 @@ end
 
 local function testGw2CanBeSelectedWhenAvailable()
     addonEnabled = true
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
     local ns = resetHarness()
 
     local ok, reason = ns.Theme:SetTheme("gw2")
@@ -100,8 +115,25 @@ local function testGw2CanBeSelectedWhenAvailable()
     assertEqual(ns.Theme:GetActiveThemeId(), "gw2", "active theme is gw2")
 end
 
+local function testGw2TbcCanBeSelectedWhenAvailable()
+    addonEnabled = true
+    addonId = "GW2_UI_TBC"
+    addonTitle = "|cffffedbaGW2 UI|r |cFF888888TBC|r"
+    local ns = resetHarness()
+
+    local ok, reason = ns.Theme:SetTheme("gw2")
+
+    assertEqual(ok, true, "gw2 theme selection succeeds when GW2 UI TBC is enabled")
+    assertEqual(reason, nil, "successful TBC theme selection has no failure reason")
+    assertEqual(ns.Settings:Get("uiTheme"), "gw2", "stored setting changes to gw2 for TBC")
+    assertEqual(ns.Theme:GetActiveThemeId(), "gw2", "active theme is gw2 for TBC")
+    assertEqual(ns.Theme:HasGW2UI(), true, "HasGW2UI recognizes TBC flavor")
+end
+
 local function testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
     addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
     local ns = resetHarness("gw2")
 
     assertEqual(ns.Theme:GetActiveThemeId(), "dark", "saved gw2 starts on fallback when addon is unavailable")
@@ -118,6 +150,7 @@ testGw2CannotBeSelectedWhenUnavailable()
 testUnknownThemeIsRejected()
 testSavedGw2FallsBackToDarkWhenUnavailable()
 testGw2CanBeSelectedWhenAvailable()
+testGw2TbcCanBeSelectedWhenAvailable()
 testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
 
 print("ThemeSelection.test.lua: ok")

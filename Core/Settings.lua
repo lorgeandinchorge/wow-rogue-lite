@@ -23,7 +23,6 @@ local S = ns:NewModule("Settings")
 
 local SETTINGS_DEFAULTS = {
     profile             = "casual_roguelite",
-    allowRepeatClaims   = false,   -- allow a character to claim the same tier more than once
     allowBankRewards    = true,    -- allow the bank to send starter rewards at all
     announceDeaths      = "local", -- "off" | "local" | "party" | "guild"  (final death only)
     announceSoftDeaths  = false,   -- also print a local notice on soft deaths (extra lives remain)
@@ -46,7 +45,6 @@ local SETTINGS_DEFAULTS = {
 
 local PROFILES = {
     casual_roguelite = {
-        allowRepeatClaims = false,
         allowBankRewards  = true,
         announceDeaths    = "local",
         rules = {
@@ -55,13 +53,11 @@ local PROFILES = {
             no_trade_except_bank = false,
             no_grouping         = false,
             no_dungeon_repeats  = false,
-            no_repeat_claims    = true,
             white_green_only    = false,
         },
     },
 
     banked_hardcore = {
-        allowRepeatClaims = false,
         allowBankRewards  = true,
         announceDeaths    = "party",
         rules = {
@@ -70,13 +66,11 @@ local PROFILES = {
             no_trade_except_bank = true,
             no_grouping         = false,
             no_dungeon_repeats  = true,
-            no_repeat_claims    = true,
             white_green_only    = false,
         },
     },
 
     solo_self_found = {
-        allowRepeatClaims = false,
         allowBankRewards  = false,
         announceDeaths    = "local",
         rules = {
@@ -85,13 +79,11 @@ local PROFILES = {
             no_trade_except_bank = true,
             no_grouping         = true,
             no_dungeon_repeats  = false,
-            no_repeat_claims    = true,
             white_green_only    = false,
         },
     },
 
     ironman = {
-        allowRepeatClaims = false,
         allowBankRewards  = false,
         announceDeaths    = "party",
         rules = {
@@ -100,7 +92,6 @@ local PROFILES = {
             no_trade_except_bank = true,
             no_grouping         = true,
             no_dungeon_repeats  = true,
-            no_repeat_claims    = true,
             white_green_only    = false,
         },
     },
@@ -130,7 +121,7 @@ local PROFILE_DISPLAY_NAMES = {
 
 -- ── Internal path resolution ─────────────────────────────────────────────────
 -- Supports dot-notation paths ("rules.no_auction_house") and plain keys
--- ("allowRepeatClaims").  Returns the parent table and the final key, or
+-- ("allowBankRewards").  Returns the parent table and the final key, or
 -- (nil, nil) when WRL_DB.settings is not yet available.
 -- Intermediate tables are created on demand so Set() never errors on a missing
 -- sub-table.
