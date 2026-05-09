@@ -9,7 +9,7 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Database")
 
-local SCHEMA_VERSION = 9
+local SCHEMA_VERSION = 10
 
 local function normalizeCharacterKey(key)
     if not key or key == "" then return nil end
@@ -51,6 +51,8 @@ local function defaults()
         settings             = {}, -- account-wide settings; owned by Core/Settings.lua
         memorials            = {}, -- [uid] = memorial entry; owned by Core/Death.lua
         achievements         = {}, -- [achievementId] = { when, characterKey }; owned by Core/Achievements.lua
+        legacyUnlocks        = {}, -- [storage|stipend|fate] = purchased rank count
+        legacySpent          = 0,  -- copper spent from lifetime contribution budget
     }
 end
 
@@ -146,10 +148,18 @@ function D:Init()
             -- Introduce account-wide achievements ledger (Step 14).
             WRL_DB.achievements = WRL_DB.achievements or {}
         end
+        if WRL_DB.schema < 10 then
+            -- Introduce spendable legacy unlock tracks. Existing contribution
+            -- totals stay intact and become available budget for fresh choices.
+            WRL_DB.legacyUnlocks = WRL_DB.legacyUnlocks or {}
+            WRL_DB.legacySpent = WRL_DB.legacySpent or 0
+        end
         WRL_DB.schema = SCHEMA_VERSION
     end
 
     WRL_DB.achievements = WRL_DB.achievements or {}
+    WRL_DB.legacyUnlocks = WRL_DB.legacyUnlocks or {}
+    WRL_DB.legacySpent = math.max(0, math.floor(WRL_DB.legacySpent or 0))
 
     -- Lazy-migrate existing character records that predate the uid/generation
     -- fields.  Safe to run every login; no-ops on already-migrated records.

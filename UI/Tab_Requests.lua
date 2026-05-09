@@ -19,11 +19,18 @@ local function tierNames(tierIds)
     end
     local out = {}
     for _, id in ipairs(tierIds or {}) do
+        local node = ns.LegacyUnlocks and ns.LegacyUnlocks.NodeById and ns.LegacyUnlocks:NodeById(id)
+        local trackId = ns.LegacyUnlocks and ns.LegacyUnlocks.TrackIdForNode and ns.LegacyUnlocks:TrackIdForNode(id)
+        local track = trackId and ns.LegacyUnlocks:TrackDef(trackId)
         local t = byId[id]
-        out[#out + 1] = t and t.name or ("Tier " .. tostring(id))
+        if node and track then
+            out[#out + 1] = ("%s %d"):format(track.name or trackId, node.rank or 0)
+        else
+            out[#out + 1] = t and t.name or ("Reward " .. tostring(id))
+        end
     end
     if #out == 0 then
-        return "No tiers selected"
+        return "No rewards selected"
     end
     return table.concat(out, ", ")
 end

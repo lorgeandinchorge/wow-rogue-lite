@@ -68,14 +68,23 @@ local function getTaintCount(key)
     return n
 end
 
--- Resolve a tier name by id from Tiers:Definitions(); falls back to "Tier N".
+-- Resolve a claimed reward name. New saves use legacy node IDs; old saves may
+-- still have tier IDs.
 local function tierName(tierId)
+    if ns.LegacyUnlocks and ns.LegacyUnlocks.NodeById then
+        local node = ns.LegacyUnlocks:NodeById(tierId)
+        local trackId = ns.LegacyUnlocks.TrackIdForNode and ns.LegacyUnlocks:TrackIdForNode(tierId)
+        local track = trackId and ns.LegacyUnlocks:TrackDef(trackId)
+        if node and track then
+            return ("%s %d - %s"):format(track.name or trackId, node.rank or 0, node.name or "Unlock")
+        end
+    end
     if ns.Tiers and ns.Tiers.Definitions then
         for _, t in ipairs(ns.Tiers:Definitions()) do
             if t.id == tierId then return t.name end
         end
     end
-    return "Tier " .. tostring(tierId)
+    return "Reward " .. tostring(tierId)
 end
 
 -- Split a newline-separated string into a sequential Lua table.

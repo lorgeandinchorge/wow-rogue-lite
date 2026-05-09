@@ -17,6 +17,7 @@ Core/Run.lua
 Core/Rules.lua
 Core/Boons.lua
 Core/Tiers.lua
+Core/LegacyUnlocks.lua
 Core/Rewards.lua
 Core/Vendor.lua
 Core/Contributions.lua

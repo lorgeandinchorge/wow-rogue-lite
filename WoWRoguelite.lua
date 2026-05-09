@@ -72,6 +72,7 @@ ns:On("PLAYER_LOGIN", function()
     ns.Rules:Init()        -- must follow Settings (reads rule toggles); precedes event-driven modules
     ns.Boons:Init()        -- must follow Rules/Settings; re-applies selected burden rules
     ns.Tiers:Init()
+    ns.LegacyUnlocks:Init()
     ns.Vendor:Init()
     ns.Contributions:Init() -- must follow Database + Vendor; used by Death
     ns.Achievements:Init()  -- must follow Contributions/Run/Rules/Tiers for criteria checks

@@ -86,7 +86,7 @@ function C:SendRequest(bankCharKey, tierIds, note)
         end
     end
     if #filtered == 0 then
-        ns:Print("Nothing to send: those ranks are already claimed for this character.")
+        ns:Print("Nothing to send: those rewards are already claimed for this character.")
         return
     end
     tierIds = filtered
@@ -110,7 +110,7 @@ function C:SendRequest(bankCharKey, tierIds, note)
         ok = true
     end
 
-    ns:Print(ok and "Rank reward request sent to %s." or "Rank reward request queued (bank offline): %s", bankCharKey)
+    ns:Print(ok and "Legacy reward request sent to %s." or "Legacy reward request queued (bank offline): %s", bankCharKey)
 end
 
 -- Acknowledge a request back to the requester.

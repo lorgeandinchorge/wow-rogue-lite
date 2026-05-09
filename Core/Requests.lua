@@ -78,7 +78,7 @@ function R:OnIncoming(fromKey, tierIds, note, via, requestId)
         when = time(), via = via or "unknown", status = REQ_STATUS.PENDING,
     }
     table.insert(WRL_DB.requests, req)
-    ns:Print("|cffc0a060New rank reward request|r from %s (tiers %s). Open /wrl to fulfill.",
+    ns:Print("|cffc0a060New legacy reward request|r from %s (rewards %s). Open /wrl to fulfill.",
         fromKey, table.concat(tierIds or {}, ","))
     if ns.MainFrame and ns.MainFrame.Notify then ns.MainFrame:Notify("requests") end
 end
@@ -446,10 +446,10 @@ function R:BeginMailFulfillment(reqId)
     -- doesn't accept "Name-Realm" in all clients.
     local recipient = req.from:match("^([^-]+)") or req.from
     if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
-    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText("Roguelite rank rewards") end
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText("Roguelite legacy rewards") end
     if SendMailBodyEditBox then
         SendMailBodyEditBox:SetText(
-            ("Rank rewards for your new run.\nTiers: %s\n\nGood luck.")
+            ("Legacy rewards for your new run.\nRewards: %s\n\nGood luck.")
                 :format(table.concat(req.tierIds, ", ")))
     end
 
@@ -515,7 +515,7 @@ function R:LoadActiveTrade()
         ns:Print("  - Trade manually: %dx item:%d (%s)", it.qty or 1, it.id, it.note or "")
     end
     req._fulfillmentMethod = "trade"
-    ns:Print("Use the checklist above to trade %s's rank rewards, then mark fulfilled.", req.from)
+    ns:Print("Use the checklist above to trade %s's legacy rewards, then mark fulfilled.", req.from)
 end
 
 -- Scan bags for an itemID; return bag,slot,count of first stack found.

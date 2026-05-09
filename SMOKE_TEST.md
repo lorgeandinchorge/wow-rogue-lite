@@ -12,8 +12,8 @@ WoW Roguelite turns your account into a run-based progression system:
 - Every other character is a run character.
 - When a run dies for good, that character retires.
 - Retired runs contribute value to the bank.
-- Lifetime contributions unlock starter kits for future runs.
-- New runs can request unlocked rewards from the bank.
+- Lifetime contributions become budget for starter-kit unlocks.
+- New runs can request unlocked Storage, Stipend, and Fate rewards from the bank.
 
 ## Before You Start
 
@@ -87,6 +87,9 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] Open the New Run tab.
   Expected: it clearly explains where rewards will be sent from.
 
+- [ ] Open the Tiers tab and unlock an affordable Storage, Stipend, or Fate node if budget is available.
+  Expected: available budget decreases, the node becomes unlocked, and the UI refreshes cleanly.
+
 - [ ] Select any available boon or burden.
   Expected: the UI updates and does not error.
 
@@ -138,9 +141,10 @@ If you want to go deeper, these are the main areas to cover.
 
 ### D. Rewards And Progression
 
-- [ ] Tier progress looks correct.
+- [ ] Lifetime, spent, and available budget look correct.
+- [ ] Storage, Stipend, and Fate track states look correct.
 - [ ] Reward previews make sense.
-- [ ] Claimed or locked tiers are shown clearly.
+- [ ] Claimed or locked rewards are shown clearly.
 - [ ] Repeat-claim behavior matches the UI.
 
 ### E. Requests

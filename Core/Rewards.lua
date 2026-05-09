@@ -34,6 +34,102 @@ local function s(silver) return silver * 100  end
 
 local BUNDLE_DEFS = {
     {
+        id = "storage_1",
+        items = {
+            { id = 4496, qty = 2, note = "Linen Bag (6-slot)" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "storage_2",
+        items = {
+            { id = 4245, qty = 2, note = "Small Silk Pack (10-slot)" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "storage_3",
+        items = {
+            { id = 10050, qty = 2, note = "Mageweave Bag (12-slot)" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "storage_4",
+        items = {
+            { id = 14046, qty = 2, note = "Runecloth Bag (14-slot)" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "storage_5",
+        items = {
+            { id = 21841, qty = 2, note = "Netherweave Bag (16-slot)" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "storage_6",
+        items = {
+            { id = 21841, qty = 4, note = "Netherweave Bag (16-slot)" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "stipend_1",
+        items = {},
+        gold = g(3),
+        extraLives = 0,
+    },
+    {
+        id = "stipend_2",
+        items = {},
+        gold = g(10),
+        extraLives = 0,
+    },
+    {
+        id = "stipend_3",
+        items = {},
+        gold = g(25),
+        extraLives = 0,
+    },
+    {
+        id = "stipend_4",
+        items = {},
+        gold = g(75),
+        extraLives = 0,
+    },
+    {
+        id = "stipend_5",
+        items = {},
+        gold = g(250),
+        extraLives = 0,
+    },
+    {
+        id = "stipend_6",
+        items = {},
+        gold = g(750),
+        extraLives = 0,
+    },
+    {
+        id = "fate_1",
+        items = {},
+        gold = 0,
+        extraLives = 1,
+    },
+    {
+        id = "fate_2",
+        items = {},
+        gold = 0,
+        extraLives = 1,
+    },
+    {
         id = "tier_1_base",
         items = {
             { id = 4496, qty = 2, note = "Linen Bag (6-slot)" },
@@ -115,6 +211,15 @@ end
 --- Return a list of bundle defs (raw, unfiltered) for a given tier ID.
 --- Reads tier.bundleIds from Tiers:Definitions() with a canonical fallback.
 function Rewards:BundlesForTier(tierId)
+    if ns.LegacyUnlocks and ns.LegacyUnlocks.NodeById and ns.LegacyUnlocks:NodeById(tierId) then
+        local out = {}
+        for _, bid in ipairs(ns.LegacyUnlocks:BundleIdsForNodeIds({ tierId })) do
+            local b = bundleById[bid]
+            if b then out[#out + 1] = b end
+        end
+        return out
+    end
+
     local defs = ns.Tiers and ns.Tiers:Definitions()
     if defs then
         for _, t in ipairs(defs) do

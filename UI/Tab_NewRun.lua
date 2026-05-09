@@ -1,5 +1,5 @@
 -- UI/Tab_NewRun.lua
--- For the character starting a new run: shows which rank rewards are unlocked
+-- For the character starting a new run: shows which legacy rewards are unlocked
 -- and lets them request any subset to be sent by the bank character.
 
 local ADDON_NAME, ns = ...
@@ -259,6 +259,26 @@ local function countClaimable(displayTiers, charKey, allowRepeat)
     return n
 end
 
+local function activeLegacyRows()
+    local out = {}
+    if not (ns.LegacyUnlocks and ns.LegacyUnlocks.ActiveNodes) then return out end
+    for _, node in ipairs(ns.LegacyUnlocks:ActiveNodes()) do
+        out[#out + 1] = {
+            id = node.nodeId,
+            name = ("%s %d - %s"):format(node.trackName or node.trackId or "Legacy", node.rank or 0, node.name or "Unlock"),
+            trackName = node.trackName,
+            rank = node.rank,
+            node = node,
+        }
+        out[#out].blurb = node.trackName == "Fate"
+            and "Rare survival power for future runs."
+            or node.trackName == "Storage"
+            and "Storage support from your legacy unlocks."
+            or "Gold support from your legacy unlocks."
+    end
+    return out
+end
+
 function Tab:Init(parent)
     if self.panel then return end
     local Theme = ns.Theme
@@ -266,7 +286,7 @@ function Tab:Init(parent)
     self.panel = p
     ns.MainFrame:RegisterPanel("NewRun", p)
 
-    local title = Theme:Header(p, "New Run - Rank Rewards", 16)
+    local title = Theme:Header(p, "New Run - Legacy Rewards", 16)
     title:SetPoint("TOPLEFT", 20, -18)
 
     self.hint = Theme:Text(p, 11, Theme.c.fg2)
@@ -296,7 +316,7 @@ function Tab:Init(parent)
 
     self.sectionLabel = Theme:Text(p, 12, Theme.c.goldH)
     self.sectionLabel:SetPoint("TOPLEFT", summaryRow, "BOTTOMLEFT", 0, -12)
-    self.sectionLabel:SetText("Available Rank Rewards")
+    self.sectionLabel:SetText("Available Legacy Rewards")
 
     self.modHeader = Theme:Text(p, 12, Theme.c.goldH)
     self.modHeader:SetPoint("TOPLEFT", self.sectionLabel, "BOTTOMLEFT", 0, -10)
@@ -306,7 +326,7 @@ function Tab:Init(parent)
     self.modHint:SetPoint("TOPLEFT", self.modHeader, "BOTTOMLEFT", 0, -3)
     self.modHint:SetWidth(720)
     self.modHint:SetJustifyH("LEFT")
-    self.modHint:SetText("Locked once your first rank reward is claimed.")
+    self.modHint:SetText("Locked once your first legacy reward is claimed.")
 
     self.modWrap = CreateFrame("Frame", nil, p)
     self.modWrap:SetPoint("TOPLEFT", self.modHint, "BOTTOMLEFT", 0, -6)
@@ -396,30 +416,14 @@ function Tab:Refresh()
 
     local isBank = ns.Database:IsBankCharacter()
     local bank = WRL_DB.bankCharacter
-    local defs = ns.Tiers:Definitions()
     local total = ns.Database:TotalContributed()
-    local cur = ns.Tiers:CurrentTier(total)
-    local nxt = ns.Tiers:NextTier(total)
-
-    local unlocked = {}
-    local locked = {}
-    for _, t in ipairs(defs) do
-        if total >= (t.threshold or 0) then
-            unlocked[#unlocked + 1] = t
-        else
-            locked[#locked + 1] = t
-        end
-    end
+    local legacySpent = ns.LegacyUnlocks and ns.LegacyUnlocks:Spent() or 0
+    local legacyAvailable = ns.LegacyUnlocks and ns.LegacyUnlocks:AvailableBudget() or total
 
     local charKey = ns:UnitKey()
     local allowRepeat = ns.Database:AllowRepeatClaims()
 
-    local displayTiers = {}
-    for _, t in ipairs(unlocked) do
-        if t.id ~= 0 then
-            displayTiers[#displayTiers + 1] = t
-        end
-    end
+    local displayTiers = activeLegacyRows()
 
     for _, t in ipairs(displayTiers) do
         local claimed = ns.Database:HasClaimedTier(charKey, t.id) and not allowRepeat
@@ -434,11 +438,11 @@ function Tab:Refresh()
     local rec = ns.Database and ns.Database:GetCharacter(charKey)
 
     if isBank then
-        self.hint:SetText("This character is marked as the bank. Open this tab on a run character to request unlocked rank rewards.")
+        self.hint:SetText("This character is marked as the bank. Open this tab on a run character to request unlocked legacy rewards.")
     elseif bank then
-        self.hint:SetText(("Pick the unlocked ranks you want delivered from |cffc0a060%s|r. Progress is account-wide and based on lifetime contribution."):format(bank))
+        self.hint:SetText(("Pick the unlocked legacy rewards you want delivered from |cffc0a060%s|r. Buy more unlocks on the Tiers tab."):format(bank))
     else
-        self.hint:SetText("No bank character is set yet. You can still review unlocked ranks here, then assign a bank with |cffffff00/wrl setbank Name-Realm|r or run |cffffff00/wrl setbank|r on your bank toon.")
+        self.hint:SetText("No bank character is set yet. You can still review unlocked legacy rewards here, then assign a bank with |cffffff00/wrl setbank Name-Realm|r or run |cffffff00/wrl setbank|r on your bank toon.")
     end
 
     if bank then
@@ -463,31 +467,25 @@ function Tab:Refresh()
     else
         statusLines = {
             "Role: run character",
-            ("Unlocked ranks: %d"):format(#unlocked),
-            ("Locked ranks remaining: %d"):format(#locked),
+            ("Unlocked rewards: %d"):format(#displayTiers),
+            ("Claimable now: %d"):format(claimableCount),
         }
     end
     self.statusCard:SetLines(statusLines)
 
     local progressLines = {
-        ("Current rank: %s"):format(cur and cur.name or "Unknown"),
         ("Lifetime contributed: %s"):format(ns.Tiers:FormatMoney(total)),
+        ("Spent on unlocks: %s"):format(ns.Tiers:FormatMoney(legacySpent)),
+        ("Available budget: %s"):format(ns.Tiers:FormatMoney(legacyAvailable)),
     }
-    if nxt then
-        progressLines[3] = ("Next rank: %s at %s"):format(nxt.name, ns.Tiers:FormatMoney(nxt.threshold or 0))
-        progressLines[4] = ("Still needed: %s"):format(ns.Tiers:FormatMoney(math.max(0, (nxt.threshold or 0) - total)))
-    else
-        progressLines[3] = "Next rank: maxed"
-        progressLines[4] = "All rank thresholds reached."
-    end
     self.progressCard:SetLines(progressLines)
 
     self.selectionCard:SetLines({
-        ("Selectable ranks: %d"):format(claimableCount),
+        ("Selectable rewards: %d"):format(claimableCount),
         ("Selected now: %d"):format(selectedCount),
-        (claimableCount > 0 and "Toggle any unlocked rank below to include it."
-            or (#displayTiers > 0 and "All unlocked ranks below are already claimed."
-            or "No rank rewards are unlocked yet.")),
+        (claimableCount > 0 and "Toggle any unlocked reward below to include it."
+            or (#displayTiers > 0 and "All unlocked rewards below are already claimed."
+            or "No legacy rewards are unlocked yet.")),
     })
 
     local cardHeight = math.max(self.statusCard:GetHeight(), self.progressCard:GetHeight(), self.selectionCard:GetHeight())
@@ -655,7 +653,7 @@ function Tab:Refresh()
         row:SetAlpha(claimed and 0.55 or 1)
 
         row.box:SetColorTexture(selected and 0.85 or 0.40, selected and 0.75 or 0.40, selected and 0.35 or 0.40, selected and 0.90 or 0.50)
-        row.label:SetText(("Tier %s - %s"):format(tostring(t.id), t.name or "Unknown"))
+        row.label:SetText(t.name or ("Legacy " .. tostring(t.id)))
         row.sub:SetText(t.blurb or "")
         row.reward:SetText(rewardSummary(t))
         fillRewardIcons(row, t)
@@ -713,7 +711,7 @@ function Tab:SendRequest()
     table.sort(tierIds)
 
     if #tierIds == 0 then
-        ns:Print("Choose at least one unclaimed rank reward first.")
+        ns:Print("Choose at least one unclaimed legacy reward first.")
         return
     end
 

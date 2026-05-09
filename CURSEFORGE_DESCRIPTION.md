@@ -12,15 +12,15 @@ It is part hardcore challenge, part account progression, and part self-made meta
 - Other characters are runs.
 - Final death retires a run.
 - Retired runs contribute value back into the account.
-- Lifetime contributions unlock higher reward tiers.
-- New runs can request unlocked starter kits from the bank.
+- Lifetime contributions become spendable legacy budget.
+- New runs can request unlocked Storage, Stipend, and Fate rewards from the bank.
 
 ## What The Addon Tracks
 
 - current run state
 - bank character assignment
 - account-wide contribution totals
-- unlocked reward tiers
+- unlocked legacy rewards
 - request and fulfillment flow between run and bank
 - roguelite rule profiles
 - optional boons and burdens for a run
@@ -34,11 +34,11 @@ Set one character as your bank with `/wrl setbank`. The bank is treated as infra
 
 ### Account-Wide Progression
 
-When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. That total unlocks higher tiers for future runs.
+When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. That total becomes spendable budget for permanent legacy unlocks.
 
 ### Starter Reward Requests
 
-On a new run, open the New Run tab and request any unlocked reward tiers. On the bank character, open the Requests tab to see what is needed and fulfill it by mail or trade.
+On a new run, spend budget on the Tiers tab, then open the New Run tab and request any unlocked legacy rewards. On the bank character, open the Requests tab to see what is needed and fulfill it by mail or trade.
 
 ### Profiles, Rules, Boons, And Burdens
 
@@ -54,10 +54,9 @@ The addon is designed to make each run feel connected to the last one.
 
 You are not just deleting characters and starting over. You are building a lineage:
 
-- better bags
-- potion support
-- gold stipends
-- late-tier recovery tools like extra lives
+- Storage: better bags
+- Stipend: starter gold
+- Fate: rare extra lives
 
 Each death still matters, but it also helps push the account forward.
 
