@@ -1,5 +1,5 @@
 -- UI/Theme.lua
--- Guild Wars 2 inspired minimalist dark theme.
+-- Theme registry and widget constructors.
 --
 -- Palette (sRGB):
 --   bg0   #0e0e10  (deepest, main frame fill)
@@ -23,18 +23,63 @@
 local ADDON_NAME, ns = ...
 local Theme = ns:NewModule("Theme")
 
-Theme.c = {
-    bg0   = {0.055, 0.055, 0.063, 0.97},
-    bg1   = {0.110, 0.110, 0.122, 1.00},
-    bg2   = {0.165, 0.165, 0.180, 1.00},
-    bg3   = {0.228, 0.228, 0.247, 1.00},
-    fg    = {0.902, 0.878, 0.831, 1.00},
-    fg2   = {0.604, 0.580, 0.541, 1.00},
-    gold  = {0.753, 0.627, 0.376, 1.00},
-    goldH = {0.878, 0.753, 0.502, 1.00},
-    red   = {0.722, 0.361, 0.361, 1.00},
-    green = {0.478, 0.698, 0.478, 1.00},
+local PALETTES = {
+    classic = {
+        id = "classic",
+        label = "Classic WoW",
+        c = {
+            bg0   = {0.075, 0.050, 0.028, 0.98},
+            bg1   = {0.145, 0.093, 0.048, 1.00},
+            bg2   = {0.235, 0.162, 0.083, 1.00},
+            bg3   = {0.350, 0.240, 0.120, 1.00},
+            fg    = {0.965, 0.875, 0.665, 1.00},
+            fg2   = {0.710, 0.620, 0.465, 1.00},
+            gold  = {0.930, 0.710, 0.250, 1.00},
+            goldH = {1.000, 0.860, 0.410, 1.00},
+            red   = {0.760, 0.245, 0.180, 1.00},
+            green = {0.340, 0.650, 0.290, 1.00},
+        },
+    },
+    dark = {
+        id = "dark",
+        label = "Dark",
+        c = {
+            bg0   = {0.035, 0.038, 0.043, 0.98},
+            bg1   = {0.080, 0.086, 0.096, 1.00},
+            bg2   = {0.135, 0.145, 0.160, 1.00},
+            bg3   = {0.205, 0.218, 0.240, 1.00},
+            fg    = {0.890, 0.900, 0.900, 1.00},
+            fg2   = {0.575, 0.610, 0.620, 1.00},
+            gold  = {0.720, 0.650, 0.455, 1.00},
+            goldH = {0.880, 0.790, 0.560, 1.00},
+            red   = {0.760, 0.305, 0.330, 1.00},
+            green = {0.365, 0.680, 0.520, 1.00},
+        },
+    },
+    gw2 = {
+        id = "gw2",
+        label = "GW2 UI",
+        requiresAddon = "GW2_UI",
+        c = {
+            bg0   = {0.055, 0.055, 0.063, 0.97},
+            bg1   = {0.110, 0.110, 0.122, 1.00},
+            bg2   = {0.165, 0.165, 0.180, 1.00},
+            bg3   = {0.228, 0.228, 0.247, 1.00},
+            fg    = {0.902, 0.878, 0.831, 1.00},
+            fg2   = {0.604, 0.580, 0.541, 1.00},
+            gold  = {0.753, 0.627, 0.376, 1.00},
+            goldH = {0.878, 0.753, 0.502, 1.00},
+            red   = {0.722, 0.361, 0.361, 1.00},
+            green = {0.478, 0.698, 0.478, 1.00},
+        },
+    },
 }
+
+local THEME_ORDER = { "classic", "dark", "gw2" }
+
+Theme.palettes = PALETTES
+Theme.themeOrder = THEME_ORDER
+Theme.c = PALETTES.classic.c
 
 local FONT_BODY    = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_HEADER  = "Fonts\\MORPHEUS.TTF"
@@ -42,8 +87,97 @@ local FONT_HEADER  = "Fonts\\MORPHEUS.TTF"
 if not CreateFont then -- defensive; only true in non-WoW env
 elseif not (MORPHEUS_FONT or true) then FONT_HEADER = FONT_BODY end
 
+local function isAddonEnabled(addonName)
+    if not addonName then return true end
+    if not GetAddOnInfo or not GetAddOnInfo(addonName) then return false end
+    if not GetAddOnEnableState then return true end
+    return (GetAddOnEnableState("player", addonName) or 0) > 0
+end
+
 function Theme:Init()
-    -- Nothing dynamic. All constructors below are pure helpers.
+    self:ApplyConfiguredTheme()
+end
+
+function Theme:HasGW2UI()
+    return isAddonEnabled("GW2_UI")
+end
+
+function Theme:IsThemeAvailable(themeId)
+    local def = PALETTES[themeId]
+    if not def then return false end
+    return isAddonEnabled(def.requiresAddon)
+end
+
+function Theme:NormalizeThemeId(themeId)
+    if PALETTES[themeId] then return themeId end
+    return "classic"
+end
+
+function Theme:GetSelectedThemeId()
+    local selected = ns.Settings and ns.Settings:Get("uiTheme", "classic") or "classic"
+    return self:NormalizeThemeId(selected)
+end
+
+function Theme:GetActiveThemeId()
+    local selected = self:GetSelectedThemeId()
+    if selected == "gw2" and not self:IsThemeAvailable("gw2") then
+        return "dark"
+    end
+    return selected
+end
+
+function Theme:ApplyConfiguredTheme()
+    local active = self:GetActiveThemeId()
+    self.activeThemeId = active
+    self.c = PALETTES[active].c
+    return active
+end
+
+function Theme:SetTheme(themeId)
+    if not PALETTES[themeId] then
+        return false, "unknown"
+    end
+    if not self:IsThemeAvailable(themeId) then
+        return false, themeId == "gw2" and "gw2_unavailable" or "unavailable"
+    end
+    if ns.Settings and ns.Settings.Set then
+        ns.Settings:Set("uiTheme", themeId)
+    end
+    self:ApplyConfiguredTheme()
+    return true
+end
+
+function Theme:ThemeList()
+    local out = {}
+    for i, id in ipairs(THEME_ORDER) do
+        local def = PALETTES[id]
+        out[i] = {
+            id = id,
+            label = def.label,
+            available = self:IsThemeAvailable(id),
+            active = self:GetActiveThemeId() == id,
+            selected = self:GetSelectedThemeId() == id,
+        }
+    end
+    return out
+end
+
+function Theme:ThemeLabel(themeId)
+    local def = PALETTES[themeId]
+    return def and def.label or tostring(themeId)
+end
+
+function Theme:NextAvailableTheme(themeId)
+    themeId = self:NormalizeThemeId(themeId)
+    local start = 1
+    for i, id in ipairs(THEME_ORDER) do
+        if id == themeId then start = i; break end
+    end
+    for offset = 1, #THEME_ORDER do
+        local id = THEME_ORDER[((start + offset - 1) % #THEME_ORDER) + 1]
+        if self:IsThemeAvailable(id) then return id end
+    end
+    return "classic"
 end
 
 -- Fill a frame with a flat color. If border == true, adds a 1px gold top/bottom line.

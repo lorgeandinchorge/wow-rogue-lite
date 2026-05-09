@@ -188,6 +188,20 @@ function Tab:Init(parent)
     self.optDeath:SetPoint("RIGHT", content, "RIGHT", 0, 0)
     y = y + OPT_ROW_H + 8
 
+    self.optTheme = buildOptRow(content, Theme, function()
+        local nextTheme = ns.Theme:NextAvailableTheme(ns.Theme:GetSelectedThemeId())
+        local ok, reason = ns.Theme:SetTheme(nextTheme)
+        if ok then
+            ns:Print("UI theme set to %s. Reload UI to apply it fully.", ns.Theme:ThemeLabel(nextTheme))
+        elseif reason == "gw2_unavailable" then
+            ns:Print("GW2 UI theme requires the GW2_UI addon to be installed and enabled.")
+        end
+        Tab:Refresh()
+    end)
+    self.optTheme:SetPoint("TOPLEFT", 0, -y)
+    self.optTheme:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+    y = y + OPT_ROW_H + 8
+
     self.taintLine = Theme:Text(content, 11, Theme.c.fg)
     self.taintLine:SetPoint("TOPLEFT", 0, -y)
     self.taintLine:SetWidth(700)
@@ -273,6 +287,18 @@ function Tab:Refresh()
     local dlab = DEATH_LABELS[death] or tostring(death)
     self.optDeath.box:SetColorTexture(0.40, 0.55, 0.75, 0.75)
     self.optDeath.label:SetText(("Death announcements: %s (click to cycle)"):format(dlab))
+
+    local selectedTheme = ns.Theme:GetSelectedThemeId()
+    local activeTheme = ns.Theme:GetActiveThemeId()
+    local selectedLabel = ns.Theme:ThemeLabel(selectedTheme)
+    local themeNote = ""
+    if selectedTheme ~= activeTheme then
+        themeNote = ("; using %s until GW2_UI loads"):format(ns.Theme:ThemeLabel(activeTheme))
+    elseif not ns.Theme:IsThemeAvailable("gw2") then
+        themeNote = "; GW2 UI unavailable"
+    end
+    self.optTheme.box:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.78)
+    self.optTheme.label:SetText(("UI theme: %s%s (click to cycle)"):format(selectedLabel, themeNote))
 
     local key = ns:UnitKey()
     local taints = (key and ns.Rules:TaintCount(key)) or 0

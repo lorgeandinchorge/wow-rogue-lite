@@ -27,6 +27,7 @@ local SETTINGS_DEFAULTS = {
     allowBankRewards    = true,    -- allow the bank to send starter rewards at all
     announceDeaths      = "local", -- "off" | "local" | "party" | "guild"  (final death only)
     announceSoftDeaths  = false,   -- also print a local notice on soft deaths (extra lives remain)
+    uiTheme             = "classic", -- "classic" | "dark" | "gw2"
     rules               = {},      -- [ruleId] = bool; absent key → rule uses its own default
     -- Reward bundle modifier settings (applied by Core/Rewards.lua: ApplyRewardModifiers).
     rewards             = {

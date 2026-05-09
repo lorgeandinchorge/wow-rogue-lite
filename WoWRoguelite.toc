@@ -5,7 +5,7 @@
 ## Version: 0.1.0
 ## SavedVariables: WRL_DB
 ## SavedVariablesPerCharacter: WRL_CharDB
-## OptionalDeps:
+## OptionalDeps: GW2_UI
 
 # --- Bootstrap ---
 WoWRoguelite.lua

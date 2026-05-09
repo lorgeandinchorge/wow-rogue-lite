@@ -63,9 +63,23 @@ Bank characters are out-of-run infrastructure. They are not subject to roguelite
 /wrl setbank        - designate the current character as the bank
 /wrl bank           - show which character is currently the bank
 /wrl request        - jump to the New Run tab
+/wrl theme          - show the current UI theme
+/wrl theme classic  - use the Classic WoW parchment/brown theme
+/wrl theme dark     - use the neutral dark theme
+/wrl theme gw2      - use the GW2 UI theme when GW2_UI is installed/enabled
 /wrl debug          - toggle debug logging
 /wrl reset confirm  - wipe saved data (cannot be undone)
 ```
+
+## UI themes
+
+Open `/wrl` -> **Rules** to cycle the account-wide UI theme, or use `/wrl theme <id>`.
+
+- `classic` is the default Classic WoW-style theme.
+- `dark` is a restrained neutral dark theme.
+- `gw2` uses the addon’s GW2-inspired palette and is selectable only when [GW2 UI](https://github.com/Mortalknight/GW2_UI) is installed and enabled. If a saved GW2 preference loads without GW2_UI available, WoW Roguelite falls back to the dark palette until GW2_UI is available again.
+
+Reload the UI after changing themes so already-built frames pick up the new palette everywhere.
 
 ## Tier ladder (v1)
 

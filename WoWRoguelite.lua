@@ -116,6 +116,9 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  allowBankRewards  = %s", tostring(s.allowBankRewards))
         ns:Print("  announceDeaths     = %s", tostring(s.announceDeaths))
         ns:Print("  announceSoftDeaths = %s", tostring(s.announceSoftDeaths))
+        ns:Print("  uiTheme            = %s (active: %s)",
+            tostring(s.uiTheme),
+            ns.Theme and ns.Theme:GetActiveThemeId() or "?")
         if s.rules then
             local ruleLines = {}
             for ruleId, enabled in pairs(s.rules) do
@@ -183,6 +186,26 @@ SlashCmdList["WRL"] = function(msg)
         else
             ns:Print("Usage: /wrl rules | /wrl rules log | /wrl rules log Name-Realm")
         end
+    elseif cmd == "theme" then
+        local themeId = rest:lower():gsub("^%s+", ""):gsub("%s+$", "")
+        if themeId == "" then
+            ns:Print("Current UI theme: %s (active: %s)",
+                ns.Theme:ThemeLabel(ns.Theme:GetSelectedThemeId()),
+                ns.Theme:ThemeLabel(ns.Theme:GetActiveThemeId()))
+            ns:Print("Usage: /wrl theme classic | dark | gw2")
+        else
+            local ok, reason = ns.Theme:SetTheme(themeId)
+            if ok then
+                ns:Print("UI theme set to %s. Reload UI to apply it fully.", ns.Theme:ThemeLabel(themeId))
+                if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+                    ns.MainFrame:RefreshCurrentTab()
+                end
+            elseif reason == "gw2_unavailable" then
+                ns:Print("GW2 UI theme requires the GW2_UI addon to be installed and enabled.")
+            else
+                ns:Print("Unknown theme %q. Use classic, dark, or gw2.", themeId)
+            end
+        end
     elseif cmd == "debug" then
         WRL_DB.debug = not WRL_DB.debug
         ns:Print("Debug: %s", WRL_DB.debug and "on" or "off")
@@ -224,6 +247,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl profile <id>   - apply a profile by ID")
         ns:Print("  /wrl rules          - list rules and enabled state")
         ns:Print("  /wrl rules log      - print recent taint/warn log entries")
+        ns:Print("  /wrl theme <id>     - set UI theme: classic, dark, or gw2")
         ns:Print("  /wrl debug          - toggle debug logging")
         ns:Print("  /wrl reqrefresh     - refresh bag item indicators")
         ns:Print("  /wrl export         - export current run summary (opens popup)")
