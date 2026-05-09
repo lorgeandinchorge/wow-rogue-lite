@@ -100,10 +100,24 @@ local function testGw2CanBeSelectedWhenAvailable()
     assertEqual(ns.Theme:GetActiveThemeId(), "gw2", "active theme is gw2")
 end
 
+local function testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
+    addonEnabled = false
+    local ns = resetHarness("gw2")
+
+    assertEqual(ns.Theme:GetActiveThemeId(), "dark", "saved gw2 starts on fallback when addon is unavailable")
+
+    addonEnabled = true
+    ns.Theme:RefreshAvailability()
+
+    assertEqual(ns.Theme:GetSelectedThemeId(), "gw2", "saved gw2 preference remains selected")
+    assertEqual(ns.Theme:GetActiveThemeId(), "gw2", "refresh reapplies gw2 once addon appears")
+end
+
 testClassicIsDefault()
 testGw2CannotBeSelectedWhenUnavailable()
 testUnknownThemeIsRejected()
 testSavedGw2FallsBackToDarkWhenUnavailable()
 testGw2CanBeSelectedWhenAvailable()
+testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
 
 print("ThemeSelection.test.lua: ok")

@@ -5,15 +5,7 @@ local ADDON_NAME, ns = ...
 local Tab = ns:NewModule("Tab_Rules")
 
 local RULE_ROW_H = 50
-local OPT_ROW_H = 24
 local LOG_LINES = 10
-local DEATH_MODES = { "off", "local", "party", "guild" }
-local DEATH_LABELS = {
-    off = "Off",
-    ["local"] = "Local",
-    party = "Party",
-    guild = "Guild",
-}
 
 local function safeTextColor(fs, c, a)
     if not fs or not c then return end
@@ -28,14 +20,6 @@ local function setProfileButtonLook(btn, selected, Theme)
         btn.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
         safeTextColor(btn.label, Theme.c.fg, 1)
     end
-end
-
-local function cycleDeathMode(cur)
-    local idx = 1
-    for i, m in ipairs(DEATH_MODES) do
-        if m == cur then idx = i; break end
-    end
-    return DEATH_MODES[(idx % #DEATH_MODES) + 1]
 end
 
 local function buildRuleRow(parent, Theme)
@@ -69,26 +53,6 @@ local function buildRuleRow(parent, Theme)
     r.state:SetWidth(44)
     r.state:SetJustifyH("RIGHT")
 
-    return r
-end
-
-local function buildOptRow(parent, Theme, onToggle)
-    local r = CreateFrame("Button", nil, parent)
-    r:SetHeight(OPT_ROW_H)
-
-    r.box = r:CreateTexture(nil, "ARTWORK")
-    r.box:SetSize(12, 12)
-    r.box:SetPoint("LEFT", 8, 0)
-
-    r.label = Theme:Text(r, 11, Theme.c.fg)
-    r.label:SetPoint("LEFT", 28, 0)
-    r.label:SetWidth(520)
-    r.label:SetJustifyH("LEFT")
-    r.label:SetWordWrap(false)
-
-    r:SetScript("OnClick", function()
-        if onToggle then onToggle(r) end
-    end)
     return r
 end
 
@@ -156,58 +120,6 @@ function Tab:Init(parent)
     self.content = content
 
     local y = 0
-    self.optHeader = Theme:Text(content, 12, Theme.c.goldH)
-    self.optHeader:SetPoint("TOPLEFT", 0, -y)
-    self.optHeader:SetText("Account options")
-    y = y + 18
-
-    self.optBank = buildOptRow(content, Theme, function()
-        local v = not (ns.Settings:Get("allowBankRewards", true) == true)
-        ns.Settings:Set("allowBankRewards", v)
-        Tab:Refresh()
-    end)
-    self.optBank:SetPoint("TOPLEFT", 0, -y)
-    self.optBank:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-    y = y + OPT_ROW_H + 2
-
-    self.optRepeat = buildOptRow(content, Theme, function()
-        local v = not (ns.Settings:Get("allowRepeatClaims", false) == true)
-        ns.Settings:Set("allowRepeatClaims", v)
-        Tab:Refresh()
-    end)
-    self.optRepeat:SetPoint("TOPLEFT", 0, -y)
-    self.optRepeat:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-    y = y + OPT_ROW_H + 2
-
-    self.optDeath = buildOptRow(content, Theme, function()
-        local cur = ns.Settings:Get("announceDeaths", "local")
-        ns.Settings:Set("announceDeaths", cycleDeathMode(cur))
-        Tab:Refresh()
-    end)
-    self.optDeath:SetPoint("TOPLEFT", 0, -y)
-    self.optDeath:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-    y = y + OPT_ROW_H + 8
-
-    self.optTheme = buildOptRow(content, Theme, function()
-        local nextTheme = ns.Theme:NextAvailableTheme(ns.Theme:GetSelectedThemeId())
-        local ok, reason = ns.Theme:SetTheme(nextTheme)
-        if ok then
-            ns:Print("UI theme set to %s. Reload UI to apply it fully.", ns.Theme:ThemeLabel(nextTheme))
-        elseif reason == "gw2_unavailable" then
-            ns:Print("GW2 UI theme requires the GW2_UI addon to be installed and enabled.")
-        end
-        Tab:Refresh()
-    end)
-    self.optTheme:SetPoint("TOPLEFT", 0, -y)
-    self.optTheme:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-    y = y + OPT_ROW_H + 8
-
-    self.taintLine = Theme:Text(content, 11, Theme.c.fg)
-    self.taintLine:SetPoint("TOPLEFT", 0, -y)
-    self.taintLine:SetWidth(700)
-    self.taintLine:SetJustifyH("LEFT")
-    y = y + 20
-
     self.rulesHeader = Theme:Text(content, 12, Theme.c.goldH)
     self.rulesHeader:SetPoint("TOPLEFT", 0, -y)
     self.rulesHeader:SetText("Roguelite rules (this account)")
@@ -236,6 +148,12 @@ function Tab:Init(parent)
     self.logHeader:SetPoint("TOPLEFT", 0, -y)
     self.logHeader:SetText("Recent rule log (this character)")
     y = y + 18
+
+    self.taintLine = Theme:Text(content, 11, Theme.c.fg)
+    self.taintLine:SetPoint("TOPLEFT", 0, -y)
+    self.taintLine:SetWidth(700)
+    self.taintLine:SetJustifyH("LEFT")
+    y = y + 20
 
     self.logEmpty = Theme:Text(content, 10, Theme.c.fg2)
     self.logEmpty:SetPoint("TOPLEFT", 0, -y)
@@ -271,34 +189,6 @@ function Tab:Refresh()
     for pid, btn in pairs(self.profileButtons) do
         setProfileButtonLook(btn, prof == pid, Theme)
     end
-
-    -- Account toggles
-    local bankOn = ns.Settings:Get("allowBankRewards", true) == true
-    self.optBank.box:SetColorTexture(bankOn and 0.38 or 0.40, bankOn and 0.70 or 0.40,
-        bankOn and 0.38 or 0.40, bankOn and 0.85 or 0.50)
-    self.optBank.label:SetText("Allow bank starter rewards (mail / trade from bank)")
-
-    local repOn = ns.Settings:Get("allowRepeatClaims", false) == true
-    self.optRepeat.box:SetColorTexture(repOn and 0.85 or 0.40, repOn and 0.75 or 0.40,
-        repOn and 0.35 or 0.40, repOn and 0.90 or 0.50)
-    self.optRepeat.label:SetText("Allow repeat tier claims (same rank more than once)")
-
-    local death = ns.Settings:Get("announceDeaths", "local")
-    local dlab = DEATH_LABELS[death] or tostring(death)
-    self.optDeath.box:SetColorTexture(0.40, 0.55, 0.75, 0.75)
-    self.optDeath.label:SetText(("Death announcements: %s (click to cycle)"):format(dlab))
-
-    local selectedTheme = ns.Theme:GetSelectedThemeId()
-    local activeTheme = ns.Theme:GetActiveThemeId()
-    local selectedLabel = ns.Theme:ThemeLabel(selectedTheme)
-    local themeNote = ""
-    if selectedTheme ~= activeTheme then
-        themeNote = ("; using %s until GW2_UI loads"):format(ns.Theme:ThemeLabel(activeTheme))
-    elseif not ns.Theme:IsThemeAvailable("gw2") then
-        themeNote = "; GW2 UI unavailable"
-    end
-    self.optTheme.box:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.78)
-    self.optTheme.label:SetText(("UI theme: %s%s (click to cycle)"):format(selectedLabel, themeNote))
 
     local key = ns:UnitKey()
     local taints = (key and ns.Rules:TaintCount(key)) or 0

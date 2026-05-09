@@ -3,6 +3,7 @@
 ## Notes: A rogue-lite run/bank system. Contribute on death, unlock perks for future runs.
 ## Author: Paul
 ## Version: 0.1.0
+## IconTexture: Interface\AddOns\WoWRoguelite\WRL_MinimapIcon.png
 ## SavedVariables: WRL_DB
 ## SavedVariablesPerCharacter: WRL_CharDB
 ## OptionalDeps: GW2_UI
@@ -28,6 +29,7 @@ Core/Death.lua
 
 # --- UI ---
 UI/Theme.lua
+UI/SettingsPopup.lua
 UI/MainFrame.lua
 UI/Tab_Run.lua
 UI/Tab_Contributions.lua
@@ -36,4 +38,5 @@ UI/Tab_Tiers.lua
 UI/Tab_Requests.lua
 UI/Tab_NewRun.lua
 UI/Tab_Rules.lua
+UI/AddonOptions.lua
 Core/Export.lua

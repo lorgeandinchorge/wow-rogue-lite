@@ -83,7 +83,7 @@ Tune these in `Core/LegacyUnlocks.lua` and `Core/Rewards.lua`.
 
 ## UI themes
 
-Open `/wrl` -> **Rules** to cycle the account-wide UI theme, or use `/wrl theme <id>`.
+Open `/wrl` and click the gear button near **Close** to choose the account-wide UI theme, or use `/wrl theme <id>`.
 
 - `classic` is the default Classic WoW-style theme.
 - `dark` is a restrained neutral dark theme.

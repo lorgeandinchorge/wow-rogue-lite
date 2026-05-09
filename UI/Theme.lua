@@ -96,6 +96,16 @@ end
 
 function Theme:Init()
     self:ApplyConfiguredTheme()
+    if ns.On then
+        ns:On("ADDON_LOADED", function(addonName)
+            if addonName == "GW2_UI" then
+                self:RefreshAvailability()
+            end
+        end)
+        ns:On("PLAYER_ENTERING_WORLD", function()
+            self:RefreshAvailability()
+        end)
+    end
 end
 
 function Theme:HasGW2UI()
@@ -130,6 +140,15 @@ function Theme:ApplyConfiguredTheme()
     local active = self:GetActiveThemeId()
     self.activeThemeId = active
     self.c = PALETTES[active].c
+    return active
+end
+
+function Theme:RefreshAvailability()
+    local prior = self.activeThemeId
+    local active = self:ApplyConfiguredTheme()
+    if prior ~= active and ns.MainFrame and ns.MainFrame.RefreshTheme then
+        ns.MainFrame:RefreshTheme()
+    end
     return active
 end
 

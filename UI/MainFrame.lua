@@ -62,6 +62,34 @@ function M:Init()
     close:SetPoint("TOPRIGHT", -10, -10)
     close:SetScript("OnClick", function() f:Hide() end)
 
+    local settings = CreateFrame("Button", nil, header)
+    settings:SetSize(24, 22)
+    settings:SetPoint("RIGHT", close, "LEFT", -6, 0)
+    settings.bg = settings:CreateTexture(nil, "BACKGROUND")
+    settings.bg:SetAllPoints(settings)
+    settings.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+    settings.icon = settings:CreateTexture(nil, "ARTWORK")
+    settings.icon:SetPoint("CENTER", 0, 0)
+    settings.icon:SetSize(16, 16)
+    settings.icon:SetTexture("Interface\\Buttons\\UI-OptionsButton")
+    settings:SetScript("OnClick", function()
+        if ns.SettingsPopup then
+            ns.SettingsPopup:Toggle()
+        end
+    end)
+    settings:SetScript("OnEnter", function(self)
+        self.bg:SetColorTexture(Theme.c.bg3[1], Theme.c.bg3[2], Theme.c.bg3[3], 1)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Settings")
+        GameTooltip:AddLine("Open addon preferences.", 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
+    settings:SetScript("OnLeave", function(self)
+        self.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+        GameTooltip:Hide()
+    end)
+    self.settingsButton = settings
+
     -- Right-side header stats (lifetime total, bank char, current char).
     self.statsTotal = Theme:Text(header, 12, Theme.c.gold)
     self.statsTotal:SetPoint("BOTTOMRIGHT", -18, 4)
@@ -177,6 +205,22 @@ function M:RefreshCurrentTab()
     end
 end
 
+function M:RefreshTheme()
+    if not self.frame then return end
+    local Theme = ns.Theme
+    Theme:Fill(self.frame, Theme.c.bg0, true)
+    Theme:Fill(self.header, Theme.c.bg1, false)
+    if self.body then Theme:Fill(self.body, Theme.c.bg0, false) end
+    if self.settingsButton and self.settingsButton.bg then
+        self.settingsButton.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+    end
+    if ns.SettingsPopup and ns.SettingsPopup.Refresh then
+        ns.SettingsPopup:Refresh()
+    end
+    self:RefreshHeader()
+    self:RefreshCurrentTab()
+end
+
 function M:Toggle()
     if not self.frame then self:Init() end
     if self.frame:IsShown() then self.frame:Hide() else self.frame:Show() end
@@ -201,19 +245,47 @@ end
 -- Minimap button -----------------------------------------------------------
 function M:CreateMinimapButton()
     local btn = CreateFrame("Button", "WRL_MinimapButton", Minimap)
-    btn:SetSize(24, 24)
+    btn:SetSize(32, 32)
     btn:SetFrameStrata("MEDIUM")
-    btn:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", -4, -4)
+    btn:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", -2, -2)
 
-    -- Simple ring + addon icon look; all flat color, GW2-ish.
     local bg = btn:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(btn)
-    bg:SetColorTexture(ns.Theme.c.bg0[1], ns.Theme.c.bg0[2], ns.Theme.c.bg0[3], 0.9)
+    bg:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    bg:ClearAllPoints()
+    bg:SetPoint("TOPLEFT", btn, "TOPLEFT", -8, 8)
+    bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 8, -8)
 
     local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("TOPLEFT", btn, "TOPLEFT", 2, -2)
-    icon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
+    icon:SetPoint("TOPLEFT", btn, "TOPLEFT", 4, -4)
+    icon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -4, 4)
     icon:SetTexture("Interface\\AddOns\\WoWRoguelite\\WRL_MinimapIcon.png")
+    icon:SetAlpha(1)
+    icon:SetVertexColor(1, 1, 1, 1)
+
+    local ringTop = btn:CreateTexture(nil, "OVERLAY")
+    ringTop:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.75)
+    ringTop:SetPoint("TOPLEFT", icon, "TOPLEFT", -1, 1)
+    ringTop:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 1, 1)
+    ringTop:SetHeight(1)
+
+    local ringBottom = btn:CreateTexture(nil, "OVERLAY")
+    ringBottom:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.75)
+    ringBottom:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", -1, -1)
+    ringBottom:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 1, -1)
+    ringBottom:SetHeight(1)
+
+    local ringLeft = btn:CreateTexture(nil, "OVERLAY")
+    ringLeft:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.75)
+    ringLeft:SetPoint("TOPLEFT", icon, "TOPLEFT", -1, 1)
+    ringLeft:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", -1, -1)
+    ringLeft:SetWidth(1)
+
+    local ringRight = btn:CreateTexture(nil, "OVERLAY")
+    ringRight:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.75)
+    ringRight:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 1, 1)
+    ringRight:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 1, -1)
+    ringRight:SetWidth(1)
+    btn.icon = icon
 
     btn:SetScript("OnClick", function() M:Toggle() end)
     btn:SetScript("OnEnter", function(self)

@@ -86,6 +86,7 @@ ns:On("PLAYER_LOGIN", function()
 
     ns.Theme:Init()
     ns.MainFrame:Init()
+    if ns.AddonOptions then ns.AddonOptions:Init() end
 
     ns:Print("v%s loaded. Type /wrl to open.", ns.version)
 end)
