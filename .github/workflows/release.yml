@@ -33,17 +33,3 @@ jobs:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
         with:
           args: -p ${{ vars.CF_PROJECT_ID }}
-
-      - name: Upload packaged addon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: WoWRoguelite
-          path: .release/*.zip
-          if-no-files-found: error
-
-      - name: Attach zip to GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: .release/*.zip
-          body_path: CHANGELOG.md

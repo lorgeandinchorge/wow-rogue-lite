@@ -32,7 +32,7 @@ git tag -a v0.1.2 -m "WoWRoguelite v0.1.2"
 git push origin v0.1.2
 ```
 
-The workflow packages the addon, uploads it to CurseForge, saves the zip as a GitHub Actions artifact, and attaches it to the GitHub release.
+The workflow packages the addon and uploads it to CurseForge.
 
 ## GitHub Settings
 
