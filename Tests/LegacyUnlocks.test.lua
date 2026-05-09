@@ -138,10 +138,21 @@ local function testResetUnlocksRefundsBudget()
     assertEqual(ns.LegacyUnlocks:AvailableBudget(), 130000, "budget becomes available again")
 end
 
+local function testFateMilestonesUseRankThreeAndSixCosts()
+    local ns = resetHarness()
+    local fate = ns.LegacyUnlocks:TrackDef("fate")
+
+    assertEqual(fate.nodes[1].milestone, 3, "first fate node displays at tier three")
+    assertEqual(fate.nodes[1].cost, 250000, "first fate node costs 25g")
+    assertEqual(fate.nodes[2].milestone, 6, "second fate node displays at tier six")
+    assertEqual(fate.nodes[2].cost, 7500000, "second fate node costs 750g")
+end
+
 testDefaultsStartUnspent()
 testUnlockSpendsBudgetAndRequiresSequentialRanks()
 testCanGoBackToAnotherTrackWhenBudgetArrives()
 testActiveNodeIdsAndRewardsReflectUnlockedTracks()
 testResetUnlocksRefundsBudget()
+testFateMilestonesUseRankThreeAndSixCosts()
 
 print("LegacyUnlocks.test.lua: ok")

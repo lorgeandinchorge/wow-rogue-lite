@@ -59,6 +59,18 @@ local function buildNode(parent, Theme)
     return r
 end
 
+local function buildSpacer(parent, Theme)
+    local r = CreateFrame("Frame", nil, parent)
+    r:SetHeight(NODE_H)
+
+    r.label = Theme:Text(r, 10, Theme.c.fg2)
+    r.label:SetPoint("CENTER", r, "CENTER", 0, 0)
+    r.label:SetText("No Fate unlock")
+    r.label:SetAlpha(0.45)
+
+    return r
+end
+
 local function buildTrack(parent, Theme)
     local f = CreateFrame("Frame", nil, parent)
     f:SetWidth(TRACK_W)
@@ -76,6 +88,7 @@ local function buildTrack(parent, Theme)
     f.blurb:SetJustifyH("LEFT")
 
     f.rows = {}
+    f.spacers = {}
     return f
 end
 
@@ -152,10 +165,30 @@ function Tab:Refresh()
         track.blurb:SetText(def.blurb or "")
 
         local y = 44
-        for i, node in ipairs(def.nodes or {}) do
-            if not track.rows[i] then
-                track.rows[i] = buildNode(track, Theme)
-                track.rows[i]:SetScript("OnClick", function(row)
+        local nodeIndex = 1
+        local visualRows = trackId == "fate" and 6 or #(def.nodes or {})
+        for visualRank = 1, visualRows do
+            local node = (def.nodes or {})[nodeIndex]
+            local nodeVisualRank = node and (node.milestone or node.rank) or nil
+            local hasNode = node and nodeVisualRank == visualRank
+
+            if not hasNode then
+                if not track.spacers[visualRank] then
+                    track.spacers[visualRank] = buildSpacer(track, Theme)
+                end
+                local spacer = track.spacers[visualRank]
+                spacer:ClearAllPoints()
+                spacer:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -y)
+                spacer:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+                spacer:Show()
+                if track.rows[visualRank] then track.rows[visualRank]:Hide() end
+                spacer.label:SetText(("Rank %d - No Fate unlock"):format(visualRank))
+                y = y + NODE_H + 6
+            else
+                if track.spacers[visualRank] then track.spacers[visualRank]:Hide() end
+                if not track.rows[visualRank] then
+                    track.rows[visualRank] = buildNode(track, Theme)
+                    track.rows[visualRank]:SetScript("OnClick", function(row)
                     local n = row._node
                     if not n then return end
                     local ok, reason = L:Unlock(row._trackId)
@@ -171,53 +204,58 @@ function Tab:Refresh()
                         ns:Print("%s is already maxed.", def.name)
                     end
                 end)
+                end
+
+                local row = track.rows[visualRank]
+                local unlocked = nodeIndex <= rank
+                local nextAvailable = nodeIndex == rank + 1
+                local affordable = nextAvailable and L:AvailableBudget() >= (node.cost or 0)
+
+                row._node = node
+                row._trackId = trackId
+                row:ClearAllPoints()
+                row:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -y)
+                row:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+                row:Show()
+
+                if unlocked then
+                    row:SetAlpha(1)
+                    row.dot:SetColorTexture(Theme.c.green[1], Theme.c.green[2], Theme.c.green[3], 1)
+                    row.state:SetText("UNLOCKED")
+                    setTextColor(row.state, Theme.c.green, 1)
+                elseif affordable then
+                    row:SetAlpha(1)
+                    row.dot:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 1)
+                    row.state:SetText("CLICK TO UNLOCK")
+                    setTextColor(row.state, Theme.c.gold, 1)
+                elseif nextAvailable then
+                    row:SetAlpha(0.78)
+                    row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.65)
+                    row.state:SetText("NEED BUDGET")
+                    setTextColor(row.state, Theme.c.fg2, 0.85)
+                else
+                    row:SetAlpha(0.45)
+                    row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.45)
+                    row.state:SetText("LOCKED")
+                    setTextColor(row.state, Theme.c.fg2, 0.75)
+                end
+
+                row.title:SetText((node.milestone and ("Tier %d - %s") or ("Rank %d - %s"))
+                    :format(node.milestone or node.rank, node.name or "Unlock"))
+                row.cost:SetText(ns.Tiers:FormatMoney(node.cost or 0))
+                row.reward:SetText(nodeRewardSummary(node))
+                setTextColor(row.title, unlocked and Theme.c.fg or Theme.c.fg2, unlocked and 1 or 0.95)
+                setTextColor(row.reward, Theme.c.fg2, unlocked and 1 or 0.82)
+
+                nodeIndex = nodeIndex + 1
+                y = y + NODE_H + 6
             end
-
-            local row = track.rows[i]
-            local unlocked = i <= rank
-            local nextAvailable = i == rank + 1
-            local affordable = nextAvailable and L:AvailableBudget() >= (node.cost or 0)
-
-            row._node = node
-            row._trackId = trackId
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -y)
-            row:SetPoint("RIGHT", track, "RIGHT", 0, 0)
-            row:Show()
-
-            if unlocked then
-                row:SetAlpha(1)
-                row.dot:SetColorTexture(Theme.c.green[1], Theme.c.green[2], Theme.c.green[3], 1)
-                row.state:SetText("UNLOCKED")
-                setTextColor(row.state, Theme.c.green, 1)
-            elseif affordable then
-                row:SetAlpha(1)
-                row.dot:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 1)
-                row.state:SetText("CLICK TO UNLOCK")
-                setTextColor(row.state, Theme.c.gold, 1)
-            elseif nextAvailable then
-                row:SetAlpha(0.78)
-                row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.65)
-                row.state:SetText("NEED BUDGET")
-                setTextColor(row.state, Theme.c.fg2, 0.85)
-            else
-                row:SetAlpha(0.45)
-                row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.45)
-                row.state:SetText("LOCKED")
-                setTextColor(row.state, Theme.c.fg2, 0.75)
-            end
-
-            row.title:SetText((node.milestone and ("Tier %d - %s") or ("Rank %d - %s"))
-                :format(node.milestone or node.rank, node.name or "Unlock"))
-            row.cost:SetText(ns.Tiers:FormatMoney(node.cost or 0))
-            row.reward:SetText(nodeRewardSummary(node))
-            setTextColor(row.title, unlocked and Theme.c.fg or Theme.c.fg2, unlocked and 1 or 0.95)
-            setTextColor(row.reward, Theme.c.fg2, unlocked and 1 or 0.82)
-
-            y = y + NODE_H + 6
         end
-        for i = #(def.nodes or {}) + 1, #track.rows do
+        for i = visualRows + 1, #track.rows do
             track.rows[i]:Hide()
+        end
+        for i = visualRows + 1, #track.spacers do
+            track.spacers[i]:Hide()
         end
         track:SetHeight(y)
         if y > maxY then maxY = y end

@@ -60,7 +60,7 @@ Lifetime contributions become spendable legacy budget. Spending budget does not 
 |------|-------|--------|
 | Storage | 3g, 10g, 25g, 75g, 250g, 750g | Better starter bags and storage support |
 | Stipend | 3g, 10g, 25g, 75g, 250g, 750g | Starter gold at each purchased rank |
-| Fate | 100g, 1200g | +1 extra life at each Fate milestone |
+| Fate | 25g, 750g | +1 extra life at ranks 3 and 6 |
 
 You can buy two ranks of Storage, come back for Stipend rank one, then later keep filling out every track. Eventually everything can be unlocked.
 

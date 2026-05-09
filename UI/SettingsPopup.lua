@@ -92,9 +92,11 @@ function Popup:Init()
     close:SetPoint("TOPRIGHT", -10, -10)
     close:SetScript("OnClick", function() f:Hide() end)
 
-    local content = CreateFrame("Frame", nil, f)
-    content:SetPoint("TOPLEFT", 18, -64)
-    content:SetPoint("BOTTOMRIGHT", -18, 16)
+    local scroll, content = Theme:ScrollArea(f)
+    scroll:SetPoint("TOPLEFT", 18, -64)
+    scroll:SetPoint("BOTTOMRIGHT", -34, 16)
+    content:SetSize(360, 292)
+    self.scroll = scroll
     self.content = content
 
     local themeLabel = Theme:Text(content, 11, Theme.c.goldH)
@@ -146,9 +148,10 @@ function Popup:Init()
     self.optSoftDeaths:SetPoint("RIGHT", content, "RIGHT", 0, 0)
 
     self.note = Theme:Text(content, 10, Theme.c.fg2)
-    self.note:SetPoint("BOTTOMLEFT", 0, 0)
-    self.note:SetWidth(380)
+    self.note:SetPoint("TOPLEFT", self.optSoftDeaths, "BOTTOMLEFT", 0, -12)
+    self.note:SetWidth(340)
     self.note:SetJustifyH("LEFT")
+    content:SetHeight(292)
 
     self.frame = f
     f:Hide()

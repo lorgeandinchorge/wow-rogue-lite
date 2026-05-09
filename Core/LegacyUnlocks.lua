@@ -41,8 +41,8 @@ local TRACK_DEFS = {
         name = "Fate",
         blurb = "Rare extra-life milestones. Powerful, expensive, and sparse.",
         nodes = {
-            { rank = 1, nodeId = 301, cost = g(100),  bundleId = "fate_1", name = "Second Thread", milestone = 3 },
-            { rank = 2, nodeId = 302, cost = g(1200), bundleId = "fate_2", name = "Last Thread", milestone = 6 },
+            { rank = 1, nodeId = 301, cost = g(25),  bundleId = "fate_1", name = "Second Thread", milestone = 3 },
+            { rank = 2, nodeId = 302, cost = g(750), bundleId = "fate_2", name = "Last Thread", milestone = 6 },
         },
     },
 }
