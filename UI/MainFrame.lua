@@ -172,8 +172,18 @@ function M:RefreshHeader()
     local bank = WRL_DB.bankCharacter
     if bank then
         local isBank = ns.Database:IsBankCharacter()
-        local tag = isBank and "|cff7ab27a(this character)|r" or ""
-        self.statsBank:SetText(("Bank: %s %s"):format(bank, tag))
+        local status, label = isBank and "self" or "unknown", nil
+        if ns.BankStatus then
+            status, label = ns.BankStatus:Status(bank)
+        end
+        local color = "|cff9a948a"
+        if status == "online" or status == "self" then
+            color = "|cff7ab27a"
+        elseif status == "offline" then
+            color = "|cffb85c5c"
+        end
+        local tag = isBank and "this character" or (label or "Unknown")
+        self.statsBank:SetText(("Bank: %s  %s[%s]|r"):format(bank, color, tag))
     else
         self.statsBank:SetText("|cffb85c5cNo bank set|r - /wrl setbank Name-Realm")
     end

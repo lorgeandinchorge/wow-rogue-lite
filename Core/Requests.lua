@@ -26,6 +26,37 @@ local function newId()
     return tostring(time()) .. "-" .. tostring(math.random(1000, 9999))
 end
 
+local function sortedRewardIds(tierIds)
+    local ids = {}
+    for _, id in ipairs(tierIds or {}) do
+        local n = tonumber(id)
+        if n then ids[#ids + 1] = n end
+    end
+    table.sort(ids)
+    return ids
+end
+
+function R:MailFallbackSubject(tierIds)
+    return MAIL_SUBJECT_PREFIX .. " " .. table.concat(sortedRewardIds(tierIds), ",")
+end
+
+function R:MailFallbackBody(bankKey, tierIds, note)
+    local fromKey = ns.UnitKey and ns:UnitKey() or "Unknown"
+    local lines = {
+        "WoW Roguelite legacy reward request.",
+        ("Requester: %s"):format(fromKey),
+        ("Bank: %s"):format(bankKey or "Unknown"),
+        ("Rewards: %s"):format(table.concat(sortedRewardIds(tierIds), ", ")),
+    }
+    if note and note ~= "" then
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = note
+    end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Bank character: open /wrl or the mailbox to import this request."
+    return table.concat(lines, "\n")
+end
+
 function R:Init()
     ns:On("MAIL_INBOX_UPDATE", function() self:ScanInbox() end)
     ns:On("MAIL_SHOW",         function() self:ScanInbox() end)
@@ -44,9 +75,40 @@ function R:EnqueueOutgoing(bankKey, tierIds, note)
     WRL_CharDB.outgoing = WRL_CharDB.outgoing or {}
     local id = newId()
     table.insert(WRL_CharDB.outgoing, {
-        id = id, when = time(), bank = bankKey, tierIds = tierIds, note = note, status = "sent",
+        id = id,
+        when = time(),
+        bank = bankKey,
+        tierIds = tierIds,
+        note = note,
+        status = "sent",
+        mailSubject = self:MailFallbackSubject(tierIds),
     })
     return id
+end
+
+function R:BeginMailFallback(bankKey, tierIds, note)
+    if not bankKey or bankKey == "" then
+        ns:Print("Set a bank first with |cffffff00/wrl setbank Name-Realm|r.")
+        return false, "missing_bank"
+    end
+    if not tierIds or #tierIds == 0 then
+        ns:Print("Choose at least one unclaimed legacy reward first.")
+        return false, "empty_request"
+    end
+    if not MailFrame or not MailFrame:IsShown() then
+        ns:Print("Open your mailbox first, then click Mail Fallback again.")
+        return false, "mail_closed"
+    end
+
+    if MailFrameTab2 and MailFrameTab2.Click then MailFrameTab2:Click() end
+
+    local recipient = bankKey:match("^([^-]+)") or bankKey
+    if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(self:MailFallbackSubject(tierIds)) end
+    if SendMailBodyEditBox then SendMailBodyEditBox:SetText(self:MailFallbackBody(bankKey, tierIds, note)) end
+
+    ns:Print("|cffc0a060Mail fallback prepared.|r Send this letter with no attachments so the bank can import your request.")
+    return true
 end
 
 -- ---- bank-side queue -----------------------------------------------------

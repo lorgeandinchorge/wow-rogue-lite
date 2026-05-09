@@ -259,6 +259,12 @@ local function countClaimable(displayTiers, charKey, allowRepeat)
     return n
 end
 
+local function bankStatusColor(status)
+    if status == "online" or status == "self" then return "|cff7ab27a" end
+    if status == "offline" then return "|cffb85c5c" end
+    return "|cff9a948a"
+end
+
 local function activeLegacyRows()
     local out = {}
     if not (ns.LegacyUnlocks and ns.LegacyUnlocks.ActiveNodes) then return out end
@@ -402,9 +408,13 @@ function Tab:Init(parent)
     self.sendBtn:SetPoint("RIGHT", -16, 0)
     self.sendBtn:SetScript("OnClick", function() Tab:SendRequest() end)
 
+    self.mailBtn = Theme:Button(footer, "Mail Fallback", 128, 24)
+    self.mailBtn:SetPoint("RIGHT", self.sendBtn, "LEFT", -8, 0)
+    self.mailBtn:SetScript("OnClick", function() Tab:BeginMailFallback() end)
+
     self.footerHint = Theme:Text(footer, 10, Theme.c.fg2)
     self.footerHint:SetPoint("LEFT", 16, 0)
-    self.footerHint:SetWidth(560)
+    self.footerHint:SetWidth(438)
     self.footerHint:SetJustifyH("LEFT")
 
     p.Refresh = function() Tab:Refresh() end
@@ -445,8 +455,18 @@ function Tab:Refresh()
         self.hint:SetText("No bank character is set yet. You can still review unlocked legacy rewards here, then assign a bank with |cffffff00/wrl setbank Name-Realm|r or run |cffffff00/wrl setbank|r on your bank toon.")
     end
 
+    local bankStatus, bankStatusLabel = "missing", "No bank set"
+    if bank and ns.BankStatus then
+        bankStatus, bankStatusLabel = ns.BankStatus:Status(bank)
+    elseif bank then
+        bankStatus, bankStatusLabel = "unknown", "Unknown"
+    end
+
     if bank then
-        self.bankLine:SetText(("Destination bank: |cffc0a060%s|r"):format(bank))
+        self.bankLine:SetText(("Destination bank: |cffc0a060%s|r  %s[%s]|r"):format(
+            bank,
+            bankStatusColor(bankStatus),
+            bankStatusLabel or "Unknown"))
     else
         self.bankLine:SetText("|cff9a948aDestination bank not configured.|r Off-account banks are supported with |cffe6e0d4/wrl setbank Name-Realm|r.")
     end
@@ -491,7 +511,12 @@ function Tab:Refresh()
     local cardHeight = math.max(self.statusCard:GetHeight(), self.progressCard:GetHeight(), self.selectionCard:GetHeight())
     self.summaryRow:SetHeight(cardHeight)
 
-    self.footerHint:SetText("Requests are sent to the configured bank. Mail fulfillment happens on the banker side in the Requests tab.")
+    local offerMailFallback = bank and ns.BankStatus and ns.BankStatus:ShouldOfferMailFallback(bank)
+    if offerMailFallback then
+        self.footerHint:SetText("Bank is not confirmed online. Send Request queues the addon whisper; Mail Fallback prepares a mailbox letter the bank can import later.")
+    else
+        self.footerHint:SetText("Requests are sent to the configured bank. Mail fulfillment happens on the banker side in the Requests tab.")
+    end
 
     local boonDefs = (ns.Boons and ns.Boons.BoonDefs and ns.Boons:BoonDefs()) or {}
     local burdenDefs = (ns.Boons and ns.Boons.BurdenDefs and ns.Boons:BurdenDefs()) or {}
@@ -605,10 +630,16 @@ function Tab:Refresh()
     local footerWouldCollide = (#displayTiers == 0)
     if footerWouldCollide then
         self.sendBtn:Hide()
+        self.mailBtn:Hide()
         self.footerHint:Hide()
     else
         self.sendBtn:Show()
         self.footerHint:Show()
+        if offerMailFallback then
+            self.mailBtn:Show()
+        else
+            self.mailBtn:Hide()
+        end
     end
 
     if isBank then
@@ -620,6 +651,14 @@ function Tab:Refresh()
     else
         self.sendBtn:Enable()
         self.sendBtn:SetAlpha(1)
+    end
+
+    if not footerWouldCollide and offerMailFallback and not isBank and bank and selectedCount > 0 and ns.Settings:Get("allowBankRewards", true) then
+        self.mailBtn:Enable()
+        self.mailBtn:SetAlpha(1)
+    else
+        self.mailBtn:Disable()
+        self.mailBtn:SetAlpha(0.45)
     end
 
     if not ns.Settings:Get("allowBankRewards", true) then
@@ -678,21 +717,7 @@ function Tab:Refresh()
     end
 end
 
-function Tab:SendRequest()
-    local bank = WRL_DB and WRL_DB.bankCharacter
-    if not bank then
-        ns:Print("Set a bank first with |cffffff00/wrl setbank Name-Realm|r.")
-        return
-    end
-    if ns.Database:IsBankCharacter() then
-        ns:Print("Open New Run on a run character, not the bank.")
-        return
-    end
-    if not ns.Settings:Get("allowBankRewards", true) then
-        ns:Print("Bank starter rewards are disabled by the active rules profile.")
-        return
-    end
-
+function Tab:SelectedRewardIds()
     local charKey = ns:UnitKey()
     local tierIds = {}
     for tierId, picked in pairs(self.selected or {}) do
@@ -709,16 +734,62 @@ function Tab:SendRequest()
         end
     end
     table.sort(tierIds)
+    return tierIds
+end
 
+function Tab:SendRequest()
+    local bank = WRL_DB and WRL_DB.bankCharacter
+    if not bank then
+        ns:Print("Set a bank first with |cffffff00/wrl setbank Name-Realm|r.")
+        return
+    end
+    if ns.Database:IsBankCharacter() then
+        ns:Print("Open New Run on a run character, not the bank.")
+        return
+    end
+    if not ns.Settings:Get("allowBankRewards", true) then
+        ns:Print("Bank starter rewards are disabled by the active rules profile.")
+        return
+    end
+
+    local tierIds = self:SelectedRewardIds()
     if #tierIds == 0 then
         ns:Print("Choose at least one unclaimed legacy reward first.")
         return
     end
 
     ns.Comm:SendRequest(bank, tierIds, "")
-    wipe(self.selected)
+    if ns.BankStatus and ns.BankStatus:ShouldOfferMailFallback(bank) then
+        ns:Print("If the bank is offline, open a mailbox and use Mail Fallback to leave a request letter.")
+    else
+        wipe(self.selected)
+    end
     self:Refresh()
     if ns.MainFrame and ns.MainFrame.RefreshHeader then
         ns.MainFrame:RefreshHeader()
     end
+end
+
+function Tab:BeginMailFallback()
+    local bank = WRL_DB and WRL_DB.bankCharacter
+    if not bank then
+        ns:Print("Set a bank first with |cffffff00/wrl setbank Name-Realm|r.")
+        return
+    end
+    if ns.Database:IsBankCharacter() then
+        ns:Print("Open New Run on a run character, not the bank.")
+        return
+    end
+    if not ns.Settings:Get("allowBankRewards", true) then
+        ns:Print("Bank starter rewards are disabled by the active rules profile.")
+        return
+    end
+
+    local tierIds = self:SelectedRewardIds()
+    if #tierIds == 0 then
+        ns:Print("Choose at least one unclaimed legacy reward first.")
+        return
+    end
+
+    ns.Requests:BeginMailFallback(bank, tierIds, "")
 end
