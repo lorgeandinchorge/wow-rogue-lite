@@ -10,26 +10,16 @@ A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one 
 2. Enable it at the character select screen.
 3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.1.1 loaded.` in chat.
 
-## Build release zip
-
-From the addon project folder, run:
-
-```powershell
-.\Build-CurseForgeRelease.ps1
-```
-
-This creates `dist\WoWRoguelite-v0.1.1.zip`, with the addon files staged under a top-level `WoWRoguelite` folder for CurseForge or manual installation.
-
 ## Publish releases
 
-This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build a zip and attach it to a GitHub release:
+This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build and publish the CurseForge package:
 
 ```powershell
 git tag v0.1.1
 git push origin v0.1.1
 ```
 
-To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable. Until `CF_PROJECT_ID` is set, the CurseForge upload job is skipped.
+To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable.
 
 ## First-time setup
 

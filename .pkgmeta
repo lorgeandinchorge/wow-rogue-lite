@@ -16,6 +16,4 @@ ignore:
   - DESIGN_*.md
   - RELEASE.md
   - SMOKE_TEST.md
-  - Build-CurseForgeRelease.ps1
-  - release-extra-files.txt
   - "*.tmp.*"
