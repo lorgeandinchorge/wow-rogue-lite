@@ -20,6 +20,17 @@ From the addon project folder, run:
 
 This creates `dist\WoWRoguelite-v0.1.0.zip`, with the addon files staged under a top-level `WoWRoguelite` folder for CurseForge or manual installation.
 
+## Publish releases
+
+This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build a zip and attach it to a GitHub release:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable. Until `CF_PROJECT_ID` is set, the CurseForge upload job is skipped.
+
 ## First-time setup
 
 On your designated bank character:

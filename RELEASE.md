@@ -26,6 +26,41 @@ The script will:
 3. Add any optional extra release files listed in `release-extra-files.txt`.
 4. Build a clean zip in `dist\`.
 
+## GitHub Release Workflow
+
+The repository also has a tag-based GitHub Actions workflow at:
+
+```text
+.github/workflows/release.yml
+```
+
+It does two things:
+
+1. Builds the same clean zip with `Build-CurseForgeRelease.ps1`.
+2. Attaches that zip to a GitHub release when you push a version tag such as `v0.1.0`.
+
+To publish a new release:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Use the version from `WoWRoguelite.toc` for the tag name.
+
+## CurseForge Upload Setup
+
+The workflow can also upload tagged releases to CurseForge through the BigWigs packager.
+
+Before that will run, add these in the GitHub repository settings:
+
+- Repository secret: `CF_API_KEY`
+- Repository variable: `CF_PROJECT_ID`
+
+Find `CF_PROJECT_ID` in the CurseForge project page's **About Project** box after the project exists. Create `CF_API_KEY` from your CurseForge author API tokens page.
+
+The CurseForge upload job is skipped until `CF_PROJECT_ID` is set, so the workflow is safe to add before the project has been approved.
+
 ## Why This Is Safe
 
 The package is built from a whitelist, not a blacklist.
@@ -54,6 +89,7 @@ Right now that extra file list is:
 
 ```text
 WRL icon.png
+WRL_MinimapIcon.png
 ```
 
 ## Output
@@ -79,4 +115,5 @@ For this project, this is the best long-term approach:
 1. Keep development docs in the repo if you want them.
 2. Never upload the repo folder directly.
 3. Always upload the zip produced by `Build-CurseForgeRelease.ps1`.
-4. Let the `.toc` stay the source of truth for shipped addon code.
+4. Push version tags to let GitHub build releases.
+5. Let the `.toc` stay the source of truth for shipped addon code.

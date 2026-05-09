@@ -1,0 +1,21 @@
+package-as: WoWRoguelite
+
+manual-changelog: CHANGELOG.md
+
+ignore:
+  - .cursor
+  - .github
+  - .git
+  - .gitignore
+  - .release
+  - dist
+  - docs
+  - Tests
+  - AI_MANAGER_PROMPTS.md
+  - CURSEFORGE_DESCRIPTION.md
+  - DESIGN_*.md
+  - RELEASE.md
+  - SMOKE_TEST.md
+  - Build-CurseForgeRelease.ps1
+  - release-extra-files.txt
+  - "*.tmp.*"
