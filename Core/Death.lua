@@ -1,0 +1,266 @@
+-- Core/Death.lua
+-- Hardcore death handling.
+--
+-- State transitions managed here (via ns.Run:SetState):
+--   final death  → dead_pending_contribution
+--   mail sent    → retired  (contribution credited)
+--   "Not Now"    → retired  (contribution skipped)
+--
+-- Soft deaths (livesRemaining > 0) do not change run state and do not create
+-- memorials.  A local notice is printed only when announceSoftDeaths = true.
+--
+-- On final death a memorial entry is written to WRL_DB.memorials (keyed by
+-- character uid) exactly once, then an announcement is sent to the channel
+-- chosen by the announceDeaths setting (off / local / party / guild).
+--
+-- We deliberately do NOT attempt to "lock" the character out of play — we just
+-- stop crediting any further contributions from a retired char.
+
+local ADDON_NAME, ns = ...
+local D = ns:NewModule("Death")
+
+-- ── Helpers ──────────────────────────────────────────────────────────────────
+
+-- Return a six-character hex colour for a WoW class name (e.g. "WARRIOR").
+-- Falls back to a warm gold if RAID_CLASS_COLORS is unavailable.
+local function classHex(class)
+    local cc = RAID_CLASS_COLORS and class and RAID_CLASS_COLORS[class]
+    if cc then
+        return string.format("%02x%02x%02x",
+            math.floor((cc.r or 1) * 255),
+            math.floor((cc.g or 1) * 255),
+            math.floor((cc.b or 1) * 255))
+    end
+    return "ffd100"
+end
+
+-- Capitalise the first letter of an all-caps string ("WARRIOR" → "Warrior").
+local function titleCase(s)
+    if not s or s == "" then return s end
+    return s:sub(1, 1):upper() .. s:sub(2):lower()
+end
+
+-- ── Announcement ─────────────────────────────────────────────────────────────
+
+-- Send a tasteful death announcement for `memorial` to the channel configured
+-- in the announceDeaths setting.  Falls back to local when the target channel
+-- is unavailable (not in a party / not in a guild).
+function D:AnnounceMemorial(memorial)
+    local dest = ns.Settings and ns.Settings:Get("announceDeaths", "local") or "local"
+    if dest == "off" then return end
+
+    local name  = (memorial.characterKey or ""):match("^([^%-]+)") or memorial.characterKey
+    local hex   = classHex(memorial.class)
+    local class = titleCase(memorial.class or "Unknown")
+    local race  = memorial.race or "Unknown"
+    local level = memorial.level or 0
+    local zone  = (memorial.zone ~= "" and memorial.zone) or "Unknown Zone"
+
+    -- Terse, flavourful one-liner.
+    local msg = string.format(
+        "[Roguelite] |cff%s%s|r the %s %s (lvl %d) has fallen in %s. Their run is over.",
+        hex, name, race, class, level, zone)
+
+    if dest == "local" then
+        ns:Print(msg)
+    elseif dest == "party" then
+        local inParty = GetNumPartyMembers and GetNumPartyMembers() or 0
+        if inParty > 0 then
+            SendChatMessage(msg, "PARTY")
+        else
+            ns:Print(msg)
+        end
+    elseif dest == "guild" then
+        if IsInGuild and IsInGuild() then
+            SendChatMessage(msg, "GUILD")
+        else
+            ns:Print(msg)
+        end
+    end
+end
+
+local RETIRE_SUBJECT = "Roguelite: final contribution"
+
+function D:Init()
+    ns:On("PLAYER_DEAD",       function() self:OnPlayerDead() end)
+    ns:On("PLAYER_UNGHOST",    function() self:OnRevive() end)
+    ns:On("PLAYER_ALIVE",      function() self:OnRevive() end)
+    ns:On("MAIL_SHOW",         function() self:OnMailShow() end)
+    ns:On("MAIL_SEND_SUCCESS", function() self:OnMailSent() end)
+
+    -- StaticPopup definitions (singletons so we register once).
+    StaticPopupDialogs["WRL_RETIRE_CONFIRM"] = {
+        text = "Your run has ended.\n\n|cffc0a060%s|r carried roughly %s in gold + vendorable goods.\n\n" ..
+               "Mail it to your bank (|cffffd700%s|r) to contribute?",
+        button1  = "Yes, Pre-Fill Mail",
+        button2  = "Not Now",
+        OnAccept = function() ns.Death:OpenMailToBank() end,
+        -- "Not Now" skips the contribution and finalises the retirement.
+        OnCancel = function()
+            local key = ns:UnitKey()
+            if key then ns.Run:SetState(key, "retired", "skipped_contribution") end
+        end,
+        timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
+    }
+    StaticPopupDialogs["WRL_DEATH_SOFT"] = {
+        text    = "You died.\n\n|cffc0a060%d|r %s remaining.\n(Contributions only recorded on final death.)",
+        button1 = "OK",
+        timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
+    }
+end
+
+function D:OnPlayerDead()
+    -- Bank characters have no roguelite death logic.
+    if ns.Database:IsBankCharacter() then return end
+
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
+
+    -- Guard against duplicate PLAYER_DEAD or re-firing on already-ended runs.
+    local state = ns.Run:GetState(rec)
+    if state == "retired" or state == "archived" or state == "dead_pending_contribution" then return end
+
+    rec.livesRemaining = (rec.livesRemaining or 1) - 1
+    if rec.livesRemaining > 0 then
+        if ns.Achievements and ns.Achievements.OnExtraLifeUsed then
+            ns.Achievements:OnExtraLifeUsed(ns:UnitKey(), rec)
+        end
+        -- Soft death: extra lives remain.  Announce locally only when the
+        -- announceSoftDeaths setting is explicitly enabled (default: off).
+        if ns.Settings and ns.Settings:Get("announceSoftDeaths", false) then
+            local charName = rec.key:match("^([^%-]+)") or rec.key
+            ns:Print("|cffffff00[Roguelite]|r %s died but has %d %s remaining.",
+                charName, rec.livesRemaining,
+                rec.livesRemaining == 1 and "life" or "lives")
+        end
+        StaticPopup_Show("WRL_DEATH_SOFT", rec.livesRemaining, rec.livesRemaining == 1 and "life" or "lives")
+        return
+    end
+
+    -- Final death: snapshot liquid value, transition to pending state, then prompt.
+    -- Contributions:SnapshotDeath captures preMoney + bag vendor value + total
+    -- onto rec.deathSnapshot so the later mail-credit step can diff against it.
+    -- It also mirrors rec._pendingContribution for any legacy callers.
+    local key  = ns:UnitKey()
+    local snap = ns.Contributions:SnapshotDeath(key)
+    local totalLiquid = snap and snap.totalLiquid or 0
+
+    -- Transition to dead_pending_contribution BEFORE recording the death log
+    -- so the state is consistent if anything inspects it during the log write.
+    ns.Run:SetState(key, "dead_pending_contribution", "final_death")
+    ns.Database:RecordDeathEntry(key, UnitLevel("player"), GetRealZoneText())
+    if ns.Achievements and ns.Achievements.OnFinalDeath then
+        ns.Achievements:OnFinalDeath(key, rec)
+    end
+
+    -- ── Memorial (Step 11) ─────────────────────────────────────────────────
+    -- Guard with HasMemorial so repeated PLAYER_DEAD firings never create a
+    -- second entry.  The top-of-function state guard already blocks re-entry
+    -- for dead_pending_contribution / retired; this is belt-and-suspenders.
+    if not ns.Database:HasMemorial(key) then
+        local memorial = {
+            uid                  = rec.uid,    -- storage key; see Database:SaveMemorial
+            characterKey         = key,
+            class                = rec.class,
+            race                 = rec.race,
+            level                = UnitLevel("player") or rec.levelCurrent,
+            zone                 = (GetRealZoneText  and GetRealZoneText())  or "",
+            subzone              = (GetSubZoneText   and GetSubZoneText())   or "",
+            timestamp            = time(),
+            runState             = "dead_pending_contribution",
+            activeProfile        = ns.Settings and ns.Settings:GetProfile() or "unknown",
+            taintCount           = ns.Rules   and ns.Rules:TaintCount(key)  or 0,
+            contributionEstimate = totalLiquid,
+            -- claimedRewards: flat list of tier IDs claimed by this character.
+            claimedRewards       = ns.Database:ClaimedTierIds(key),
+            -- livesUsed: deathLog now includes the current death entry (added
+            -- by RecordDeathEntry above), so #deathLog equals total lives used.
+            livesUsed            = #(rec.deathLog or {}),
+        }
+        ns.Database:SaveMemorial(memorial)
+        self:AnnounceMemorial(memorial)
+    end
+
+    local bank = WRL_DB.bankCharacter or "(no bank set)"
+    StaticPopup_Show("WRL_RETIRE_CONFIRM", rec.key, ns.Tiers:FormatMoney(totalLiquid), bank)
+end
+
+function D:OnRevive()
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
+    local state = ns.Run:GetState(rec)
+    if state == "retired" then
+        ns:Print("|cffff6060This character is retired.|r Further play will not be credited to the bank.")
+    elseif state == "dead_pending_contribution" then
+        local bank = WRL_DB.bankCharacter or "no bank set"
+        ns:Print("|cffffff00Your run has ended.|r Walk to a mailbox to send your contribution to |cffffd700%s|r, or use /wrl.", bank)
+    end
+end
+
+-- Auto-open the mail window UI to the bank and pre-fill the send tab.
+-- We can't force a mailbox open from Lua — player must walk to one. We just
+-- set a flag and prefill when MAIL_SHOW fires.
+function D:OpenMailToBank()
+    if not WRL_DB.bankCharacter then
+        ns:Print("No bank character set. Use /wrl setbank Name-Realm first.")
+        return
+    end
+    ns:Print("Walk to a mailbox; the send form will pre-fill for %s.", WRL_DB.bankCharacter)
+    self._awaitingMailbox = true
+end
+
+function D:OnMailShow()
+    if not self._awaitingMailbox then return end
+    self._awaitingMailbox = false
+
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
+    if MailFrameTab2 and MailFrameTab2.Click then MailFrameTab2:Click() end
+
+    local bank  = WRL_DB.bankCharacter
+    local short = bank and (bank:match("^([^-]+)") or bank)
+    if SendMailNameEditBox and short then SendMailNameEditBox:SetText(short) end
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(RETIRE_SUBJECT) end
+    if SendMailBodyEditBox then
+        SendMailBodyEditBox:SetText(string.format(
+            "Final run: %s (lvl %d).\nAttach bag contents + fill money. Press Send.",
+            rec.key, rec.levelCurrent or 0))
+    end
+    -- Pre-fill money = carried copper; player can edit.
+    if MoneyInputFrame_SetCopper and SendMailMoney then
+        MoneyInputFrame_SetCopper(SendMailMoney, GetMoney() or 0)
+    end
+end
+
+-- Triggered when a mail is successfully sent.  If the current character is
+-- in dead_pending_contribution state, credit the death snapshot exactly once
+-- and advance the run to "retired".
+--
+-- Crediting is delegated to Contributions:CreditFinalDeath, which:
+--   * diffs GetMoney() against the death snapshot to derive the money sent,
+--   * caps the amount at the snapshot's totalLiquid (no over-credit),
+--   * marks the snapshot consumed so repeated MAIL_SEND_SUCCESS events do
+--     NOT re-credit the same run,
+--   * tags the receipt as "estimated" since items in mail are unverifiable.
+function D:OnMailSent()
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return end
+
+    local key     = ns:UnitKey()
+    local snap    = ns.Contributions:GetDeathSnapshot(key)
+    local receipt = ns.Contributions:CreditFinalDeath(key)
+
+    if not snap then
+        -- No snapshot at all — retire without credit so state doesn't stall.
+        ns.Run:SetState(key, "retired", "mail_sent_no_snapshot")
+        return
+    end
+
+    ns.Run:SetState(key, "retired", "contribution_credited")
+
+    if receipt then
+        ns:Print("|cffc0a060+%s|r contributed to the bank (est.). Total lifetime: %s",
+            ns.Tiers:FormatMoney(receipt.amount),
+            ns.Tiers:FormatMoney(ns.Database:TotalContributed()))
+    else
+        -- Snapshot existed but no net change was detected (or already credited).
+        ns:Print("|cffc0a060Run retired.|r No new contribution detected since death snapshot.")
+    end
+end

@@ -1,0 +1,206 @@
+# WoW Roguelite Tester Guide
+
+This version of the smoke test is meant to be shared with external testers.
+
+Please focus on whether the addon feels stable, understandable, and usable in normal play. You do not need to test every edge case.
+
+## What This Addon Does
+
+WoW Roguelite turns your account into a run-based progression system:
+
+- Pick one character as your bank.
+- Every other character is a run character.
+- When a run dies for good, that character retires.
+- Retired runs contribute value to the bank.
+- Lifetime contributions unlock starter kits for future runs.
+- New runs can request unlocked rewards from the bank.
+
+## Before You Start
+
+1. Install the addon in `World of Warcraft\_classic_\Interface\AddOns\WoWRoguelite`.
+2. Enable Lua errors if you know how. If not, that is fine.
+3. Use at least two characters if possible:
+   - one bank character
+   - one run character
+4. If you can, test on a fresh SavedVariables setup first.
+
+## Commands You May Need
+
+```text
+/wrl
+/wrl help
+/wrl setbank
+/wrl bank
+/wrl settings
+/wrl profile list
+/wrl rules
+/wrl export
+/reload
+```
+
+## What I Need Feedback On Most
+
+Please prioritize these:
+
+1. Does the addon load cleanly with no errors?
+2. Is the UI understandable?
+3. Can you set a bank character without confusion?
+4. Can a run character request rewards successfully?
+5. Can the bank character view and fulfill requests?
+6. Does death and retirement behave correctly?
+7. Does anything feel misleading, clunky, or unclear?
+
+## Fast Test Pass
+
+If you only have 10 to 15 minutes, please do this section.
+
+### 1. Load And Open
+
+- [ ] Log in with the addon enabled.
+  Expected: no visible errors, and chat shows the addon loaded.
+
+- [ ] Run `/wrl`.
+  Expected: the main window opens.
+
+- [ ] Run `/wrl help`.
+  Expected: slash commands print without errors.
+
+- [ ] Click through every tab once.
+  Expected: each tab opens and displays content without breaking.
+
+### 2. Bank Setup
+
+- [ ] On your bank character, run `/wrl setbank`.
+  Expected: the addon confirms that character as the bank.
+
+- [ ] Run `/wrl bank`.
+  Expected: the correct bank character is shown.
+
+- [ ] Open the addon on a different character.
+  Expected: the same bank is visible account-wide.
+
+### 3. New Run Flow
+
+- [ ] Open the addon on a non-bank character.
+  Expected: the run character can view Current Run, Rules, Tiers, and New Run cleanly.
+
+- [ ] Open the New Run tab.
+  Expected: it clearly explains where rewards will be sent from.
+
+- [ ] Select any available boon or burden.
+  Expected: the UI updates and does not error.
+
+- [ ] If rewards are unlocked, try sending a request.
+  Expected: the request sends cleanly and the addon gives clear feedback.
+
+### 4. Bank Request Flow
+
+- [ ] On the bank character, open the Requests tab.
+  Expected: incoming requests appear clearly.
+
+- [ ] Check whether the shopping list is understandable.
+  Expected: needed items, gold, and actions are easy to follow.
+
+- [ ] Try mail fulfillment or trade fulfillment if possible.
+  Expected: the addon assists correctly, but still leaves final protected actions to the player.
+
+### 5. Death / Retirement
+
+- [ ] Die on a run character if practical.
+  Expected: the addon handles the death state cleanly.
+
+- [ ] If it is a final death, follow the retirement/contribution flow.
+  Expected: the character becomes retired and the contribution flow is understandable.
+
+## Full Test Pass
+
+If you want to go deeper, these are the main areas to cover.
+
+### A. Stability
+
+- [ ] No Lua errors during login, reload, tab switching, request flow, or death flow.
+- [ ] `/reload` does not wipe or scramble data.
+- [ ] Saved state persists after relog or reload.
+
+### B. UI Clarity
+
+- [ ] Text is readable.
+- [ ] Buttons make sense.
+- [ ] Tooltips help when needed.
+- [ ] Nothing important is clipped or overlapping.
+
+### C. Profiles And Rules
+
+- [ ] Switching profiles works.
+- [ ] Rules tab reflects the selected profile.
+- [ ] Individual rule toggles behave sensibly.
+- [ ] Rule warnings are understandable when triggered.
+
+### D. Rewards And Progression
+
+- [ ] Tier progress looks correct.
+- [ ] Reward previews make sense.
+- [ ] Claimed or locked tiers are shown clearly.
+- [ ] Repeat-claim behavior matches the UI.
+
+### E. Requests
+
+- [ ] Requests do not duplicate unexpectedly.
+- [ ] Invalid/self-requests are blocked cleanly.
+- [ ] Fulfilled requests do not double-credit rewards or lives.
+- [ ] Bank-side bag/item guidance is useful.
+
+### F. Contributions And Export
+
+- [ ] Contributions increase totals correctly.
+- [ ] Receipts and history feel believable.
+- [ ] `/wrl export` works and produces readable output.
+
+## Please Report These Immediately
+
+- Addon does not load
+- Window or tabs do not open
+- Requests disappear or duplicate incorrectly
+- Fulfillment gives the wrong rewards
+- Extra lives are added more than once
+- A bank character gets treated like a normal run
+- Data is lost after `/reload` or relog
+- Any Lua error
+
+## Best Way To Send Feedback
+
+Please include:
+
+- what you were doing
+- which character you were on
+- what you expected
+- what actually happened
+- whether `/reload` fixed it
+- screenshot or Lua error text if available
+
+Use this template:
+
+```text
+Character:
+Bank or run:
+What I did:
+What I expected:
+What happened instead:
+Can I reproduce it:
+Lua error text:
+Screenshot:
+```
+
+## Nice-To-Have Feedback
+
+I also want soft feedback like:
+
+- confusing wording
+- unclear buttons
+- features you expected but could not find
+- parts of the flow that felt tedious
+- anything that made the addon harder to trust
+
+## Current Known Limitation
+
+Blizzard does not allow addons to press protected buttons like Send Mail or Accept Trade. WoW Roguelite can prefill and assist, but the player must confirm the final action manually.

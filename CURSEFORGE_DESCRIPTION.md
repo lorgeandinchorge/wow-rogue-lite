@@ -1,0 +1,91 @@
+# WoW Roguelite
+
+WoW Roguelite is a run-based progression addon for WoW Classic.
+
+You choose one character to act as your bank. Every other character becomes a run. When a run ends, its contribution helps fund the next generation. Over time, your account builds a legacy bank that unlocks stronger starter kits for future characters.
+
+It is part hardcore challenge, part account progression, and part self-made metagame.
+
+## Core Idea
+
+- One character is your bank.
+- Other characters are runs.
+- Final death retires a run.
+- Retired runs contribute value back into the account.
+- Lifetime contributions unlock higher reward tiers.
+- New runs can request unlocked starter kits from the bank.
+
+## What The Addon Tracks
+
+- current run state
+- bank character assignment
+- account-wide contribution totals
+- unlocked reward tiers
+- request and fulfillment flow between run and bank
+- roguelite rule profiles
+- optional boons and burdens for a run
+- retirements, rule logs, and exports
+
+## Main Features
+
+### Bank And Run Structure
+
+Set one character as your bank with `/wrl setbank`. The bank is treated as infrastructure, not as a run, so it can handle storage, mail, trading, and reward fulfillment.
+
+### Account-Wide Progression
+
+When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. That total unlocks higher tiers for future runs.
+
+### Starter Reward Requests
+
+On a new run, open the New Run tab and request any unlocked reward tiers. On the bank character, open the Requests tab to see what is needed and fulfill it by mail or trade.
+
+### Profiles, Rules, Boons, And Burdens
+
+Choose from built-in profiles like Casual Roguelite, Banked Hardcore, Solo Self Found, and Ironman. You can also customize individual rule toggles and add run modifiers through boons and burdens.
+
+### Export And Audit Tools
+
+Use `/wrl export` to generate a compact summary of a run or your account state for sharing, logging, or troubleshooting.
+
+## Reward Philosophy
+
+The addon is designed to make each run feel connected to the last one.
+
+You are not just deleting characters and starting over. You are building a lineage:
+
+- better bags
+- potion support
+- gold stipends
+- late-tier recovery tools like extra lives
+
+Each death still matters, but it also helps push the account forward.
+
+## Important Limitation
+
+Because of Blizzard API restrictions, the addon cannot click protected buttons for you. It can prepare mail and trade actions, show the shopping list, and assist with fulfillment, but the player must still confirm the final send or trade manually.
+
+## Slash Commands
+
+```text
+/wrl
+/wrl help
+/wrl setbank
+/wrl bank
+/wrl settings
+/wrl profile
+/wrl rules
+/wrl export
+```
+
+## Good Fit If You Want
+
+- a self-imposed hardcore progression mode
+- account-wide persistence between runs
+- a bank-driven legacy system
+- more structure for reroll-heavy play
+- a personal roguelite layer on top of WoW Classic
+
+## Early Version Note
+
+This project is still in an early version, so feedback on bugs, rough edges, and confusing UI is especially helpful.

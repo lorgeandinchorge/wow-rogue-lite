@@ -1,0 +1,2 @@
+WRL icon.png
+WRL_MinimapIcon.png

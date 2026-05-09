@@ -1,0 +1,38 @@
+## Interface: 20504
+## Title: WoW Roguelite
+## Notes: A rogue-lite run/bank system. Contribute on death, unlock perks for future runs.
+## Author: Paul
+## Version: 0.1.0
+## SavedVariables: WRL_DB
+## SavedVariablesPerCharacter: WRL_CharDB
+## OptionalDeps:
+
+# --- Bootstrap ---
+WoWRoguelite.lua
+
+# --- Core ---
+Core/Database.lua
+Core/Settings.lua
+Core/Run.lua
+Core/Rules.lua
+Core/Boons.lua
+Core/Tiers.lua
+Core/Rewards.lua
+Core/Vendor.lua
+Core/Contributions.lua
+Core/Achievements.lua
+Core/Comm.lua
+Core/Requests.lua
+Core/Death.lua
+
+# --- UI ---
+UI/Theme.lua
+UI/MainFrame.lua
+UI/Tab_Run.lua
+UI/Tab_Contributions.lua
+UI/TierDisplay.lua
+UI/Tab_Tiers.lua
+UI/Tab_Requests.lua
+UI/Tab_NewRun.lua
+UI/Tab_Rules.lua
+Core/Export.lua
