@@ -1,5 +1,10 @@
 # WoW Roguelite Changelog
 
+## v0.1.1
+
+- Release packaging refresh for automated CurseForge publishing.
+- No gameplay changes from v0.1.0.
+
 ## v0.1.0
 
 - Initial CurseForge-ready release.
