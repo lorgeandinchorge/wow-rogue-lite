@@ -105,13 +105,13 @@ WoWRoguelite/
 ## Known limits of this first draft
 
 - **Send button not automated.** Blizzard doesn't let addons press Send on mail or Trade — those are protected. The addon pre-fills everything and shows you the shopping list; you confirm.
-- **Contribution accounting is optimistic.** We snapshot vendor value at death and credit it when we see a `MAIL_SEND_SUCCESS`. If you send that mail without attaching everything, the addon over-credits. A follow-up will diff `GetMoney()` and the snapshot to tighten this.
+- **Contribution accounting is still estimated for items.** On final death the addon snapshots carried gold and bag vendor value, then on `MAIL_SEND_SUCCESS` credits only the gold and bag value that actually left the character since the snapshot. Blizzard does not expose the exact sent attachments back to addons, so item value is still recorded as an estimate.
 - **Cross-realm addon whispers** aren't guaranteed in BC; the mail-fallback path exists for this reason.
 - **Retirement is soft.** The addon marks a character retired but doesn't delete them or block play — it just stops crediting further contributions. If you want hard deletion, that's on you.
 
 ## Next steps / backlog
 
-- Credit contributions from vendor transactions instead of (or in addition to) mail events.
+- Add a manual reconciliation UI for rare cases where a final contribution mail needs adjustment.
 - Gather-helper tooltip on item icons in bags, showing "needed for request from X".
 - Per-character class tint on the contribution bars.
 - Sound/toast on incoming request.

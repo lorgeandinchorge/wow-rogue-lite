@@ -22,6 +22,7 @@
 --   preMoney          optional snapshot of GetMoney() at death
 --   postMoney         optional GetMoney() after mail send
 --   estimatedBagValue optional vendor value at death
+--   postEstimatedBagValue optional vendor value after mail send
 
 local ADDON_NAME, ns = ...
 local C = ns:NewModule("Contributions")
@@ -108,7 +109,8 @@ end
 -- mirrors the entry into rec.history for existing UI.
 --
 -- `info` is optional; recognised fields: confidence, note, preMoney,
--- postMoney, estimatedBagValue.  Unknown confidences fall back to "estimated".
+-- postMoney, estimatedBagValue, postEstimatedBagValue. Unknown confidences
+-- fall back to "estimated".
 function C:Record(characterKey, amount, source, info)
     local rec = ns.Database:GetCharacter(characterKey); if not rec then return nil end
     amount = math.max(0, math.floor(amount or 0))
@@ -130,6 +132,7 @@ function C:Record(characterKey, amount, source, info)
         preMoney          = info.preMoney,
         postMoney         = info.postMoney,
         estimatedBagValue = info.estimatedBagValue,
+        postEstimatedBagValue = info.postEstimatedBagValue,
     }
     table.insert(WRL_DB.contributionReceipts, receipt)
 
@@ -199,11 +202,11 @@ end
 --
 -- Amount derivation:
 --   moneySent  = max(0, snap.preMoney - GetMoney())       -- how much copper left the wallet
---   bagEst     = snap.estimatedBagValue                   -- unverifiable: we trust the snapshot
---   amount     = min(snap.totalLiquid, moneySent + bagEst) -- never exceed the death estimate
+--   bagSentEst = max(0, snap.estimatedBagValue - currentBagValue)
+--   amount     = min(snap.totalLiquid, moneySent + bagSentEst)
 --
--- We can't prove items were actually attached to the mail (no server read-
--- back), so confidence is "estimated" even when money math lines up.
+-- We still mark item value as estimated, but unchanged bag value is no longer
+-- credited just because it existed at death.
 function C:CreditFinalDeath(characterKey, opts)
     local rec = ns.Database:GetCharacter(characterKey); if not rec then return nil end
     opts = opts or {}
@@ -213,13 +216,23 @@ function C:CreditFinalDeath(characterKey, opts)
         return nil
     end
 
-    local postMoney  = GetMoney and GetMoney() or 0
+    local postMoney = GetMoney and GetMoney() or 0
     local moneyDelta = math.max(0, (snap.preMoney or 0) - postMoney)
-    local bagEst     = snap.estimatedBagValue or 0
-    local total      = snap.totalLiquid or (moneyDelta + bagEst)
+    local bagEst = snap.estimatedBagValue or 0
+    local postBagEst
+    if ns.Vendor and ns.Vendor.BagsSnapshot then
+        postBagEst = select(1, ns.Vendor:BagsSnapshot()) or 0
+    end
+    local bagDelta
+    if postBagEst ~= nil then
+        bagDelta = math.max(0, bagEst - postBagEst)
+    else
+        bagDelta = bagEst
+    end
+    local total = snap.totalLiquid or ((snap.preMoney or 0) + bagEst)
 
     -- Cap at the snapshot total so we never over-credit the recorded estimate.
-    local amount = math.min(total, moneyDelta + bagEst)
+    local amount = math.min(total, moneyDelta + bagDelta)
 
     -- If nothing plausibly moved, mark the snapshot consumed without a receipt
     -- so we don't repeatedly try to credit on future MAIL_SEND_SUCCESS events.
@@ -232,8 +245,8 @@ function C:CreditFinalDeath(characterKey, opts)
     end
 
     local note = opts.note or string.format(
-        "final death credit: moneyDelta=%d bagEst=%d cap=%d",
-        moneyDelta, bagEst, total
+        "final death credit: moneyDelta=%d bagDelta=%d preBagEst=%d postBagEst=%s cap=%d",
+        moneyDelta, bagDelta, bagEst, tostring(postBagEst), total
     )
     local receipt = self:Record(characterKey, amount, opts.source or "final_contribution", {
         confidence        = "estimated",
@@ -241,6 +254,7 @@ function C:CreditFinalDeath(characterKey, opts)
         preMoney          = snap.preMoney,
         postMoney         = postMoney,
         estimatedBagValue = snap.estimatedBagValue,
+        postEstimatedBagValue = postBagEst,
     })
 
     -- Mark the snapshot consumed; second calls short-circuit at the top.
