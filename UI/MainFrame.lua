@@ -49,7 +49,7 @@ function M:Init()
     local header = CreateFrame("Frame", nil, f)
     header:SetPoint("TOPLEFT", 0, 0); header:SetPoint("TOPRIGHT", 0, 0)
     header:SetHeight(64)
-    Theme:Fill(header, Theme.c.bg1, false)
+    Theme:Fill(header, Theme.c.headerBg or Theme.c.bg1, false)
 
     local title = Theme:Header(header, "ROGUELITE", 22)
     title:SetPoint("TOPLEFT", 18, -14)
@@ -108,7 +108,8 @@ function M:Init()
     tabBar:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, 0)
     tabBar:SetHeight(32)
     tabBar:SetFrameLevel(f:GetFrameLevel() + 10)
-    Theme:Fill(tabBar, Theme.c.bg1, false)
+    Theme:Fill(tabBar, Theme.c.navBg or Theme.c.bg1, false)
+    self.tabBar = tabBar
 
     self.tabs = {}
     local x = 12
@@ -219,10 +220,20 @@ function M:RefreshTheme()
     if not self.frame then return end
     local Theme = ns.Theme
     Theme:Fill(self.frame, Theme.c.bg0, true)
-    Theme:Fill(self.header, Theme.c.bg1, false)
+    Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false)
+    if self.tabBar then Theme:Fill(self.tabBar, Theme.c.navBg or Theme.c.bg1, false) end
     if self.body then Theme:Fill(self.body, Theme.c.bg0, false) end
     if self.settingsButton and self.settingsButton.bg then
         self.settingsButton.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+    end
+    if self.statsTotal then
+        self.statsTotal:SetTextColor(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 1)
+    end
+    if self.statsBank then
+        self.statsBank:SetTextColor(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 1)
+    end
+    for key, tab in pairs(self.tabs or {}) do
+        if tab.SetSelected then tab:SetSelected(key == self._activeTab) end
     end
     if ns.SettingsPopup and ns.SettingsPopup.Refresh then
         ns.SettingsPopup:Refresh()

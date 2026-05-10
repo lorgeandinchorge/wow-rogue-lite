@@ -61,10 +61,34 @@ local function encode(op, payload)
     return table.concat({ PROTO, op, payload or "" }, "|")
 end
 
+local function sendWhisper(target, msg)
+    if C2_ChatInfo and C2_ChatInfo.SendAddonMessage then
+        return C2_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", target)
+    elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
+        return C_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", target)
+    elseif SendAddonMessage then
+        SendAddonMessage(prefix, msg, "WHISPER", target)
+        return true
+    end
+    return false
+end
+
 local function decode(text)
     local proto, op, payload = text:match("^([^|]+)|([^|]+)|(.*)$")
     if proto ~= PROTO then return nil end
     return op, payload
+end
+
+function C:SendPresencePing(bankCharKey)
+    local fromKey = ns:UnitKey()
+    if not bankCharKey or not fromKey then return false end
+    return sendWhisper(bankCharKey, encode("PING", fromKey))
+end
+
+function C:SendPresencePong(toKey)
+    local fromKey = ns:UnitKey()
+    if not toKey or not fromKey then return false end
+    return sendWhisper(toKey, encode("PONG", fromKey))
 end
 
 -- Send a request from a non-bank character to the bank character.
@@ -100,15 +124,7 @@ function C:SendRequest(bankCharKey, tierIds, note)
     }, "|")
     local msg = encode("REQ", payload)
 
-    local ok = false
-    if C2_ChatInfo and C2_ChatInfo.SendAddonMessage then
-        ok = C2_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", bankCharKey)
-    elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        ok = C_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", bankCharKey)
-    elseif SendAddonMessage then
-        SendAddonMessage(prefix, msg, "WHISPER", bankCharKey)
-        ok = true
-    end
+    local ok = sendWhisper(bankCharKey, msg)
 
     ns:Print(ok and "Legacy reward request sent to %s." or "Legacy reward request queued (bank offline): %s", bankCharKey)
 end
@@ -116,13 +132,7 @@ end
 -- Acknowledge a request back to the requester.
 function C:SendAck(toKey, requestId, status)
     local msg = encode("ACK", requestId .. "|" .. status)
-    if C2_ChatInfo and C2_ChatInfo.SendAddonMessage then
-        C2_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", toKey)
-    elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        C_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", toKey)
-    elseif SendAddonMessage then
-        SendAddonMessage(prefix, msg, "WHISPER", toKey)
-    end
+    sendWhisper(toKey, msg)
 end
 
 local function itemsCompactForWire(fulfillment)
@@ -163,19 +173,23 @@ function C:SendAck2(toKey, fulfillment)
             "",
         }, "|"))
     end
-    if C2_ChatInfo and C2_ChatInfo.SendAddonMessage then
-        C2_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", toKey)
-    elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        C_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", toKey)
-    elseif SendAddonMessage then
-        SendAddonMessage(prefix, msg, "WHISPER", toKey)
-    end
+    sendWhisper(toKey, msg)
 end
 
 function C:Receive(text, sender, channel)
     local op, payload = decode(text)
     if not op then return end
-    if op == "REQ" then
+    if op == "PING" then
+        if ns.Database and ns.Database.IsBankCharacter and ns.Database:IsBankCharacter() then
+            self:SendPresencePong((payload and payload ~= "") and payload or sender)
+        end
+        return
+    elseif op == "PONG" then
+        if ns.BankStatus and ns.BankStatus.MarkSeen then
+            ns.BankStatus:MarkSeen((payload and payload ~= "") and payload or sender)
+        end
+        return
+    elseif op == "REQ" then
         -- Only the bank character processes incoming requests.
         if not ns.Database:IsBankCharacter() then return end
         local parts = splitPayloadByPipe(payload)

@@ -28,16 +28,20 @@ local PALETTES = {
         id = "classic",
         label = "Classic WoW",
         c = {
-            bg0   = {0.075, 0.050, 0.028, 0.98},
-            bg1   = {0.145, 0.093, 0.048, 1.00},
-            bg2   = {0.235, 0.162, 0.083, 1.00},
-            bg3   = {0.350, 0.240, 0.120, 1.00},
-            fg    = {0.965, 0.875, 0.665, 1.00},
-            fg2   = {0.710, 0.620, 0.465, 1.00},
-            gold  = {0.930, 0.710, 0.250, 1.00},
-            goldH = {1.000, 0.860, 0.410, 1.00},
-            red   = {0.760, 0.245, 0.180, 1.00},
-            green = {0.340, 0.650, 0.290, 1.00},
+            bg0       = {0.045, 0.047, 0.055, 0.98},
+            bg1       = {0.095, 0.098, 0.112, 1.00},
+            bg2       = {0.145, 0.150, 0.170, 1.00},
+            bg3       = {0.220, 0.225, 0.250, 1.00},
+            headerBg  = {0.105, 0.105, 0.120, 1.00},
+            navBg     = {0.072, 0.075, 0.086, 1.00},
+            rowBg     = {0.105, 0.108, 0.122, 1.00},
+            rowAccent = {0.780, 0.650, 0.360, 0.55},
+            fg        = {0.925, 0.895, 0.820, 1.00},
+            fg2       = {0.650, 0.620, 0.560, 1.00},
+            gold      = {0.780, 0.650, 0.360, 1.00},
+            goldH     = {0.930, 0.800, 0.480, 1.00},
+            red       = {0.760, 0.305, 0.300, 1.00},
+            green     = {0.410, 0.690, 0.460, 1.00},
         },
     },
     dark = {
@@ -61,16 +65,20 @@ local PALETTES = {
         label = "GW2 UI",
         requiresAddon = { kind = "gw2ui" },
         c = {
-            bg0   = {0.055, 0.055, 0.063, 0.97},
-            bg1   = {0.110, 0.110, 0.122, 1.00},
-            bg2   = {0.165, 0.165, 0.180, 1.00},
-            bg3   = {0.228, 0.228, 0.247, 1.00},
-            fg    = {0.902, 0.878, 0.831, 1.00},
-            fg2   = {0.604, 0.580, 0.541, 1.00},
-            gold  = {0.753, 0.627, 0.376, 1.00},
-            goldH = {0.878, 0.753, 0.502, 1.00},
-            red   = {0.722, 0.361, 0.361, 1.00},
-            green = {0.478, 0.698, 0.478, 1.00},
+            bg0       = {0.035, 0.034, 0.036, 0.98},
+            bg1       = {0.090, 0.082, 0.078, 1.00},
+            bg2       = {0.155, 0.135, 0.115, 1.00},
+            bg3       = {0.255, 0.205, 0.155, 1.00},
+            headerBg  = {0.270, 0.120, 0.105, 1.00},
+            navBg     = {0.055, 0.052, 0.055, 1.00},
+            rowBg     = {0.120, 0.090, 0.080, 1.00},
+            rowAccent = {0.850, 0.620, 0.230, 0.70},
+            fg        = {0.965, 0.900, 0.790, 1.00},
+            fg2       = {0.675, 0.610, 0.540, 1.00},
+            gold      = {0.850, 0.620, 0.230, 1.00},
+            goldH     = {1.000, 0.780, 0.350, 1.00},
+            red       = {0.780, 0.250, 0.200, 1.00},
+            green     = {0.460, 0.700, 0.460, 1.00},
         },
     },
 }
@@ -232,10 +240,21 @@ end
 function Theme:RefreshAvailability()
     local prior = self.activeThemeId
     local active = self:ApplyConfiguredTheme()
-    if prior ~= active and ns.MainFrame and ns.MainFrame.RefreshTheme then
-        ns.MainFrame:RefreshTheme()
+    if prior ~= active then
+        self:NotifyThemeChanged()
     end
     return active
+end
+
+function Theme:NotifyThemeChanged()
+    if ns.MainFrame and ns.MainFrame.RefreshTheme then
+        ns.MainFrame:RefreshTheme()
+    end
+    if ns.SettingsPopup and ns.SettingsPopup.RefreshTheme then
+        ns.SettingsPopup:RefreshTheme()
+    elseif ns.SettingsPopup and ns.SettingsPopup.Refresh then
+        ns.SettingsPopup:Refresh()
+    end
 end
 
 function Theme:SetTheme(themeId)
@@ -248,7 +267,11 @@ function Theme:SetTheme(themeId)
     if ns.Settings and ns.Settings.Set then
         ns.Settings:Set("uiTheme", themeId)
     end
+    local prior = self.activeThemeId
     self:ApplyConfiguredTheme()
+    if prior ~= self.activeThemeId then
+        self:NotifyThemeChanged()
+    end
     return true
 end
 

@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.1.0"
+ns.version     = "0.1.4"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -198,7 +198,7 @@ SlashCmdList["WRL"] = function(msg)
         else
             local ok, reason = ns.Theme:SetTheme(themeId)
             if ok then
-                ns:Print("UI theme set to %s. Reload UI to apply it fully.", ns.Theme:ThemeLabel(themeId))
+                ns:Print("UI theme set to %s.", ns.Theme:ThemeLabel(themeId))
                 if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
                     ns.MainFrame:RefreshCurrentTab()
                 end

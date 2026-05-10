@@ -83,10 +83,12 @@ function Popup:Init()
     header:SetPoint("TOPLEFT", 0, 0)
     header:SetPoint("TOPRIGHT", 0, 0)
     header:SetHeight(48)
-    Theme:Fill(header, Theme.c.bg1, false)
+    Theme:Fill(header, Theme.c.headerBg or Theme.c.bg1, false)
+    self.header = header
 
     local title = Theme:Header(header, "Settings", 16)
     title:SetPoint("TOPLEFT", 16, -12)
+    self.title = title
 
     local close = Theme:Button(header, "Close", 58, 22)
     close:SetPoint("TOPRIGHT", -10, -10)
@@ -167,7 +169,7 @@ function Popup:Refresh()
                 info.func = function()
                     local ok, reason = ns.Theme:SetTheme(itemId)
                     if ok then
-                        ns:Print("UI theme set to %s. Reload UI to apply it fully.", itemLabel)
+                        ns:Print("UI theme set to %s.", itemLabel)
                         Popup:Refresh()
                     elseif reason == "gw2_unavailable" then
                         ns:Print("GW2 UI theme requires GW2 UI or GW2 UI TBC to be installed and enabled.")
@@ -211,7 +213,19 @@ function Popup:Refresh()
     setToggle(self.optSoftDeaths, ns.Settings:Get("announceSoftDeaths", false) == true, Theme)
 
     local gw2Note = ns.Theme:IsThemeAvailable("gw2") and "GW2 UI detected." or "GW2 UI is not detected yet."
-    self.note:SetText(gw2Note .. " Theme changes may need /reload for already-built frames.")
+    self.note:SetText(gw2Note .. " Theme changes apply immediately to open addon windows.")
+end
+
+function Popup:RefreshTheme()
+    if not self.frame then return end
+    local Theme = ns.Theme
+    Theme:Fill(self.frame, Theme.c.bg0, true)
+    if self.header then Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false) end
+    if self.title then setTextColor(self.title, Theme.c.fg, 1) end
+    if self.themeLabel then setTextColor(self.themeLabel, Theme.c.goldH, 1) end
+    if self.deathLabel then setTextColor(self.deathLabel, Theme.c.goldH, 1) end
+    if self.optionsLabel then setTextColor(self.optionsLabel, Theme.c.goldH, 1) end
+    self:Refresh()
 end
 
 function Popup:Show()

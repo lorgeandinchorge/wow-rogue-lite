@@ -225,6 +225,53 @@ local function testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
     assertEqual(ns.Theme:GetActiveThemeId(), "gw2", "refresh reapplies gw2 once addon appears")
 end
 
+local function testSetThemeRefreshesVisibleUi()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+    local refreshed = false
+    ns.MainFrame = {
+        RefreshTheme = function()
+            refreshed = true
+        end,
+    }
+
+    local ok = ns.Theme:SetTheme("dark")
+
+    assertEqual(ok, true, "dark theme selection succeeds")
+    assertEqual(refreshed, true, "theme selection refreshes visible UI")
+end
+
+local function testClassicPaletteIsConservativeDarkDefault()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    assertEqual(ns.Theme:GetActiveThemeId(), "classic", "classic remains the default active theme")
+    assertEqual(ns.Theme.c.bg0[1], 0.045, "classic default bg0 red channel is dark neutral")
+    assertEqual(ns.Theme.c.headerBg[1], 0.105, "classic default has conservative dark header token")
+    assertEqual(ns.Theme.c.gold[1], 0.780, "classic default has restrained gold accent")
+end
+
+local function testGw2PaletteUsesHeroicSurfaceTokens()
+    useCAddOns = false
+    addonEnabled = true
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok = ns.Theme:SetTheme("gw2")
+
+    assertEqual(ok, true, "gw2 theme can be selected")
+    assertEqual(ns.Theme.c.headerBg[1], 0.270, "gw2 header has warm red channel")
+    assertEqual(ns.Theme.c.headerBg[2], 0.120, "gw2 header has restrained green channel")
+    assertEqual(ns.Theme.c.gold[1], 0.850, "gw2 uses stronger metallic gold")
+end
+
 testClassicIsDefault()
 testGw2CannotBeSelectedWhenUnavailable()
 testUnknownThemeIsRejected()
@@ -236,5 +283,8 @@ testGw2MistsCanBeSelectedWhenAvailable()
 testGw2WrathCanBeSelectedWhenAvailable()
 testGw2DetectedThroughCAddOns()
 testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
+testSetThemeRefreshesVisibleUi()
+testClassicPaletteIsConservativeDarkDefault()
+testGw2PaletteUsesHeroicSurfaceTokens()
 
 print("ThemeSelection.test.lua: ok")

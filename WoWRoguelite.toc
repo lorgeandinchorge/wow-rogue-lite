@@ -1,8 +1,8 @@
-## Interface: 20504
+## Interface: 20505
 ## Title: WoW Roguelite
 ## Notes: A rogue-lite run/bank system. Contribute on death, unlock perks for future runs.
 ## Author: Paul
-## Version: 0.1.3
+## Version: 0.1.4
 ## IconTexture: Interface\AddOns\WoWRoguelite\WRL_MinimapIcon.png
 ## SavedVariables: WRL_DB
 ## SavedVariablesPerCharacter: WRL_CharDB

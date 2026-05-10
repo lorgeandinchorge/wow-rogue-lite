@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.1.4
+
+- Add addon-whisper bank presence detection so off-account online bankers can show as online.
+- Refresh the default and GW2-inspired themes with stronger GW2-style visual direction.
+- Make theme changes refresh open addon windows immediately.
+- Update TBC Anniversary interface metadata to 20505.
+
 ## v0.1.3
 
 - Improve GW2 UI theme detection across current GW2 UI flavors and modern addon APIs.

@@ -4,6 +4,11 @@
 local ADDON_NAME, ns = ...
 local B = ns:NewModule("BankStatus")
 
+local PRESENCE_TTL = 90
+local PING_COOLDOWN = 30
+local seenAtByKey = {}
+local pingedAtByKey = {}
+
 local function stripRealm(key)
     return (key and key:match("^([^-]+)")) or key
 end
@@ -18,6 +23,10 @@ local function sameCharacter(a, b)
     local an = normName(stripRealm(a))
     local bn = normName(stripRealm(b))
     return an ~= nil and an == bn
+end
+
+local function now()
+    return time and time() or 0
 end
 
 local function guildStatus(bankKey)
@@ -43,6 +52,31 @@ local function friendStatus(bankKey)
         end
     end
     return nil
+end
+
+function B:MarkSeen(bankKey, when)
+    if not bankKey or bankKey == "" then return end
+    seenAtByKey[normName(bankKey)] = when or now()
+    if ns.Debug then
+        ns:Debug("BankStatus: saw addon presence from %s", tostring(bankKey))
+    end
+    self:NotifyChanged()
+end
+
+function B:Ping(bankKey)
+    if not bankKey or bankKey == "" then return false end
+    if ns.Database and ns.Database.IsBankCharacter and ns.Database:IsBankCharacter() then return false end
+    local key = normName(bankKey)
+    local t = now()
+    if pingedAtByKey[key] and (t - pingedAtByKey[key]) < PING_COOLDOWN then return false end
+    pingedAtByKey[key] = t
+    if ns.Debug then
+        ns:Debug("BankStatus: pinging %s for addon presence", tostring(bankKey))
+    end
+    if ns.Comm and ns.Comm.SendPresencePing then
+        return ns.Comm:SendPresencePing(bankKey)
+    end
+    return false
 end
 
 function B:Init()
@@ -84,6 +118,12 @@ function B:Status(bankKey)
         return status, status == "online" and "Online (friends)" or "Offline (friends)", source
     end
 
+    local seenAt = seenAtByKey[normName(bankKey)]
+    if seenAt and (now() - seenAt) <= PRESENCE_TTL then
+        return "online", "Online (addon)", "addon"
+    end
+
+    self:Ping(bankKey)
     return "unknown", "Unknown"
 end
 
