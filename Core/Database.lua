@@ -316,17 +316,31 @@ end
 -- Record a death-log entry and update levelCurrent + retiredAt without
 -- changing the run state.  Called by Death.lua on final death so that
 -- Run:SetState can own the state transition independently.
-function D:RecordDeathEntry(key, atLevel, zone)
+function D:RecordDeathEntry(key, atLevel, zone, ctx)
     local rec = self:GetCharacter(key); if not rec then return end
     local now = time()
     rec.retiredAt    = rec.retiredAt or now   -- preserve if already set
     rec.levelCurrent = atLevel or rec.levelCurrent
-    table.insert(rec.deathLog, {
+    local entry = {
         when    = now,
         level   = atLevel or rec.levelCurrent,
         zone    = zone or (GetRealZoneText() or ""),
         subzone = GetSubZoneText() or "",
-    })
+    }
+    -- Optional death context from D:GetDeathContextSnapshot().
+    -- All fields are nil when not captured, so old entries remain valid.
+    if ctx then
+        entry.sourceName        = ctx.sourceName
+        entry.sourceGuid        = ctx.sourceGuid
+        entry.environmentalType = ctx.environmentalType
+        entry.mapID             = ctx.mapID
+        entry.instanceName      = ctx.instanceName
+        entry.instanceID        = ctx.instanceID
+        entry.positionX         = ctx.positionX
+        entry.positionY         = ctx.positionY
+        entry.lastWords         = ctx.lastWords
+    end
+    table.insert(rec.deathLog, entry)
 end
 
 -- Convenience accessors -----------------------------------------------------

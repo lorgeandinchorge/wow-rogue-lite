@@ -1,3 +1,5 @@
+local mockTime = 200   -- tests set this to control time(); reset inside resetHarness
+
 local popupShown = {}
 local printed = {}
 local currentDead = true
@@ -38,11 +40,17 @@ local function resetHarness(opts)
         memorials = {},
     }
 
-    _G.time = function() return 200 end
+    mockTime = 200
+    _G.time = function() return mockTime end
     _G.UnitLevel = function() return 12 end
     _G.GetRealZoneText = function() return "Westfall" end
     _G.GetSubZoneText = function() return "Moonbrook" end
     _G.GetMoney = function() return currentMoney end
+    _G.UnitGUID   = function(unit) return unit == "player" and "Player-1-00000001" or nil end
+    _G.UnitName   = function(unit) return unit == "player" and "Runner" or nil end
+    _G.UnitPosition  = function() return nil end   -- no position by default
+    _G.GetInstanceInfo = function() return nil end
+    _G.C_Map      = nil   -- no map API by default
     if hasDeadOrGhostApi then
         _G.UnitIsDeadOrGhost = function() return currentDead end
     else
@@ -53,6 +61,12 @@ local function resetHarness(opts)
     _G.StaticPopupDialogs = {}
     _G.StaticPopup_Show = function(name, ...)
         popupShown[#popupShown + 1] = { name = name, args = { ... } }
+    end
+    _G.CreateFrame = function(_frameType)
+        return {
+            RegisterEvent = function() end,
+            SetScript     = function() end,
+        }
     end
 
     local ns = {
@@ -83,11 +97,11 @@ local function resetHarness(opts)
     function ns.Database:IsBankCharacter() return false end
     function ns.Database:GetCurrentCharacter() return WRL_DB.characters["Runner-Realm"] end
     function ns.Database:GetCharacter(key) return WRL_DB.characters[key] end
-    function ns.Database:RecordDeathEntry(key, level, zone)
+    function ns.Database:RecordDeathEntry(key, level, zone, ctx)
         local rec = self:GetCharacter(key)
         rec.retiredAt = rec.retiredAt or time()
         rec.levelCurrent = level
-        rec.deathLog[#rec.deathLog + 1] = { when = time(), level = level, zone = zone }
+        rec.deathLog[#rec.deathLog + 1] = { when = time(), level = level, zone = zone, ctx = ctx }
     end
     function ns.Database:HasMemorial() return false end
     function ns.Database:SaveMemorial(entry) WRL_DB.memorials[entry.uid] = entry end
@@ -221,6 +235,136 @@ local function testDeathPopupExplainsNextStepsAndMaximumPotential()
     assertContains(text, "sell vendorable bags/gear", "popup explains max-value path")
 end
 
+local function testCombatDamageSourceCapturedBeforeDeath()
+    -- Player alive on login (currentDead=false), 1 life → first PLAYER_DEAD is final.
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    -- Simulate a melee hit 5 seconds before death.
+    mockTime = 195
+    ns.Death:OnCombatLogEvent(
+        195, "SWING_DAMAGE", nil,
+        "Creature-0-3684-0-0001", "Defias Trapper", 0x10a48, 0,
+        "Player-1-00000001", "Runner", 0x512, 0)
+
+    mockTime = 200
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testCombatDamageSourceCapturedBeforeDeath: memorial created")
+    assertEqual(memorial.sourceName, "Defias Trapper",
+        "testCombatDamageSourceCapturedBeforeDeath: memorial.sourceName")
+end
+
+local function testEnvironmentalDamageSourceCapturedBeforeDeath()
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    -- Simulate a falling-damage event 2 seconds before death.
+    mockTime = 198
+    ns.Death:OnCombatLogEvent(
+        198, "ENVIRONMENTAL_DAMAGE", nil,
+        nil, nil, 0, 0,
+        "Player-1-00000001", "Runner", 0x512, 0,
+        "Falling", 9999)
+
+    mockTime = 200
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testEnvironmentalDamageSourceCapturedBeforeDeath: memorial created")
+    assertEqual(memorial.environmentalType, "Falling",
+        "testEnvironmentalDamageSourceCapturedBeforeDeath: environmentalType")
+    assert(memorial.sourceName == nil,
+        "testEnvironmentalDamageSourceCapturedBeforeDeath: no creature sourceName for env death")
+end
+
+local function testFinalDeathMemorialIncludesSourceContext()
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    ns.Death:OnCombatLogEvent(
+        199, "SWING_DAMAGE", nil,
+        "Creature-0-0001", "Hogger", 0, 0,
+        "Player-1-00000001", "Runner", 0, 0)
+
+    mockTime = 200
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testFinalDeathMemorialIncludesSourceContext: memorial created")
+    assertEqual(memorial.sourceName, "Hogger",
+        "testFinalDeathMemorialIncludesSourceContext: memorial.sourceName")
+
+    -- Death log entry must also carry the context table.
+    local rec = WRL_DB.characters["Runner-Realm"]
+    assert(rec.deathLog[1] ~= nil, "testFinalDeathMemorialIncludesSourceContext: deathLog entry exists")
+    assert(rec.deathLog[1].ctx ~= nil,
+        "testFinalDeathMemorialIncludesSourceContext: deathLog entry carries ctx")
+    assertEqual(rec.deathLog[1].ctx.sourceName, "Hogger",
+        "testFinalDeathMemorialIncludesSourceContext: deathLog ctx.sourceName")
+end
+
+local function testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
+    -- Player alive on login, 2 lives → first PLAYER_DEAD is a soft death.
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 2 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    assertEqual(rec.status, "active", "testDuplicateDeath: setup — character is active")
+
+    -- Fire PLAYER_DEAD twice (event fires oddly in one corpse-state).
+    registeredEvents.PLAYER_DEAD()
+    registeredEvents.PLAYER_DEAD()
+
+    -- Only 1 life should be consumed, not 2.
+    assertEqual(rec.livesRemaining, 1,
+        "testDuplicateDeath: only one life consumed by duplicate PLAYER_DEAD")
+    assertEqual(rec.status, "active",
+        "testDuplicateDeath: soft death does not end the run")
+    assertEqual(#rec.deathLog, 0,
+        "testDuplicateDeath: soft death writes no death log entry")
+end
+
+local function testStaleLastAttackerIsIgnoredAfterTimeout()
+    -- Player alive on login, 1 life.
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    -- Attacker hit at t=100.
+    mockTime = 100
+    ns.Death:OnCombatLogEvent(
+        100, "SWING_DAMAGE", nil,
+        "Creature-0-0001", "Old Enemy", 0, 0,
+        "Player-1-00000001", "Runner", 0, 0)
+
+    -- Die at t=135 — 35 s later, beyond the 30 s stale window.
+    mockTime = 135
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testStaleAttacker: memorial created")
+    assert(memorial.sourceName == nil,
+        "testStaleAttacker: stale attacker is excluded from memorial")
+end
+
+local function testMissingMapAPIsDoNotBreakDeathHandling()
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    -- Explicitly clear all map-related APIs.
+    _G.C_Map         = nil
+    _G.GetInstanceInfo = nil
+    _G.UnitPosition  = nil
+
+    -- Death should succeed without error.
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testMissingMapAPIs: memorial created despite missing APIs")
+    assert(memorial.mapID == nil,    "testMissingMapAPIs: mapID is nil")
+    assert(memorial.positionX == nil, "testMissingMapAPIs: positionX is nil")
+    assert(memorial.instanceName == nil, "testMissingMapAPIs: instanceName is nil")
+end
+
 testAlreadyDeadCharacterTriggersFinalDeathPopup()
 testDuplicateAlreadyDeadCheckDoesNotDuplicateDeath()
 testAlreadyGhostedCharacterUsesClassicApiFallback()
@@ -228,5 +372,11 @@ testEnteringWorldRechecksAlreadyDeadCharacter()
 testOutOfLivesActiveCharacterFinalizesOnLoginEvenWhenAlive()
 testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
 testDeathPopupExplainsNextStepsAndMaximumPotential()
+testCombatDamageSourceCapturedBeforeDeath()
+testEnvironmentalDamageSourceCapturedBeforeDeath()
+testFinalDeathMemorialIncludesSourceContext()
+testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
+testStaleLastAttackerIsIgnoredAfterTimeout()
+testMissingMapAPIsDoNotBreakDeathHandling()
 
 print("DeathFlow.test.lua: ok")

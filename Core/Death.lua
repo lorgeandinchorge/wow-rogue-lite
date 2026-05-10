@@ -19,6 +19,26 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Death")
 
+-- ── Death-context state ───────────────────────────────────────────────────────
+-- Populated by COMBAT_LOG_EVENT_UNFILTERED and CHAT_MSG_* handlers.
+-- Snapshot is captured on final death, then reset.
+local CTX_STALE_SEC = 30  -- ignore last attacker if their hit was >30 s ago
+local D_ctx = {
+    lastAttackSourceName        = nil,
+    lastAttackSourceGuid        = nil,
+    lastDamageEvent             = nil,   -- subevent: "SWING_DAMAGE", etc.
+    lastEnvironmentalDamageType = nil,   -- "Falling", "Drowning", "Fire", etc.
+    lastAttackTime              = nil,
+    lastPlayerChatText          = nil,
+    lastPlayerChatChannel       = nil,
+    lastPlayerChatTime          = nil,
+}
+-- Soft-death cycle guard: set true when a soft death consumes a life,
+-- reset to false on PLAYER_ALIVE / PLAYER_UNGHOST.
+-- Prevents one corpse-state from burning multiple extra lives if
+-- PLAYER_DEAD fires more than once before the revive event.
+local deathCycleOpen = false
+
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 
 -- Return a six-character hex colour for a WoW class name (e.g. "WARRIOR").
@@ -40,6 +60,89 @@ local function titleCase(s)
     return s:sub(1, 1):upper() .. s:sub(2):lower()
 end
 
+-- ── Death-context capture ────────────────────────────────────────────────────
+
+local function playerGuid()
+    return UnitGUID and UnitGUID("player") or nil
+end
+
+-- Called from a dedicated frame for COMBAT_LOG_EVENT_UNFILTERED.
+-- In TBC Classic, combat log args are passed directly to OnEvent rather
+-- than via CombatLogGetCurrentEventInfo(), so we receive them as varargs.
+-- Only tracks damage sub-events where the destination is the player.
+function D:OnCombatLogEvent(timestamp, subevent, _hiddenArg,
+                             srcGUID, srcName, _srcFlags, _srcRaidFlags,
+                             dstGUID, _dstName, _dstFlags, _dstRaidFlags, ...)
+    local myGuid = playerGuid()
+    if myGuid and dstGUID ~= myGuid then return end
+
+    if subevent == "ENVIRONMENTAL_DAMAGE" then
+        -- args after destRaidFlags: environmentalType, amount, ...
+        local envType = select(1, ...)
+        D_ctx.lastEnvironmentalDamageType = envType
+        D_ctx.lastAttackSourceName        = nil
+        D_ctx.lastAttackSourceGuid        = nil
+        D_ctx.lastDamageEvent             = subevent
+        D_ctx.lastAttackTime              = timestamp or time()
+    elseif subevent == "SWING_DAMAGE"
+        or subevent == "SPELL_DAMAGE"
+        or subevent == "SPELL_PERIODIC_DAMAGE"
+        or subevent == "RANGE_DAMAGE" then
+        -- Only track hostile sources, not self-inflicted damage.
+        if srcGUID and srcGUID ~= (myGuid or "") then
+            D_ctx.lastAttackSourceName        = srcName
+            D_ctx.lastAttackSourceGuid        = srcGUID
+            D_ctx.lastDamageEvent             = subevent
+            D_ctx.lastEnvironmentalDamageType = nil
+            D_ctx.lastAttackTime              = timestamp or time()
+        end
+    end
+end
+
+-- Called when the player sends a chat message.
+-- `channel` is "SAY", "PARTY", or "GUILD".
+function D:OnPlayerChat(channel, text)
+    D_ctx.lastPlayerChatText    = text
+    D_ctx.lastPlayerChatChannel = channel
+    D_ctx.lastPlayerChatTime    = time()
+end
+
+-- Returns a snapshot of current context, silently filtering stale attackers.
+-- Called immediately before recording a final death.
+function D:GetDeathContextSnapshot()
+    local now  = time()
+    local snap = {}
+    local age  = D_ctx.lastAttackTime and (now - D_ctx.lastAttackTime) or math.huge
+    if age <= CTX_STALE_SEC then
+        snap.sourceName        = D_ctx.lastAttackSourceName
+        snap.sourceGuid        = D_ctx.lastAttackSourceGuid
+        snap.environmentalType = D_ctx.lastEnvironmentalDamageType
+    end
+    snap.lastWords   = D_ctx.lastPlayerChatText
+    snap.lastChannel = D_ctx.lastPlayerChatChannel
+
+    -- Map / position (degrade gracefully if APIs unavailable in Classic).
+    if C_Map and C_Map.GetBestMapForUnit then
+        snap.mapID = C_Map.GetBestMapForUnit("player")
+    end
+    if GetInstanceInfo then
+        snap.instanceName = (select(1, GetInstanceInfo()))
+        snap.instanceID   = (select(8, GetInstanceInfo()))
+    end
+    if UnitPosition then
+        local y, x = UnitPosition("player")
+        snap.positionX = x
+        snap.positionY = y
+    end
+    return snap
+end
+
+-- Clears context state after a final death is fully recorded.
+function D:ResetDeathContext()
+    for k in pairs(D_ctx) do D_ctx[k] = nil end
+    deathCycleOpen = false
+end
+
 -- ── Announcement ─────────────────────────────────────────────────────────────
 
 -- Send a tasteful death announcement for `memorial` to the channel configured
@@ -56,10 +159,20 @@ function D:AnnounceMemorial(memorial)
     local level = memorial.level or 0
     local zone  = (memorial.zone ~= "" and memorial.zone) or "Unknown Zone"
 
-    -- Terse, flavourful one-liner.
-    local msg = string.format(
-        "[Roguelite] |cff%s%s|r the %s %s (lvl %d) has fallen in %s. Their run is over.",
-        hex, name, race, class, level, zone)
+    -- Terse, flavourful one-liner.  Include cause of death when available.
+    local cause = memorial.sourceName
+        or (memorial.environmentalType and titleCase(memorial.environmentalType))
+        or nil
+    local msg
+    if cause then
+        msg = string.format(
+            "[Roguelite] |cff%s%s|r the %s %s (lvl %d) has fallen in %s to %s. Their run is over.",
+            hex, name, race, class, level, zone, cause)
+    else
+        msg = string.format(
+            "[Roguelite] |cff%s%s|r the %s %s (lvl %d) has fallen in %s. Their run is over.",
+            hex, name, race, class, level, zone)
+    end
 
     if dest == "local" then
         ns:Print(msg)
@@ -91,6 +204,27 @@ function D:Init()
     ns:On("PLAYER_ALIVE",      function() self:OnRevive() end)
     ns:On("MAIL_SHOW",         function() self:OnMailShow() end)
     ns:On("MAIL_SEND_SUCCESS", function() self:OnMailSent() end)
+
+    -- Combat-log context capture uses a dedicated frame because ns:On() does
+    -- not forward event arguments to callbacks.
+    local ctxFrame = CreateFrame("Frame")
+    ctxFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    ctxFrame:SetScript("OnEvent", function(_, _event, ...)
+        D:OnCombatLogEvent(...)
+    end)
+
+    -- Last-words capture: filter to our own messages by comparing the author
+    -- arg to UnitName("player").
+    local function onChatMsg(channel)
+        return function(text, author)
+            if author == (UnitName and UnitName("player") or "") then
+                D:OnPlayerChat(channel, text)
+            end
+        end
+    end
+    ns:On("CHAT_MSG_SAY",   onChatMsg("SAY"))
+    ns:On("CHAT_MSG_PARTY", onChatMsg("PARTY"))
+    ns:On("CHAT_MSG_GUILD", onChatMsg("GUILD"))
 
     -- StaticPopup definitions (singletons so we register once).
     StaticPopupDialogs["WRL_RETIRE_CONFIRM"] = {
@@ -164,10 +298,16 @@ function D:ProcessCurrentDeath(reason)
     if self:_IsEndedState(state) then return end
 
     if rec.livesRemaining == nil then rec.livesRemaining = 1 end
+
+    -- Soft-death cycle guard: if PLAYER_DEAD fires more than once before
+    -- PLAYER_ALIVE in the same corpse-state, do not consume another life.
+    if deathCycleOpen and (rec.livesRemaining or 0) > 0 then return end
+
     if rec.livesRemaining > 0 then
         rec.livesRemaining = rec.livesRemaining - 1
     end
     if rec.livesRemaining >= 1 then
+        deathCycleOpen = true   -- mark this corpse-cycle as consuming a life
         if ns.Achievements and ns.Achievements.OnExtraLifeUsed then
             ns.Achievements:OnExtraLifeUsed(ns:UnitKey(), rec)
         end
@@ -195,7 +335,9 @@ function D:ProcessCurrentDeath(reason)
     -- so the state is consistent if anything inspects it during the log write.
     local stateReason = reason and ("final_death_" .. tostring(reason)) or "final_death"
     ns.Run:SetState(key, "dead_pending_contribution", stateReason)
-    ns.Database:RecordDeathEntry(key, UnitLevel("player"), GetRealZoneText())
+    -- Capture context snapshot before recording (will be reset after memorial).
+    local deathCtx = self:GetDeathContextSnapshot()
+    ns.Database:RecordDeathEntry(key, UnitLevel("player"), GetRealZoneText(), deathCtx)
     if ns.Achievements and ns.Achievements.OnFinalDeath then
         ns.Achievements:OnFinalDeath(key, rec)
     end
@@ -223,9 +365,19 @@ function D:ProcessCurrentDeath(reason)
             -- livesUsed: deathLog now includes the current death entry (added
             -- by RecordDeathEntry above), so #deathLog equals total lives used.
             livesUsed            = #(rec.deathLog or {}),
+            -- Death context (all fields optional; nil when not captured).
+            sourceName           = deathCtx.sourceName,
+            sourceGuid           = deathCtx.sourceGuid,
+            environmentalType    = deathCtx.environmentalType,
+            lastWords            = deathCtx.lastWords,
+            mapID                = deathCtx.mapID,
+            instanceName         = deathCtx.instanceName,
+            positionX            = deathCtx.positionX,
+            positionY            = deathCtx.positionY,
         }
         ns.Database:SaveMemorial(memorial)
         self:AnnounceMemorial(memorial)
+        self:ResetDeathContext()   -- clear context state after memorial is written
     end
 
     self:_ShowFinalDeathPopup(rec, snap)
@@ -253,6 +405,7 @@ function D:OnPlayerDead()
 end
 
 function D:OnRevive()
+    deathCycleOpen = false   -- reset soft-death cycle guard on successful revive
     self:ReconcileCurrentDeath("player_alive")
     local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
     local state = ns.Run:GetState(rec)
