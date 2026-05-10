@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.1.5
+
+- Detect missed final deaths on login/reload when a run character is already dead or ghosted.
+- Show a clearer final-death next-steps popup with mailbox guidance.
+- Snapshot carried money, bag vendor value, equipped gear vendor value, and maximum possible contribution on death.
+- Display contribution-pending final deaths as retired in run/contribution status views.
+- Block retired or dead characters from requesting new starter rewards.
+
 ## v0.1.4
 
 - Add addon-whisper bank presence detection so off-account online bankers can show as online.
