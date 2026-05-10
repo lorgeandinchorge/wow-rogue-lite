@@ -49,6 +49,49 @@ function V:BagsSnapshot()
     return total, items
 end
 
+-- Walk equipped inventory slots. Returns:
+-- totalCopper, list{ {slot, link, count, sellPrice, copper} ... }
+--
+-- Most equipped gear cannot be mailed directly, but its sell value matters for
+-- the "maximum possible if you sell everything first" death estimate.
+function V:EquipmentSnapshot()
+    local total = 0
+    local items = {}
+    for slot = 1, 19 do
+        local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
+        if link then
+            local copper = self:StackValue(link, 1)
+            if copper > 0 then
+                total = total + copper
+                items[#items + 1] = {
+                    slot = slot,
+                    link = link,
+                    count = 1,
+                    sellPrice = copper,
+                    copper = copper,
+                }
+            end
+        end
+    end
+    return total, items
+end
+
+-- Snapshot carried money, bag value, and equipped gear value separately.
+-- Returns a table so death/contribution code can store an auditable estimate.
+function V:FullCharacterSnapshot()
+    local bagValue, bagItems = self:BagsSnapshot()
+    local gearValue, gearItems = self:EquipmentSnapshot()
+    local money = GetMoney and (GetMoney() or 0) or 0
+    return {
+        money = money,
+        bagValue = bagValue or 0,
+        gearValue = gearValue or 0,
+        maximumPotential = money + (bagValue or 0) + (gearValue or 0),
+        bagItems = bagItems or {},
+        gearItems = gearItems or {},
+    }
+end
+
 -- Sum of carried money + vendorable bag contents. This is what "goes to the bank"
 -- conceptually on death (the player still has to mail it manually).
 function V:TotalLiquidValue()

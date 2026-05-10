@@ -187,7 +187,7 @@ function Tab:Refresh()
     local function liveScore(r)
         if r.isArchived then return 0 end
         local s = ns.Run:GetState(r)
-        return (s == "retired") and 0 or 1
+        return (s == "fresh" or s == "active") and 1 or 0
     end
 
     table.sort(roster, function(a, b)
@@ -269,7 +269,7 @@ function Tab:Refresh()
         elseif rec.isArchived then
             statusStr = "|cffb07828prev. char|r"
         elseif runState == "dead_pending_contribution" then
-            statusStr = "|cffffff00pending contribution|r"
+            statusStr = "|cffffff00retired - contribution pending|r"
         elseif runState == "retired" then
             statusStr = "|cffb85c5cretired|r"
         else

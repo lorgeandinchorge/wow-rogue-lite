@@ -90,9 +90,18 @@ function D:Init()
 
     -- StaticPopup definitions (singletons so we register once).
     StaticPopupDialogs["WRL_RETIRE_CONFIRM"] = {
-        text = "Your run has ended.\n\n|cffc0a060%s|r carried roughly %s in gold + vendorable goods.\n\n" ..
-               "Mail it to your bank (|cffffd700%s|r) to contribute?",
-        button1  = "Yes, Pre-Fill Mail",
+        text = "YOU DIED. WE'RE SORRY, BUT YOUR NEXT STEPS FOR WOW ROGUE LITE ARE...\n\n" ..
+               "|cffc0a060%s|r is retired. This character can no longer contribute after this final handoff.\n\n" ..
+               "Current money: %s\n" ..
+               "Bag vendor value: %s\n" ..
+               "Equipped gear vendor value: %s\n" ..
+               "Maximum possible contribution: %s\n\n" ..
+               "1. Go to a mailbox.\n" ..
+               "2. The addon will pre-fill mail to your bank (|cffffd700%s|r).\n" ..
+               "3. Send carried gold and eligible items you choose to contribute.\n" ..
+               "4. To reach the maximum, sell vendorable bags/gear first, then mail the gold.\n" ..
+               "5. After mail sends, the addon records the contribution and retires the run.",
+        button1  = "Pre-Fill Mail",
         button2  = "Not Now",
         OnAccept = function() ns.Death:OpenMailToBank() end,
         -- "Not Now" skips the contribution and finalises the retirement.
@@ -107,9 +116,33 @@ function D:Init()
         button1 = "OK",
         timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
     }
+
+    self:ReconcileCurrentDeath("login")
 end
 
-function D:OnPlayerDead()
+function D:_IsEndedState(state)
+    return state == "retired" or state == "archived" or state == "dead_pending_contribution"
+end
+
+function D:_ShowFinalDeathPopup(rec, snap)
+    snap = snap or {}
+    local bank = WRL_DB.bankCharacter or "(no bank set)"
+    local money = snap.preMoney or 0
+    local bagValue = snap.estimatedBagValue or 0
+    local gearValue = snap.estimatedGearValue or 0
+    local maxPotential = snap.maximumPotential or (money + bagValue + gearValue)
+    StaticPopup_Show(
+        "WRL_RETIRE_CONFIRM",
+        rec.key,
+        ns.Tiers:FormatMoney(money),
+        ns.Tiers:FormatMoney(bagValue),
+        ns.Tiers:FormatMoney(gearValue),
+        ns.Tiers:FormatMoney(maxPotential),
+        bank
+    )
+end
+
+function D:ProcessCurrentDeath(reason)
     -- Bank characters have no roguelite death logic.
     if ns.Database:IsBankCharacter() then return end
 
@@ -117,10 +150,13 @@ function D:OnPlayerDead()
 
     -- Guard against duplicate PLAYER_DEAD or re-firing on already-ended runs.
     local state = ns.Run:GetState(rec)
-    if state == "retired" or state == "archived" or state == "dead_pending_contribution" then return end
+    if self:_IsEndedState(state) then return end
 
-    rec.livesRemaining = (rec.livesRemaining or 1) - 1
+    if rec.livesRemaining == nil then rec.livesRemaining = 1 end
     if rec.livesRemaining > 0 then
+        rec.livesRemaining = rec.livesRemaining - 1
+    end
+    if rec.livesRemaining >= 1 then
         if ns.Achievements and ns.Achievements.OnExtraLifeUsed then
             ns.Achievements:OnExtraLifeUsed(ns:UnitKey(), rec)
         end
@@ -146,7 +182,8 @@ function D:OnPlayerDead()
 
     -- Transition to dead_pending_contribution BEFORE recording the death log
     -- so the state is consistent if anything inspects it during the log write.
-    ns.Run:SetState(key, "dead_pending_contribution", "final_death")
+    local stateReason = reason and ("final_death_" .. tostring(reason)) or "final_death"
+    ns.Run:SetState(key, "dead_pending_contribution", stateReason)
     ns.Database:RecordDeathEntry(key, UnitLevel("player"), GetRealZoneText())
     if ns.Achievements and ns.Achievements.OnFinalDeath then
         ns.Achievements:OnFinalDeath(key, rec)
@@ -180,11 +217,21 @@ function D:OnPlayerDead()
         self:AnnounceMemorial(memorial)
     end
 
-    local bank = WRL_DB.bankCharacter or "(no bank set)"
-    StaticPopup_Show("WRL_RETIRE_CONFIRM", rec.key, ns.Tiers:FormatMoney(totalLiquid), bank)
+    self:_ShowFinalDeathPopup(rec, snap)
+    return true
+end
+
+function D:ReconcileCurrentDeath(reason)
+    if not UnitIsDeadOrGhost or not UnitIsDeadOrGhost("player") then return false end
+    return self:ProcessCurrentDeath(reason or "reconcile")
+end
+
+function D:OnPlayerDead()
+    return self:ProcessCurrentDeath(nil)
 end
 
 function D:OnRevive()
+    self:ReconcileCurrentDeath("player_alive")
     local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
     local state = ns.Run:GetState(rec)
     if state == "retired" then

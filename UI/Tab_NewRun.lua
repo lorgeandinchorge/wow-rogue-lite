@@ -445,9 +445,12 @@ function Tab:Refresh()
     local selectedCount = selectionCount(self.selected, displayTiers, charKey)
     local modifiersLocked = not (ns.Boons and ns.Boons.IsLocked) or ns.Boons:IsLocked(charKey)
     local rec = ns.Database and ns.Database:GetCharacter(charKey)
+    local canRequest = (not rec) or (not ns.Run) or ns.Run:IsPlayable(rec)
 
     if isBank then
         self.hint:SetText("This character is marked as the bank. Open this tab on a run character to request unlocked legacy rewards.")
+    elseif not canRequest then
+        self.hint:SetText("This run is retired. Dead or retired characters cannot request new bank rewards.")
     elseif bank then
         self.hint:SetText(("Pick the unlocked legacy rewards you want delivered from |cffc0a060%s|r. Buy more unlocks on the Tiers tab."):format(bank))
     else
@@ -476,6 +479,12 @@ function Tab:Refresh()
             "Role: bank character",
             "Requests are fulfilled from the bank side.",
             "Switch to a run character to build a request.",
+        }
+    elseif not canRequest then
+        statusLines = {
+            "Role: retired run character",
+            "This run is over.",
+            "No new starter rewards can be requested.",
         }
     elseif not bank then
         statusLines = {
@@ -746,6 +755,11 @@ function Tab:SendRequest()
         ns:Print("Open New Run on a run character, not the bank.")
         return
     end
+    local rec = ns.Database:GetCurrentCharacter()
+    if ns.Run and rec and not ns.Run:IsPlayable(rec) then
+        ns:Print("This run is retired. Dead or retired characters cannot request new bank rewards.")
+        return
+    end
     if not ns.Settings:Get("allowBankRewards", true) then
         ns:Print("Bank starter rewards are disabled by the active rules profile.")
         return
@@ -777,6 +791,11 @@ function Tab:BeginMailFallback()
     end
     if ns.Database:IsBankCharacter() then
         ns:Print("Open New Run on a run character, not the bank.")
+        return
+    end
+    local rec = ns.Database:GetCurrentCharacter()
+    if ns.Run and rec and not ns.Run:IsPlayable(rec) then
+        ns:Print("This run is retired. Dead or retired characters cannot request new bank rewards.")
         return
     end
     if not ns.Settings:Get("allowBankRewards", true) then

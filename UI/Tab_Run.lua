@@ -27,7 +27,7 @@ end
 local function stateLabel(state)
     if state == "fresh" then return "|cffc0a060fresh|r" end
     if state == "active" then return "|cff7ab27aactive|r" end
-    if state == "dead_pending_contribution" then return "|cffffff00dead_pending_contribution|r" end
+    if state == "dead_pending_contribution" then return "|cffffff00retired - contribution pending|r" end
     if state == "retired" then return "|cffb85c5cretired|r" end
     if state == "archived" then return "|cffb07828archived|r" end
     return "|cff9a948aunknown|r"

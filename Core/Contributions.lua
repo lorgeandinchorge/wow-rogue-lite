@@ -172,15 +172,31 @@ function C:SnapshotDeath(characterKey)
 
     local money = GetMoney and GetMoney() or 0
     local bagCopper = 0
-    if ns.Vendor and ns.Vendor.BagsSnapshot then
-        bagCopper = select(1, ns.Vendor:BagsSnapshot()) or 0
+    local gearCopper = 0
+    local bagItems = {}
+    local gearItems = {}
+    if ns.Vendor and ns.Vendor.FullCharacterSnapshot then
+        local full = ns.Vendor:FullCharacterSnapshot()
+        money = full.money or money
+        bagCopper = full.bagValue or 0
+        gearCopper = full.gearValue or 0
+        bagItems = full.bagItems or {}
+        gearItems = full.gearItems or {}
+    elseif ns.Vendor and ns.Vendor.BagsSnapshot then
+        bagCopper, bagItems = ns.Vendor:BagsSnapshot()
+        bagCopper = bagCopper or 0
+        bagItems = bagItems or {}
     end
 
     local snap = {
         at                = now(),
         preMoney          = money,
         estimatedBagValue = bagCopper,
+        estimatedGearValue = gearCopper,
         totalLiquid       = money + bagCopper,
+        maximumPotential  = money + bagCopper + gearCopper,
+        bagItems          = bagItems,
+        gearItems         = gearItems,
         credited          = false,
     }
     rec.deathSnapshot = snap
