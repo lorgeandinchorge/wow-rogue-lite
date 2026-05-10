@@ -78,8 +78,12 @@ local PALETTES = {
 local THEME_ORDER = { "classic", "dark", "gw2" }
 local GW2_UI_ADDON_IDS = {
     "GW2_UI",
+    "GW2_UI_Mainline",
     "GW2_UI_TBC",
+    "GW2_UI_Vanilla",
     "GW2_UI_Classic",
+    "GW2_UI_Mists",
+    "GW2_UI_Wrath",
 }
 
 Theme.palettes = PALETTES
@@ -92,10 +96,54 @@ local FONT_HEADER  = "Fonts\\MORPHEUS.TTF"
 if not CreateFont then -- defensive; only true in non-WoW env
 elseif not (MORPHEUS_FONT or true) then FONT_HEADER = FONT_BODY end
 
+local function getAddonInfo(addonNameOrIndex)
+    local api = C_AddOns
+    local fn = api and api.GetAddOnInfo or GetAddOnInfo
+    if not fn then return nil end
+
+    local ok, name, title, notes, loadable, reason, security, newVersion = pcall(fn, addonNameOrIndex)
+    if not ok or reason == "MISSING" then return nil end
+    return name, title, notes, loadable, reason, security, newVersion
+end
+
+local function getAddonEnableState(addonName)
+    if C_AddOns and C_AddOns.GetAddOnEnableState then
+        local ok, state = pcall(C_AddOns.GetAddOnEnableState, addonName, "player")
+        if ok then return state end
+        ok, state = pcall(C_AddOns.GetAddOnEnableState, addonName)
+        if ok then return state end
+    end
+
+    if GetAddOnEnableState then
+        local ok, state = pcall(GetAddOnEnableState, "player", addonName)
+        if ok then return state end
+        ok, state = pcall(GetAddOnEnableState, addonName)
+        if ok then return state end
+    end
+
+    return nil
+end
+
+local function getNumAddOns()
+    if C_AddOns and C_AddOns.GetNumAddOns then
+        local ok, count = pcall(C_AddOns.GetNumAddOns)
+        if ok then return count end
+    end
+    if GetNumAddOns then
+        local ok, count = pcall(GetNumAddOns)
+        if ok then return count end
+    end
+    return 0
+end
+
 local function addonEnabledById(addonName)
-    if not GetAddOnInfo or not GetAddOnInfo(addonName) then return false end
-    if not GetAddOnEnableState then return true end
-    return (GetAddOnEnableState("player", addonName) or 0) > 0
+    local name, _, _, loadable, reason = getAddonInfo(addonName)
+    if not name then return false end
+
+    local state = getAddonEnableState(name)
+    if state ~= nil then return state > 0 end
+
+    return loadable ~= false and reason ~= "DISABLED"
 end
 
 local function normalizeAddonTitle(value)
@@ -115,9 +163,8 @@ local function findEnabledGW2UIAddon()
         if addonEnabledById(addonName) then return addonName end
     end
 
-    if not GetNumAddOns or not GetAddOnInfo then return nil end
-    for i = 1, GetNumAddOns() do
-        local name, title = GetAddOnInfo(i)
+    for i = 1, getNumAddOns() do
+        local name, title = getAddonInfo(i)
         if name and addonTitleLooksLikeGW2UI(title or name) and addonEnabledById(name) then
             return name
         end

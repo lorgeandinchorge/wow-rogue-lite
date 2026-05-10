@@ -1,5 +1,10 @@
 # WoW Roguelite Changelog
 
+## v0.1.3
+
+- Improve GW2 UI theme detection across current GW2 UI flavors and modern addon APIs.
+- Recognize GW2 UI Mainline, TBC, Vanilla, Classic, Mists, and Wrath variants.
+
 ## v0.1.2
 
 - Detect GW2 UI TBC and other GW2 UI variants for theme availability.
