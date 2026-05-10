@@ -83,6 +83,10 @@ local RETIRE_SUBJECT = "Roguelite: final contribution"
 
 function D:Init()
     ns:On("PLAYER_DEAD",       function() self:OnPlayerDead() end)
+    ns:On("PLAYER_ENTERING_WORLD", function() self:ReconcileCurrentDeath("entering_world") end)
+    ns:On("PLAYER_FLAGS_CHANGED", function(unit)
+        if unit == "player" then self:ReconcileCurrentDeath("flags_changed") end
+    end)
     ns:On("PLAYER_UNGHOST",    function() self:OnRevive() end)
     ns:On("PLAYER_ALIVE",      function() self:OnRevive() end)
     ns:On("MAIL_SHOW",         function() self:OnMailShow() end)
@@ -122,6 +126,13 @@ end
 
 function D:_IsEndedState(state)
     return state == "retired" or state == "archived" or state == "dead_pending_contribution"
+end
+
+function D:_IsPlayerDeadOrGhost()
+    if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return true end
+    if UnitIsDead and UnitIsDead("player") then return true end
+    if UnitIsGhost and UnitIsGhost("player") then return true end
+    return false
 end
 
 function D:_ShowFinalDeathPopup(rec, snap)
@@ -222,8 +233,19 @@ function D:ProcessCurrentDeath(reason)
 end
 
 function D:ReconcileCurrentDeath(reason)
-    if not UnitIsDeadOrGhost or not UnitIsDeadOrGhost("player") then return false end
-    return self:ProcessCurrentDeath(reason or "reconcile")
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return false end
+    local state = ns.Run:GetState(rec)
+    if self:_IsEndedState(state) then return false end
+
+    if self:_IsPlayerDeadOrGhost() then
+        return self:ProcessCurrentDeath(reason or "reconcile")
+    end
+
+    if (rec.livesRemaining or 1) < 1 then
+        return self:ProcessCurrentDeath((reason or "reconcile") .. "_out_of_lives")
+    end
+
+    return false
 end
 
 function D:OnPlayerDead()

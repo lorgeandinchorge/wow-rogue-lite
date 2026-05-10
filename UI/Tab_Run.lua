@@ -249,6 +249,19 @@ local function achievementsSummary(maxShown)
     return rows
 end
 
+local function pendingRequestCount()
+    local requests = WRL_DB and WRL_DB.requests
+    if type(requests) ~= "table" then return 0 end
+    local count = 0
+    for _, req in ipairs(requests) do
+        local status = req and req.status
+        if status == "pending" or status == "gathering" then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function writeLines(target, lines)
     for i = 1, #target do
         local fs = target[i]
@@ -260,6 +273,50 @@ local function writeLines(target, lines)
             fs:Hide()
         end
     end
+end
+
+function Tab:_BuildBankerOverviewLines(key)
+    local name, realm = withRealm(key)
+    local total = ns.Database and ns.Database.TotalContributed and ns.Database:TotalContributed()
+        or (WRL_DB and WRL_DB.totalContributed) or 0
+    local spent = WRL_DB and WRL_DB.legacySpent or 0
+    local available = ns.LegacyUnlocks and ns.LegacyUnlocks.AvailableBudget
+        and ns.LegacyUnlocks:AvailableBudget()
+        or math.max(0, total - spent)
+
+    local fmtMoney = function(copper)
+        if ns.Tiers and ns.Tiers.FormatMoney then
+            return ns.Tiers:FormatMoney(copper or 0)
+        end
+        return tostring(copper or 0)
+    end
+
+    local left = {
+        ("You're the banker: |cffc0a060%s|r"):format(name),
+        ("Bank character on %s"):format(realm),
+        ("Total lifetime contributed: %s"):format(fmtMoney(total)),
+        ("Available legacy budget: %s"):format(fmtMoney(available)),
+        ("Pending requests: %d"):format(pendingRequestCount()),
+        "Run state: bank infrastructure",
+        "Deaths on this character do not retire the bank.",
+    }
+
+    local right = {
+        "|cffc0a060Your responsibilities|r",
+        "Fulfill pending requests from the Requests tab.",
+        "Mail starter rewards to run characters.",
+        "Hold contributed gold and items for future runs.",
+        "Track legacy progression through Tiers and Contributions.",
+        "Banker deaths do not retire this character or end account progress.",
+        "",
+        "|cffc0a060Suggested flow|r",
+        "1. Open Requests to see what runners asked for.",
+        "2. Gather gold and items from bank storage.",
+        "3. Use mailbox or trade fulfillment.",
+        "4. Check Contributions and Tiers after final-death mail arrives.",
+    }
+
+    return left, right
 end
 
 function Tab:Init(parent)
@@ -349,6 +406,20 @@ function Tab:Refresh()
     end
 
     local name, realm = withRealm(key)
+    if ns.Database:IsBankCharacter(key) then
+        self.hint:SetText("Bank characters manage the legacy economy instead of running roguelite lives.")
+        self.leftTitle:SetText("Banker Overview")
+        local left, right = self:_BuildBankerOverviewLines(key)
+        writeLines(self.leftLines, left)
+        writeLines(self.rightLines, right)
+        self.content:SetHeight(math.max(1, (#right * 16) + 20))
+        self.scroll:SetVerticalScroll(0)
+        return
+    end
+
+    self.hint:SetText("Snapshot of your current character's run state and audit trail.")
+    self.leftTitle:SetText("Run Snapshot")
+
     local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"
     local level = rec.levelCurrent or rec.levelAtCreate or (UnitLevel and UnitLevel("player")) or "?"
     local lives = rec.livesRemaining or 0

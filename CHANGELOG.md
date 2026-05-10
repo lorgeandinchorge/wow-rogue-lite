@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.1.6
+
+- Reconcile final death on world entry, player flag changes, and revive/body recovery events.
+- Finalize any active non-bank run with no lives remaining, even if the character is no longer dead or ghosted.
+- Add Classic API fallbacks for dead/ghost detection.
+- Show a banker-focused overview on bank characters instead of normal run status details.
+
 ## v0.1.5
 
 - Detect missed final deaths on login/reload when a run character is already dead or ghosted.

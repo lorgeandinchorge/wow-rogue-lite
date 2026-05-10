@@ -2,12 +2,23 @@ local popupShown = {}
 local printed = {}
 local currentDead = true
 local currentMoney = 12345
+local registeredEvents = {}
+local hasDeadOrGhostApi = true
+local unitIsDead = false
+local unitIsGhost = false
 
-local function resetHarness()
+local function resetHarness(opts)
+    opts = opts or {}
     popupShown = {}
     printed = {}
-    currentDead = true
+    registeredEvents = {}
+    currentDead = opts.currentDead
+    if currentDead == nil then currentDead = true end
     currentMoney = 12345
+    hasDeadOrGhostApi = opts.hasDeadOrGhostApi
+    if hasDeadOrGhostApi == nil then hasDeadOrGhostApi = true end
+    unitIsDead = opts.unitIsDead or false
+    unitIsGhost = opts.unitIsGhost or false
 
     WRL_DB = {
         bankCharacter = "Bank-Realm",
@@ -19,7 +30,7 @@ local function resetHarness()
                 class = "WARRIOR",
                 race = "HUMAN",
                 levelCurrent = 12,
-                livesRemaining = 0,
+                livesRemaining = opts.livesRemaining or 0,
                 deathLog = {},
                 claimedTiers = {},
             },
@@ -32,7 +43,13 @@ local function resetHarness()
     _G.GetRealZoneText = function() return "Westfall" end
     _G.GetSubZoneText = function() return "Moonbrook" end
     _G.GetMoney = function() return currentMoney end
-    _G.UnitIsDeadOrGhost = function() return currentDead end
+    if hasDeadOrGhostApi then
+        _G.UnitIsDeadOrGhost = function() return currentDead end
+    else
+        _G.UnitIsDeadOrGhost = nil
+    end
+    _G.UnitIsDead = function() return unitIsDead end
+    _G.UnitIsGhost = function() return unitIsGhost end
     _G.StaticPopupDialogs = {}
     _G.StaticPopup_Show = function(name, ...)
         popupShown[#popupShown + 1] = { name = name, args = { ... } }
@@ -54,7 +71,9 @@ local function resetHarness()
         return module
     end
 
-    function ns:On() end
+    function ns:On(event, cb)
+        registeredEvents[event] = cb
+    end
     function ns:UnitKey() return "Runner-Realm" end
     function ns:Print(msg, ...)
         if select("#", ...) > 0 then msg = msg:format(...) end
@@ -142,6 +161,55 @@ local function testDuplicateAlreadyDeadCheckDoesNotDuplicateDeath()
     assertEqual(#popupShown, 1, "duplicate reconciliation does not show another popup")
 end
 
+local function testAlreadyGhostedCharacterUsesClassicApiFallback()
+    resetHarness({
+        hasDeadOrGhostApi = false,
+        unitIsGhost = true,
+    })
+
+    local rec = WRL_DB.characters["Runner-Realm"]
+    assertEqual(rec.status, "dead_pending_contribution", "ghost fallback detects an already-dead run")
+    assertEqual(#popupShown, 1, "ghost fallback shows final death popup")
+end
+
+local function testEnteringWorldRechecksAlreadyDeadCharacter()
+    resetHarness({ currentDead = false, livesRemaining = 1 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+
+    currentDead = true
+    registeredEvents.PLAYER_ENTERING_WORLD()
+
+    assertEqual(rec.status, "dead_pending_contribution", "entering world catches dead state after login")
+    assertEqual(rec.stateReason, "final_death_entering_world", "entering world records missed-death reason")
+    assertEqual(#popupShown, 1, "entering world shows final death popup")
+end
+
+local function testOutOfLivesActiveCharacterFinalizesOnLoginEvenWhenAlive()
+    resetHarness({ currentDead = false })
+
+    local rec = WRL_DB.characters["Runner-Realm"]
+    assertEqual(rec.status, "dead_pending_contribution", "active out-of-lives run finalizes even when corpse state was missed")
+    assertEqual(rec.stateReason, "final_death_login_out_of_lives", "out-of-lives login path records reason")
+    assertEqual(#popupShown, 1, "out-of-lives login path shows final death popup")
+end
+
+local function testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
+    resetHarness({ currentDead = false, livesRemaining = 1 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "active"
+    rec.livesRemaining = 0
+    rec.stateReason = nil
+    rec.deathLog = {}
+    rec.deathSnapshot = nil
+    popupShown = {}
+
+    registeredEvents.PLAYER_ALIVE()
+
+    assertEqual(rec.status, "dead_pending_contribution", "revive event catches active out-of-lives run")
+    assertEqual(rec.stateReason, "final_death_player_alive_out_of_lives", "revive event records out-of-lives reason")
+    assertEqual(#popupShown, 1, "revive event shows final death popup")
+end
+
 local function testDeathPopupExplainsNextStepsAndMaximumPotential()
     resetHarness()
 
@@ -155,6 +223,10 @@ end
 
 testAlreadyDeadCharacterTriggersFinalDeathPopup()
 testDuplicateAlreadyDeadCheckDoesNotDuplicateDeath()
+testAlreadyGhostedCharacterUsesClassicApiFallback()
+testEnteringWorldRechecksAlreadyDeadCharacter()
+testOutOfLivesActiveCharacterFinalizesOnLoginEvenWhenAlive()
+testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
 testDeathPopupExplainsNextStepsAndMaximumPotential()
 
 print("DeathFlow.test.lua: ok")
