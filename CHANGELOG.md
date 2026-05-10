@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.1.7
+
+- Capture last attacker name and damage type from combat log before PLAYER_DEAD fires.
+- Record sourceName and environmentalType in death memorials and deathLog context entries.
+- Fix combat-log event parsing: correctly skip destFlags/destRaidFlags before suffix arguments.
+- Add 6 new DeathFlow tests covering combat source capture, environmental death, stale attacker timeout, duplicate PLAYER_DEAD guard, missing map APIs, and memorial context propagation.
+
 ## v0.1.6
 
 - Reconcile final death on world entry, player flag changes, and revive/body recovery events.
