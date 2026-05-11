@@ -30,9 +30,26 @@ function V:BagsSnapshot()
     local total = 0
     local items = {}
     for bag = 0, NUM_BAG_SLOTS or 4 do
-        local slots = GetContainerNumSlots(bag) or 0
+        local getNumSlots = GetContainerNumSlots
+            or (C_Container and C_Container.GetContainerNumSlots)
+        local getItemInfo = GetContainerItemInfo
+            or (C_Container and C_Container.GetContainerItemInfo)
+        local slots = getNumSlots and (getNumSlots(bag) or 0) or 0
         for slot = 1, slots do
-            local _, count, _, _, _, _, link, _, hasNoValue = GetContainerItemInfo(bag, slot)
+            local count, link, hasNoValue
+            if GetContainerItemInfo then
+                local _, stackCount, _, _, _, _, itemLink, _, noValue = getItemInfo(bag, slot)
+                count = stackCount
+                link = itemLink
+                hasNoValue = noValue
+            elseif getItemInfo then
+                local info = getItemInfo(bag, slot)
+                if type(info) == "table" then
+                    count = info.stackCount or info.quantity or info.count
+                    link = info.hyperlink or info.itemLink
+                    hasNoValue = info.hasNoValue
+                end
+            end
             if link and not hasNoValue then
                 local copper = self:StackValue(link, count or 1)
                 if copper > 0 then

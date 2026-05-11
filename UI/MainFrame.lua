@@ -168,6 +168,8 @@ function M:RegisterPanel(key, panel)
 end
 
 function M:RefreshHeader()
+    if not self.statsTotal or not self.statsBank then return end
+
     local total = ns.Database:TotalContributed()
     self.statsTotal:SetText("Lifetime  " .. ns.Tiers:FormatMoney(total))
     local bank = WRL_DB.bankCharacter
@@ -210,6 +212,8 @@ function M:ShowTab(key)
 end
 
 function M:RefreshCurrentTab()
+    if not self.panels then return end
+
     local key = self._activeTab
     if key and self.panels[key] and self.panels[key].Refresh then
         self.panels[key]:Refresh()

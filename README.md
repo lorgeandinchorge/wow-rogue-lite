@@ -2,21 +2,21 @@
 
 A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one character as your **bank**; every other character is a **run**. Runs are hardcore: one final death and the character is retired, but everything they contribute to the bank becomes legacy budget for **Storage**, **Stipend**, and **Fate** unlocks that future runs can request as starter kits.
 
-> Status: **first draft (v0.1.8)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
+> Status: **first draft (v0.1.9)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
 
 ## Install
 
 1. Copy the `WoWRoguelite` folder into `World of Warcraft\_classic_\Interface\AddOns\` so the full path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`.
 2. Enable it at the character select screen.
-3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.1.8 loaded.` in chat.
+3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.1.9 loaded.` in chat.
 
 ## Publish releases
 
 This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build and publish the CurseForge package:
 
 ```powershell
-git tag v0.1.8
-git push origin v0.1.8
+git tag v0.1.9
+git push origin v0.1.9
 ```
 
 To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable.

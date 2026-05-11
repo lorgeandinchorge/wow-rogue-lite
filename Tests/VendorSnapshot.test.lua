@@ -80,7 +80,39 @@ local function testFullCharacterSnapshotSeparatesMoneyBagsGearAndPotential()
     assertEqual(snap.maximumPotential, 642, "maximum potential includes money, bags, and gear")
 end
 
+local function testBagsSnapshotUsesCContainerFallback()
+    local vendor = resetHarness()
+    _G.GetContainerNumSlots = nil
+    _G.GetContainerItemInfo = nil
+    _G.C_Container = {
+        GetContainerNumSlots = function(bag)
+            local slots = bagItems[bag]
+            if not slots then return 0 end
+            local max = 0
+            for slot in pairs(slots) do if slot > max then max = slot end end
+            return max
+        end,
+        GetContainerItemInfo = function(bag, slot)
+            local item = bagItems[bag] and bagItems[bag][slot]
+            if not item then return nil end
+            return {
+                stackCount = item.count,
+                hyperlink = item.link,
+                hasNoValue = item.hasNoValue,
+            }
+        end,
+    }
+
+    local total, items = vendor:BagsSnapshot()
+
+    assertEqual(total, 6, "C_Container fallback computes bag value")
+    assertEqual(#items, 1, "C_Container fallback lists vendorable bag items")
+    assertEqual(items[1].link, "|cffffffff|Hitem:300::::::::|h[Linen Cloth]|h|r",
+        "C_Container fallback records item link")
+end
+
 testEquipmentSnapshotAddsVendorableGear()
 testFullCharacterSnapshotSeparatesMoneyBagsGearAndPotential()
+testBagsSnapshotUsesCContainerFallback()
 
 print("VendorSnapshot.test.lua: ok")

@@ -1,5 +1,10 @@
 # WoW Roguelite Changelog
 
+## v0.1.9
+
+- Fix an early bank-status refresh crash before the main window header widgets are built.
+- Add `C_Container` bag API fallback for clients where legacy container globals are unavailable.
+
 ## v0.1.8
 
 - Add a full-screen final-death overlay that appears after corpse recovery or on login for pending deaths.
