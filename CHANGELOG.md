@@ -1,6 +1,6 @@
 # WoW Roguelite Changelog
 
-## v0.1.10
+## v0.2.0
 
 - Fix final-death retire popup formatting on Classic clients that only pass two text arguments through `StaticPopup_Show`.
 - Track player GUIDs so future same-name/same-class rerolls archive the old character record instead of reusing it.
