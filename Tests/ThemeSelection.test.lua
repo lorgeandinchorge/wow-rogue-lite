@@ -244,6 +244,68 @@ local function testSetThemeRefreshesVisibleUi()
     assertEqual(refreshed, true, "theme selection refreshes visible UI")
 end
 
+local function testGrantThemeCanBeSelected()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok, reason = ns.Theme:SetTheme("grant")
+
+    assertEqual(ok, true, "grant theme selection succeeds")
+    assertEqual(reason, nil, "successful grant selection has no failure reason")
+    assertEqual(ns.Settings:Get("uiTheme"), "grant", "stored setting changes to grant")
+    assertEqual(ns.Theme:GetActiveThemeId(), "grant", "active theme is grant")
+    assertEqual(ns.Theme:ThemeLabel("grant"), "Grant", "grant theme has display label")
+    assertEqual(ns.Theme.c.gold[1], 0.486, "grant primary accent uses jewel purple")
+    assertEqual(ns.Theme.c.green[2], 0.659, "grant secondary success uses jewel green")
+end
+
+local function testIsabellaThemeCanBeSelected()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok, reason = ns.Theme:SetTheme("isabella")
+
+    assertEqual(ok, true, "isabella theme selection succeeds")
+    assertEqual(reason, nil, "successful isabella selection has no failure reason")
+    assertEqual(ns.Settings:Get("uiTheme"), "isabella", "stored setting changes to isabella")
+    assertEqual(ns.Theme:GetActiveThemeId(), "isabella", "active theme is isabella")
+    assertEqual(ns.Theme:ThemeLabel("isabella"), "Isabella", "isabella theme has display label")
+    assertEqual(ns.Theme.c.gold[1], 0.851, "isabella primary accent uses jewel pink")
+    assertEqual(ns.Theme.c.green[2], 0.714, "isabella secondary success uses jewel teal")
+end
+
+local function testPersonalThemesAppearInThemeListOrder()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local list = ns.Theme:ThemeList()
+
+    assertEqual(list[4].id, "grant", "grant appears after gw2 in theme list")
+    assertEqual(list[4].available, true, "grant is always available")
+    assertEqual(list[5].id, "isabella", "isabella appears after grant in theme list")
+    assertEqual(list[5].available, true, "isabella is always available")
+end
+
+local function testThemeCommandTextUsesThemeOrder()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    assertEqual(ns.Theme:ThemeUsageText(), "classic | dark | gw2 | grant | isabella", "theme usage text follows theme order")
+    assertEqual(ns.Theme:ThemeSentenceText(), "classic, dark, gw2, grant, or isabella", "theme sentence text follows theme order")
+end
+
 local function testClassicPaletteIsConservativeDarkDefault()
     useCAddOns = false
     addonEnabled = false
@@ -284,6 +346,10 @@ testGw2WrathCanBeSelectedWhenAvailable()
 testGw2DetectedThroughCAddOns()
 testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
 testSetThemeRefreshesVisibleUi()
+testGrantThemeCanBeSelected()
+testIsabellaThemeCanBeSelected()
+testPersonalThemesAppearInThemeListOrder()
+testThemeCommandTextUsesThemeOrder()
 testClassicPaletteIsConservativeDarkDefault()
 testGw2PaletteUsesHeroicSurfaceTokens()
 

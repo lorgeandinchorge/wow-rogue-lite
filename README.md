@@ -2,21 +2,23 @@
 
 A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one character as your **bank**; every other character is a **run**. Runs are hardcore: one final death and the character is retired, but everything they contribute to the bank becomes legacy budget for **Storage**, **Stipend**, and **Fate** unlocks that future runs can request as starter kits.
 
-> Status: **first draft (v0.2.0)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
+> Status: **first draft (v0.2.1)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
+
+> Development note: This project was built with AI assistance, with human direction, review, and testing throughout.
 
 ## Install
 
 1. Copy the `WoWRoguelite` folder into `World of Warcraft\_classic_\Interface\AddOns\` so the full path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`.
 2. Enable it at the character select screen.
-3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.0 loaded.` in chat.
+3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.1 loaded.` in chat.
 
 ## Publish releases
 
 This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build and publish the CurseForge package:
 
 ```powershell
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable.
@@ -78,6 +80,8 @@ Tune these in `Core/LegacyUnlocks.lua` and `Core/Rewards.lua`.
 /wrl theme classic  - use the Classic WoW parchment/brown theme
 /wrl theme dark     - use the neutral dark theme
 /wrl theme gw2      - use the GW2 UI theme when GW2 UI is installed/enabled
+/wrl theme grant    - use the Grant purple/green theme
+/wrl theme isabella - use the Isabella pink/teal theme
 /wrl debug          - toggle debug logging
 /wrl reset confirm  - wipe saved data (cannot be undone)
 ```
@@ -89,6 +93,8 @@ Open `/wrl` and click the gear button near **Close** to choose the account-wide 
 - `classic` is the default Classic WoW-style theme.
 - `dark` is a restrained neutral dark theme.
 - `gw2` uses the addon's GW2-inspired palette and is selectable only when [GW2 UI](https://github.com/Mortalknight/GW2_UI), including the TBC flavor, is installed and enabled.
+- `grant` uses jewel purples as the primary accent with greens as the secondary accent.
+- `isabella` uses jewel pinks as the primary accent with teals as the secondary accent.
 
 Theme changes apply immediately to open addon windows.
 

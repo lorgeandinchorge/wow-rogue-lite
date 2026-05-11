@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.2.1
+
+- Add Grant and Isabella personal UI themes.
+- Generate slash-command theme help from the theme registry so future theme IDs stay in sync.
+- Document that the project was built with AI assistance under human direction, review, and testing.
+
 ## v0.2.0
 
 - Fix final-death retire popup formatting on Classic clients that only pass two text arguments through `StaticPopup_Show`.

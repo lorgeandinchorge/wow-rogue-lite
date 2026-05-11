@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.2.0"
+ns.version     = "0.2.1"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -197,7 +197,7 @@ SlashCmdList["WRL"] = function(msg)
             ns:Print("Current UI theme: %s (active: %s)",
                 ns.Theme:ThemeLabel(ns.Theme:GetSelectedThemeId()),
                 ns.Theme:ThemeLabel(ns.Theme:GetActiveThemeId()))
-            ns:Print("Usage: /wrl theme classic | dark | gw2")
+            ns:Print("Usage: /wrl theme %s", ns.Theme:ThemeUsageText())
         else
             local ok, reason = ns.Theme:SetTheme(themeId)
             if ok then
@@ -208,7 +208,7 @@ SlashCmdList["WRL"] = function(msg)
             elseif reason == "gw2_unavailable" then
                 ns:Print("GW2 UI theme requires GW2 UI or GW2 UI TBC to be installed and enabled.")
             else
-                ns:Print("Unknown theme %q. Use classic, dark, or gw2.", themeId)
+                ns:Print("Unknown theme %q. Use %s.", themeId, ns.Theme:ThemeSentenceText())
             end
         end
     elseif cmd == "debug" then
@@ -252,7 +252,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl profile <id>   - apply a profile by ID")
         ns:Print("  /wrl rules          - list rules and enabled state")
         ns:Print("  /wrl rules log      - print recent taint/warn log entries")
-        ns:Print("  /wrl theme <id>     - set UI theme: classic, dark, or gw2")
+        ns:Print("  /wrl theme <id>     - set UI theme: %s", ns.Theme:ThemeSentenceText())
         ns:Print("  /wrl debug          - toggle debug logging")
         ns:Print("  /wrl reqrefresh     - refresh bag item indicators")
         ns:Print("  /wrl export         - export current run summary (opens popup)")

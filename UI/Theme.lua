@@ -81,9 +81,49 @@ local PALETTES = {
             green     = {0.460, 0.700, 0.460, 1.00},
         },
     },
+    grant = {
+        id = "grant",
+        label = "Grant",
+        c = {
+            bg0       = {0.070, 0.060, 0.100, 0.98},
+            bg1       = {0.125, 0.105, 0.170, 1.00},
+            bg2       = {0.175, 0.135, 0.245, 1.00},
+            bg3       = {0.245, 0.190, 0.335, 1.00},
+            headerBg  = {0.255, 0.185, 0.430, 1.00},
+            navBg     = {0.055, 0.048, 0.080, 1.00},
+            rowBg     = {0.125, 0.105, 0.170, 1.00},
+            rowAccent = {0.486, 0.310, 0.839, 0.70},
+            fg        = {0.935, 0.910, 0.970, 1.00},
+            fg2       = {0.680, 0.640, 0.735, 1.00},
+            gold      = {0.486, 0.310, 0.839, 1.00},
+            goldH     = {0.640, 0.465, 0.960, 1.00},
+            red       = {0.780, 0.300, 0.355, 1.00},
+            green     = {0.263, 0.659, 0.427, 1.00},
+        },
+    },
+    isabella = {
+        id = "isabella",
+        label = "Isabella",
+        c = {
+            bg0       = {0.085, 0.060, 0.095, 0.98},
+            bg1       = {0.155, 0.105, 0.155, 1.00},
+            bg2       = {0.230, 0.140, 0.205, 1.00},
+            bg3       = {0.325, 0.195, 0.285, 1.00},
+            headerBg  = {0.445, 0.225, 0.360, 1.00},
+            navBg     = {0.070, 0.050, 0.080, 1.00},
+            rowBg     = {0.155, 0.105, 0.155, 1.00},
+            rowAccent = {0.851, 0.365, 0.624, 0.70},
+            fg        = {0.970, 0.910, 0.945, 1.00},
+            fg2       = {0.735, 0.640, 0.695, 1.00},
+            gold      = {0.851, 0.365, 0.624, 1.00},
+            goldH     = {1.000, 0.485, 0.755, 1.00},
+            red       = {0.805, 0.285, 0.360, 1.00},
+            green     = {0.208, 0.714, 0.678, 1.00},
+        },
+    },
 }
 
-local THEME_ORDER = { "classic", "dark", "gw2" }
+local THEME_ORDER = { "classic", "dark", "gw2", "grant", "isabella" }
 local GW2_UI_ADDON_IDS = {
     "GW2_UI",
     "GW2_UI_Mainline",
@@ -293,6 +333,23 @@ end
 function Theme:ThemeLabel(themeId)
     local def = PALETTES[themeId]
     return def and def.label or tostring(themeId)
+end
+
+function Theme:ThemeUsageText()
+    return table.concat(THEME_ORDER, " | ")
+end
+
+function Theme:ThemeSentenceText()
+    local count = #THEME_ORDER
+    if count == 0 then return "" end
+    if count == 1 then return THEME_ORDER[1] end
+    if count == 2 then return THEME_ORDER[1] .. " or " .. THEME_ORDER[2] end
+
+    local out = {}
+    for i = 1, count - 1 do
+        out[#out + 1] = THEME_ORDER[i]
+    end
+    return table.concat(out, ", ") .. ", or " .. THEME_ORDER[count]
 end
 
 function Theme:NextAvailableTheme(themeId)
