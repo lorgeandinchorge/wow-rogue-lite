@@ -235,9 +235,14 @@ function C:CreditFinalDeath(characterKey, opts)
     local postMoney = GetMoney and GetMoney() or 0
     local moneyDelta = math.max(0, (snap.preMoney or 0) - postMoney)
     local bagEst = snap.estimatedBagValue or 0
+    local gearEst = snap.estimatedGearValue or 0
     local postBagEst
     if ns.Vendor and ns.Vendor.BagsSnapshot then
         postBagEst = select(1, ns.Vendor:BagsSnapshot()) or 0
+    end
+    local postGearEst
+    if ns.Vendor and ns.Vendor.EquipmentSnapshot then
+        postGearEst = select(1, ns.Vendor:EquipmentSnapshot()) or 0
     end
     local bagDelta
     if postBagEst ~= nil then
@@ -245,10 +250,14 @@ function C:CreditFinalDeath(characterKey, opts)
     else
         bagDelta = bagEst
     end
-    local total = snap.totalLiquid or ((snap.preMoney or 0) + bagEst)
+    local gearDelta = 0
+    if postGearEst ~= nil then
+        gearDelta = math.max(0, gearEst - postGearEst)
+    end
+    local total = snap.maximumPotential or snap.totalLiquid or ((snap.preMoney or 0) + bagEst + gearEst)
 
     -- Cap at the snapshot total so we never over-credit the recorded estimate.
-    local amount = math.min(total, moneyDelta + bagDelta)
+    local amount = math.min(total, moneyDelta + bagDelta + gearDelta)
 
     -- If nothing plausibly moved, mark the snapshot consumed without a receipt
     -- so we don't repeatedly try to credit on future MAIL_SEND_SUCCESS events.
@@ -261,8 +270,8 @@ function C:CreditFinalDeath(characterKey, opts)
     end
 
     local note = opts.note or string.format(
-        "final death credit: moneyDelta=%d bagDelta=%d preBagEst=%d postBagEst=%s cap=%d",
-        moneyDelta, bagDelta, bagEst, tostring(postBagEst), total
+        "final death credit: moneyDelta=%d bagDelta=%d gearDelta=%d preBagEst=%d postBagEst=%s preGearEst=%d postGearEst=%s cap=%d",
+        moneyDelta, bagDelta, gearDelta, bagEst, tostring(postBagEst), gearEst, tostring(postGearEst), total
     )
     local receipt = self:Record(characterKey, amount, opts.source or "final_contribution", {
         confidence        = "estimated",
@@ -271,6 +280,8 @@ function C:CreditFinalDeath(characterKey, opts)
         postMoney         = postMoney,
         estimatedBagValue = snap.estimatedBagValue,
         postEstimatedBagValue = postBagEst,
+        estimatedGearValue = snap.estimatedGearValue,
+        postEstimatedGearValue = postGearEst,
     })
 
     -- Mark the snapshot consumed; second calls short-circuit at the top.

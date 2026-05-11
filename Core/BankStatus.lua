@@ -120,10 +120,9 @@ function B:Status(bankKey)
 
     local seenAt = seenAtByKey[normName(bankKey)]
     if seenAt and (now() - seenAt) <= PRESENCE_TTL then
-        return "online", "Online (addon)", "addon"
+        return "online", "Online", "addon"
     end
 
-    self:Ping(bankKey)
     return "unknown", "Unknown"
 end
 

@@ -255,17 +255,7 @@ function D:Init()
 
     -- StaticPopup definitions (singletons so we register once).
     StaticPopupDialogs["WRL_RETIRE_CONFIRM"] = {
-        text = "YOU DIED. WE'RE SORRY, BUT YOUR NEXT STEPS FOR WOW ROGUE LITE ARE...\n\n" ..
-               "|cffc0a060%s|r is retired. This character can no longer contribute after this final handoff.\n\n" ..
-               "Current money: %s\n" ..
-               "Bag vendor value: %s\n" ..
-               "Equipped gear vendor value: %s\n" ..
-               "Maximum possible contribution: %s\n\n" ..
-               "1. Go to a mailbox.\n" ..
-               "2. The addon will pre-fill mail to your bank (|cffffd700%s|r).\n" ..
-               "3. Send carried gold and eligible items you choose to contribute.\n" ..
-               "4. To reach the maximum, sell vendorable bags/gear first, then mail the gold.\n" ..
-               "5. After mail sends, the addon records the contribution and retires the run.",
+        text = "%s",
         button1  = "Pre-Fill Mail",
         button2  = "Not Now",
         OnAccept = function() ns.Death:OpenMailToBank() end,
@@ -305,15 +295,31 @@ function D:_ShowFinalDeathPopup(rec, snap)
     local bagValue = snap.estimatedBagValue or 0
     local gearValue = snap.estimatedGearValue or 0
     local maxPotential = snap.maximumPotential or (money + bagValue + gearValue)
-    StaticPopup_Show(
-        "WRL_RETIRE_CONFIRM",
+    local postageWarning = ""
+    if maxPotential > 0 and maxPotential < 30 then
+        postageWarning = "\n\n|cffff6060Warning:|r This is less than the 30c postage cost, so mailing it may lose value."
+    end
+    local body = string.format(
+        "YOU DIED. WE'RE SORRY, BUT YOUR NEXT STEPS FOR WOW ROGUE LITE ARE...\n\n" ..
+        "|cffc0a060%s|r is retired. This character can no longer contribute after this final handoff.\n\n" ..
+        "Current money: %s\n" ..
+        "Bag vendor value: %s\n" ..
+        "Equipped gear vendor value: %s\n" ..
+        "Maximum possible contribution: %s%s\n\n" ..
+        "1. Go to a mailbox.\n" ..
+        "2. The addon will pre-fill mail to your bank (|cffffd700%s|r).\n" ..
+        "3. Send carried gold and eligible items you choose to contribute.\n" ..
+        "4. To reach the maximum, sell vendorable bags/gear first, then mail the gold.\n" ..
+        "5. After mail sends, the addon records the contribution and retires the run.",
         rec.key,
         ns.Tiers:FormatMoney(money),
         ns.Tiers:FormatMoney(bagValue),
         ns.Tiers:FormatMoney(gearValue),
         ns.Tiers:FormatMoney(maxPotential),
+        postageWarning,
         bank
     )
+    StaticPopup_Show("WRL_RETIRE_CONFIRM", body)
 end
 
 -- Look up the most recent memorial belonging to this character record by uid.

@@ -63,6 +63,10 @@ local function resetHarness(opts)
     _G.StaticPopupDialogs = {}
     _G.StaticPopup_Show = function(name, ...)
         popupShown[#popupShown + 1] = { name = name, args = { ... } }
+        local dialog = StaticPopupDialogs[name]
+        if dialog and dialog.text then
+            string.format(dialog.text, ...)
+        end
     end
     _G.CreateFrame = function(_frameType)
         return {
@@ -413,14 +417,61 @@ local function testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
 end
 
 local function testDeathPopupExplainsNextStepsAndMaximumPotential()
-    resetHarness()
+    resetHarness({ currentDead = false })
 
-    local text = StaticPopupDialogs["WRL_RETIRE_CONFIRM"].text
+    local text = popupShown[1] and popupShown[1].args[1] or ""
     assertContains(text, "YOU DIED", "popup headline is explicit")
     assertContains(text, "NEXT STEPS FOR WOW ROGUE LITE", "popup explains this is the next-step flow")
     assertContains(text, "Maximum possible contribution", "popup shows max contribution label")
     assertContains(text, "Go to a mailbox", "popup lists mailbox step")
     assertContains(text, "sell vendorable bags/gear", "popup explains max-value path")
+end
+
+local function testFinalDeathPopupUsesSingleFormattedMessageArgument()
+    resetHarness({ currentDead = false })
+
+    local popup = popupShown[1]
+    assert(popup ~= nil, "final death popup was shown")
+    assertEqual(popup.name, "WRL_RETIRE_CONFIRM", "final death popup name")
+    assertEqual(#popup.args, 1, "final death popup passes one formatted body argument")
+    assertContains(popup.args[1], "Runner-Realm", "formatted popup includes character key")
+    assertContains(popup.args[1], "Current money: 12345c", "formatted popup includes current money")
+    assertContains(popup.args[1], "Bank-Realm", "formatted popup includes bank character")
+end
+
+local function testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
+    resetHarness({ currentDead = false })
+    local popup = popupShown[1]
+
+    assert(popup ~= nil, "final death popup was shown")
+    assert(not popup.args[1]:find("less than the 30c postage", 1, true),
+        "normal contribution does not show postage warning")
+
+    resetHarness({ currentDead = false })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 10,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 10,
+        maximumPotential = 10,
+    }
+    WRL_DB.memorials[rec.uid] = {
+        uid = rec.uid,
+        characterKey = rec.key,
+        class = "WARRIOR",
+        race = "HUMAN",
+        level = 12,
+        zone = "Westfall",
+        acknowledged = true,
+    }
+    popupShown = {}
+
+    registeredEvents.PLAYER_ENTERING_WORLD()
+
+    assertContains(popupShown[1].args[1], "less than the 30c postage",
+        "tiny final contribution warns about postage")
 end
 
 local function testCombatDamageSourceCapturedBeforeDeath()
@@ -561,6 +612,8 @@ testEnteringWorldRechecksAlreadyDeadCharacter()
 testOutOfLivesActiveCharacterFinalizesOnLoginEvenWhenAlive()
 testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
 testDeathPopupExplainsNextStepsAndMaximumPotential()
+testFinalDeathPopupUsesSingleFormattedMessageArgument()
+testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
 testCombatDamageSourceCapturedBeforeDeath()
 testEnvironmentalDamageSourceCapturedBeforeDeath()
 testFinalDeathMemorialIncludesSourceContext()

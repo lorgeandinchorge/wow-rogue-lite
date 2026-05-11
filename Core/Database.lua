@@ -74,6 +74,7 @@ local function newCharRecord(key)
     return {
         key            = key,
         uid            = key .. "#" .. tostring(ts),
+        playerGuid     = UnitGUID and UnitGUID("player") or nil,
         generation     = 1,
         isArchived     = false,
         class          = class or "UNKNOWN",
@@ -199,11 +200,16 @@ function D:EnsureCharacter(key)
     local rec = WRL_DB.characters[key]
     local _, currentClass = UnitClass("player")
     currentClass = currentClass or ""
+    local currentGuid = UnitGUID and UnitGUID("player") or nil
 
     -- ── Replacement detection ───────────────────────────────────────────────
-    -- If there's a live record but the class doesn't match the logged-in player,
-    -- the character must have been deleted and a new one rolled with the same name.
-    if rec and currentClass ~= "" and rec.class ~= currentClass then
+    -- If there's a live record but the stored identity no longer matches the
+    -- logged-in player, the character was deleted and re-created with the same
+    -- name.  GUID catches same-name/same-class rerolls after this version; class
+    -- mismatch preserves the older fallback for pre-GUID records.
+    local guidChanged = rec and rec.playerGuid and currentGuid and rec.playerGuid ~= currentGuid
+    local classChanged = rec and currentClass ~= "" and rec.class ~= currentClass
+    if rec and (guidChanged or classChanged) then
         local archiveKey = key .. "#" .. tostring(rec.createdAt or 0)
         if not WRL_DB.characters[archiveKey] then
             rec.isArchived = true
@@ -235,6 +241,7 @@ function D:EnsureCharacter(key)
         if not rec.uid then
             rec.uid = key .. "#" .. tostring(rec.createdAt or 0)
         end
+        if not rec.playerGuid then rec.playerGuid = currentGuid end
         if rec.generation == nil then rec.generation = 1 end
         if rec.isArchived == nil then rec.isArchived = false end
         if rec.claimedTiers     == nil then rec.claimedTiers     = {} end

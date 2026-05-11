@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.1.10
+
+- Fix final-death retire popup formatting on Classic clients that only pass two text arguments through `StaticPopup_Show`.
+- Track player GUIDs so future same-name/same-class rerolls archive the old character record instead of reusing it.
+- Credit sold equipped gear value after final death up to the recorded maximum potential contribution.
+- Warn when a final contribution is below the 30c mail postage cost.
+- Simplify bank presence wording from "Online (addon)" to "Online" and stop passive status refreshes from whisper-pinging offline bank characters.
+
 ## v0.1.9
 
 - Fix an early bank-status refresh crash before the main window header widgets are built.

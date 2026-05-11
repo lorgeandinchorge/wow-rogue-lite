@@ -94,11 +94,11 @@ local function testAddonPresenceMarksUnknownBankOnline()
     local status, label, source = ns.BankStatus:Status("Bank-Realm")
 
     assertEqual(status, "online", "fresh addon presence marks bank online")
-    assertEqual(label, "Online (addon)", "fresh addon presence label")
+    assertEqual(label, "Online", "fresh addon presence label")
     assertEqual(source, "addon", "fresh addon presence source")
 end
 
-local function testStaleAddonPresenceFallsBackToUnknownAndPings()
+local function testStaleAddonPresenceFallsBackToUnknownWithoutChatPing()
     local ns = resetUnknownHarness(200)
 
     ns.BankStatus:MarkSeen("Bank-Realm", 100)
@@ -106,12 +106,12 @@ local function testStaleAddonPresenceFallsBackToUnknownAndPings()
 
     assertEqual(status, "unknown", "stale addon presence falls back to unknown")
     assertEqual(label, "Unknown", "stale addon presence label")
-    assertEqual(ns.Comm.sentPing, "Bank-Realm", "unknown bank gets pinged")
+    assertEqual(ns.Comm.sentPing, nil, "unknown bank is not auto-pinged from status refresh")
 end
 
 testConfiguredBankIsNotSelfOnRunCharacter()
 testConfiguredBankIsSelfOnBankCharacter()
 testAddonPresenceMarksUnknownBankOnline()
-testStaleAddonPresenceFallsBackToUnknownAndPings()
+testStaleAddonPresenceFallsBackToUnknownWithoutChatPing()
 
 print("BankStatus.test.lua: ok")
