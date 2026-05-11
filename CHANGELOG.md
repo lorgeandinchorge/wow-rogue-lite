@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.1.8
+
+- Add a full-screen final-death overlay that appears after corpse recovery or on login for pending deaths.
+- Keep final-death bookkeeping durable while dead or ghosted, then continue into the existing mail/skip retirement flow after the death screen.
+- Fix same-name rerolls so old memorials do not block the current character generation from creating its own memorial.
+- Re-open the retire contribution popup for acknowledged but still-pending deaths until the run is mailed or skipped.
+- Add death-screen compatibility coverage for Classic clients without keyboard propagation APIs.
+
 ## v0.1.7
 
 - Capture last attacker name and damage type from combat log before PLAYER_DEAD fires.

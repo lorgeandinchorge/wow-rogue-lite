@@ -1,5 +1,5 @@
 -- Core/Death.lua
--- Hardcore death handling.
+-- Hardcore-style death handling.
 --
 -- State transitions managed here (via ns.Run:SetState):
 --   final death  → dead_pending_contribution
@@ -9,9 +9,28 @@
 -- Soft deaths (livesRemaining > 0) do not change run state and do not create
 -- memorials.  A local notice is printed only when announceSoftDeaths = true.
 --
--- On final death a memorial entry is written to WRL_DB.memorials (keyed by
--- character uid) exactly once, then an announcement is sent to the channel
--- chosen by the announceDeaths setting (off / local / party / guild).
+-- ── Flow ─────────────────────────────────────────────────────────────────────
+--
+-- PLAYER_DEAD only does the bookkeeping (snapshot money/loot, write memorial,
+-- transition state, announce).  No UI is shown while the player is corpse-
+-- running.  The bookkeeping leaves rec.deathSnapshot + the memorial entry on
+-- disk so a UI reload mid-corpse-run does not lose anything.
+--
+-- PLAYER_UNGHOST / PLAYER_ALIVE present the death screen the moment the player
+-- is alive again (corpse run completed, or spirit-healer revival).  The death
+-- screen is the new ns.DeathScreen overlay; its Continue button chains into
+-- the existing WRL_RETIRE_CONFIRM popup so the contribution mail flow remains.
+--
+-- PLAYER_ENTERING_WORLD reconciles the run on login: if the character is
+-- dead/ghosted but the run state is still active, we run the bookkeeping
+-- pass.  If the character is alive but the state is dead_pending_contribution
+-- (e.g. they alt-F4'd after dying and reloaded later), we re-present the death
+-- screen until the player acknowledges it.
+--
+-- On a final death a memorial entry is written to WRL_DB.memorials (keyed by
+-- character uid) exactly once.  Memorials carry an `acknowledged` flag set
+-- when the player clicks Continue on the death screen — this prevents the
+-- screen from re-popping every login forever.
 --
 -- We deliberately do NOT attempt to "lock" the character out of play — we just
 -- stop crediting any further contributions from a retired char.
@@ -196,7 +215,15 @@ local RETIRE_SUBJECT = "Roguelite: final contribution"
 
 function D:Init()
     ns:On("PLAYER_DEAD",       function() self:OnPlayerDead() end)
-    ns:On("PLAYER_ENTERING_WORLD", function() self:ReconcileCurrentDeath("entering_world") end)
+    ns:On("PLAYER_ENTERING_WORLD", function()
+        self:ReconcileCurrentDeath("entering_world")
+        -- ReconcileCurrentDeath above only handles the "missed-the-death-event"
+        -- case.  If the player is alive at login but the run is already in
+        -- dead_pending_contribution state (they alt-F4'd after dying, or
+        -- released to graveyard between sessions), surface the death screen
+        -- as a reminder.
+        self:TryPresentPendingDeathScreen("entering_world")
+    end)
     ns:On("PLAYER_FLAGS_CHANGED", function(unit)
         if unit == "player" then self:ReconcileCurrentDeath("flags_changed") end
     end)
@@ -256,6 +283,8 @@ function D:Init()
     }
 
     self:ReconcileCurrentDeath("login")
+    -- Login is the moment to surface a missed/un-acknowledged death screen too.
+    self:TryPresentPendingDeathScreen("login")
 end
 
 function D:_IsEndedState(state)
@@ -285,6 +314,87 @@ function D:_ShowFinalDeathPopup(rec, snap)
         ns.Tiers:FormatMoney(maxPotential),
         bank
     )
+end
+
+-- Look up the most recent memorial belonging to this character record by uid.
+function D:_GetMemorialForRec(rec)
+    if not rec or not rec.uid then return nil end
+    if not WRL_DB or not WRL_DB.memorials then return nil end
+    return WRL_DB.memorials[rec.uid]
+end
+
+function D:_GetDeathSnapshotForRec(rec)
+    if not rec then return {} end
+    return (ns.Contributions and ns.Contributions.GetDeathSnapshot
+            and ns.Contributions:GetDeathSnapshot(rec.key))
+        or rec.deathSnapshot
+        or {}
+end
+
+function D:_ShowPendingRetirePopup(rec)
+    if not rec then return false end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return false end
+    self:_ShowFinalDeathPopup(rec, self:_GetDeathSnapshotForRec(rec))
+    return true
+end
+
+-- Show the death-screen overlay (if the module is available) for the given
+-- record.  When the player clicks Continue, the existing retire popup is
+-- shown so the mail/skip flow proceeds as before.  Idempotent — if the screen
+-- is already visible or the memorial has already been acknowledged, no-op.
+function D:_PresentDeathScreen(rec, reason)
+    if not rec then return false end
+    local memorial = self:_GetMemorialForRec(rec)
+    if not memorial then return false end
+    if memorial.acknowledged then return false end
+
+    -- Resolve the snapshot used to populate the retire popup.
+    local snap = self:_GetDeathSnapshotForRec(rec)
+
+    -- Continue handler: mark acknowledged + chain into the retire popup.
+    local function onContinue()
+        if ns.Database and ns.Database.AcknowledgeMemorial then
+            ns.Database:AcknowledgeMemorial(memorial.uid)
+        else
+            memorial.acknowledged = true
+        end
+        D:_ShowFinalDeathPopup(rec, snap)
+    end
+
+    if ns.DeathScreen and ns.DeathScreen.Show then
+        ns.DeathScreen:Show(memorial, snap, rec, onContinue)
+        ns:Debug("Death screen presented (reason=%s)", tostring(reason))
+        return true
+    else
+        -- DeathScreen module unavailable (early boot or stripped build).
+        -- Fall back to the retire popup directly so the player still gets
+        -- the contribution flow.
+        if ns.Database and ns.Database.AcknowledgeMemorial then
+            ns.Database:AcknowledgeMemorial(memorial.uid)
+        else
+            memorial.acknowledged = true
+        end
+        self:_ShowFinalDeathPopup(rec, snap)
+        return true
+    end
+end
+
+-- Shown on revive and on login.  Only fires when:
+--   * the run is in dead_pending_contribution,
+--   * the player is currently alive (not corpse-running),
+--   * a memorial exists and has not been acknowledged.
+function D:TryPresentPendingDeathScreen(reason)
+    local rec = ns.Database and ns.Database:GetCurrentCharacter()
+    if not rec then return false end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return false end
+    if self:_IsPlayerDeadOrGhost() then return false end
+
+    local memorial = self:_GetMemorialForRec(rec)
+    if memorial and memorial.acknowledged then
+        return self:_ShowPendingRetirePopup(rec)
+    end
+
+    return self:_PresentDeathScreen(rec, reason)
 end
 
 function D:ProcessCurrentDeath(reason)
@@ -323,7 +433,11 @@ function D:ProcessCurrentDeath(reason)
         return
     end
 
-    -- Final death: snapshot liquid value, transition to pending state, then prompt.
+    -- ── Final death: bookkeeping only.  No UI is shown here. ────────────────
+    -- The death screen + retire popup are presented when the player is alive
+    -- again (PLAYER_UNGHOST / PLAYER_ALIVE), or on the next login if the
+    -- player logs out before reviving.
+    --
     -- Contributions:SnapshotDeath captures preMoney + bag vendor value + total
     -- onto rec.deathSnapshot so the later mail-credit step can diff against it.
     -- It also mirrors rec._pendingContribution for any legacy callers.
@@ -343,10 +457,10 @@ function D:ProcessCurrentDeath(reason)
     end
 
     -- ── Memorial (Step 11) ─────────────────────────────────────────────────
-    -- Guard with HasMemorial so repeated PLAYER_DEAD firings never create a
-    -- second entry.  The top-of-function state guard already blocks re-entry
-    -- for dead_pending_contribution / retired; this is belt-and-suspenders.
-    if not ns.Database:HasMemorial(key) then
+    -- Guard by uid so repeated PLAYER_DEAD firings never create a second entry
+    -- for this character generation, while same-name rerolls still get their
+    -- own memorials.
+    if not ns.Database:HasMemorialUID(rec.uid) then
         local memorial = {
             uid                  = rec.uid,    -- storage key; see Database:SaveMemorial
             characterKey         = key,
@@ -365,6 +479,9 @@ function D:ProcessCurrentDeath(reason)
             -- livesUsed: deathLog now includes the current death entry (added
             -- by RecordDeathEntry above), so #deathLog equals total lives used.
             livesUsed            = #(rec.deathLog or {}),
+            -- acknowledged: set when the player clicks Continue on the death
+            -- screen.  Until then, every login re-presents the death screen.
+            acknowledged         = false,
             -- Death context (all fields optional; nil when not captured).
             sourceName           = deathCtx.sourceName,
             sourceGuid           = deathCtx.sourceGuid,
@@ -380,7 +497,9 @@ function D:ProcessCurrentDeath(reason)
         self:ResetDeathContext()   -- clear context state after memorial is written
     end
 
-    self:_ShowFinalDeathPopup(rec, snap)
+    -- Friendly chat hint while the player is still corpse-running.  The death
+    -- screen + mail popup will appear the moment they're alive again.
+    ns:Print("|cffff6060Your run has ended.|r Return to your corpse to continue.")
     return true
 end
 
@@ -407,19 +526,18 @@ end
 function D:OnRevive()
     deathCycleOpen = false   -- reset soft-death cycle guard on successful revive
     self:ReconcileCurrentDeath("player_alive")
+
     local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
     local state = ns.Run:GetState(rec)
-    if state == "retired" then
+    if state == "dead_pending_contribution" then
+        -- Player has just returned to their corpse (or accepted the spirit
+        -- healer res).  Present the death screen then retire popup chain.
+        self:TryPresentPendingDeathScreen("revive")
+    elseif state == "retired" then
         ns:Print("|cffff6060This character is retired.|r Further play will not be credited to the bank.")
-    elseif state == "dead_pending_contribution" then
-        local bank = WRL_DB.bankCharacter or "no bank set"
-        ns:Print("|cffffff00Your run has ended.|r Walk to a mailbox to send your contribution to |cffffd700%s|r, or use /wrl.", bank)
     end
 end
 
--- Auto-open the mail window UI to the bank and pre-fill the send tab.
--- We can't force a mailbox open from Lua — player must walk to one. We just
--- set a flag and prefill when MAIL_SHOW fires.
 function D:OpenMailToBank()
     if not WRL_DB.bankCharacter then
         ns:Print("No bank character set. Use /wrl setbank Name-Realm first.")
@@ -445,22 +563,11 @@ function D:OnMailShow()
             "Final run: %s (lvl %d).\nAttach bag contents + fill money. Press Send.",
             rec.key, rec.levelCurrent or 0))
     end
-    -- Pre-fill money = carried copper; player can edit.
     if MoneyInputFrame_SetCopper and SendMailMoney then
         MoneyInputFrame_SetCopper(SendMailMoney, GetMoney() or 0)
     end
 end
 
--- Triggered when a mail is successfully sent.  If the current character is
--- in dead_pending_contribution state, credit the death snapshot exactly once
--- and advance the run to "retired".
---
--- Crediting is delegated to Contributions:CreditFinalDeath, which:
---   * diffs GetMoney() against the death snapshot to derive the money sent,
---   * caps the amount at the snapshot's totalLiquid (no over-credit),
---   * marks the snapshot consumed so repeated MAIL_SEND_SUCCESS events do
---     NOT re-credit the same run,
---   * tags the receipt as "estimated" since items in mail are unverifiable.
 function D:OnMailSent()
     local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
     if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return end
@@ -470,7 +577,6 @@ function D:OnMailSent()
     local receipt = ns.Contributions:CreditFinalDeath(key)
 
     if not snap then
-        -- No snapshot at all — retire without credit so state doesn't stall.
         ns.Run:SetState(key, "retired", "mail_sent_no_snapshot")
         return
     end
@@ -482,7 +588,6 @@ function D:OnMailSent()
             ns.Tiers:FormatMoney(receipt.amount),
             ns.Tiers:FormatMoney(ns.Database:TotalContributed()))
     else
-        -- Snapshot existed but no net change was detected (or already credited).
         ns:Print("|cffc0a060Run retired.|r No new contribution detected since death snapshot.")
     end
 end

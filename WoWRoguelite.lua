@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.1.7"
+ns.version     = "0.1.8"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -79,6 +79,9 @@ ns:On("PLAYER_LOGIN", function()
     ns.Achievements:Init()  -- must follow Contributions/Run/Rules/Tiers for criteria checks
     ns.Comm:Init()
     ns.Requests:Init()
+    -- DeathScreen must Init before Death so Death:Init can call
+    -- TryPresentPendingDeathScreen on login with the UI available.
+    if ns.DeathScreen then ns.DeathScreen:Init() end
     ns.Death:Init()
     ns.Export:Init()        -- after data modules; before UI
 
@@ -258,6 +261,6 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl reset          - wipe ALL addon data (requires confirm)")
         ns:Print("  /wrl help           - show this message")
     else
-        ns:Print("Unknown command: %q  —  type /wrl help for a list.", cmd)
+        ns:Print("Unknown command: %q  -  type /wrl help for a list.", cmd)
     end
 end

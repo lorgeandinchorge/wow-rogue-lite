@@ -458,6 +458,17 @@ function D:SaveMemorial(entry)
     WRL_DB.memorials[entry.uid] = entry
 end
 
+--- Return the memorial stored for a specific character generation uid.
+function D:GetMemorialByUID(uid)
+    if not uid or not WRL_DB or not WRL_DB.memorials then return nil end
+    return WRL_DB.memorials[uid]
+end
+
+--- Returns true when a memorial exists for a specific character generation uid.
+function D:HasMemorialUID(uid)
+    return self:GetMemorialByUID(uid) ~= nil
+end
+
 --- Returns true when any memorial exists for the given character key.
 --- Looks up by the characterKey field stored inside each uid-keyed entry.
 function D:HasMemorial(key)
@@ -466,4 +477,15 @@ function D:HasMemorial(key)
         if m and m.characterKey == key then return true end
     end
     return false
+end
+
+--- Mark a memorial as having been acknowledged on the death screen.
+--- Once acknowledged the death screen will not re-pop on subsequent logins;
+--- the retire popup mail/skip flow remains the only further prompt.
+function D:AcknowledgeMemorial(uid)
+    if not uid or not WRL_DB or not WRL_DB.memorials then return end
+    local m = WRL_DB.memorials[uid]
+    if not m then return end
+    m.acknowledged   = true
+    m.acknowledgedAt = time()
 end
