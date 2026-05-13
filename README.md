@@ -2,7 +2,7 @@
 
 A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one character as your **bank**; every other character is a **run**. Runs are hardcore: one final death and the character is retired, but everything they contribute to the bank becomes legacy budget for **Storage**, **Stipend**, and **Fate** unlocks that future runs can request as starter kits.
 
-> Status: **first draft (v0.2.1)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
+> Status: **first draft (v0.2.2)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
 
 > Development note: This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -10,15 +10,15 @@ A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one 
 
 1. Copy the `WoWRoguelite` folder into `World of Warcraft\_classic_\Interface\AddOns\` so the full path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`.
 2. Enable it at the character select screen.
-3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.1 loaded.` in chat.
+3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.2 loaded.` in chat.
 
 ## Publish releases
 
 This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build and publish the CurseForge package:
 
 ```powershell
-git tag v0.2.1
-git push origin v0.2.1
+git tag v0.2.2
+git push origin v0.2.2
 ```
 
 To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable.
@@ -37,15 +37,15 @@ This marks that character as the bank. Bank characters are out-of-run infrastruc
 
 **On a new character:**
 
-- Open `/wrl` -> **Tiers** to spend available legacy budget into Storage, Stipend, and Fate.
-- Open `/wrl` -> **New Run**.
+- Open `/wrl` -> **Legacy** to review lifetime contribution history and spend available legacy budget into Storage, Stipend, and Fate.
+- Open `/wrl` -> **Rewards**.
 - Tick any unlocked legacy rewards you want sent to you.
 - Click **Send Request**. This addon-whispers your bank character.
 - If the bank is offline, use the mail fallback at any mailbox; the bank picks it up on next login.
 
 **On your bank character:**
 
-- Open `/wrl` -> **Requests** to see incoming kits with a shopping list.
+- Open `/wrl` -> **Rewards** to see incoming kits with a shopping list.
 - Go to a mailbox and click **Fulfill via Mail**: name, subject, and gold pre-fill; drag items into attachment slots; press Send.
 - Or open a **Trade** window with the requester and click **Load into Trade** for the manual trade checklist.
 
@@ -75,10 +75,10 @@ Tune these in `Core/LegacyUnlocks.lua` and `Core/Rewards.lua`.
 /wrl                - toggle the main window
 /wrl setbank        - designate the current character as the bank
 /wrl bank           - show which character is currently the bank
-/wrl request        - jump to the New Run tab
+/wrl request        - jump to the Rewards tab
 /wrl theme          - show the current UI theme
-/wrl theme classic  - use the Classic WoW parchment/brown theme
-/wrl theme dark     - use the neutral dark theme
+/wrl theme classic  - use the Classic WoW / BetterBags-style default theme
+/wrl theme dark     - use the former dark default theme
 /wrl theme gw2      - use the GW2 UI theme when GW2 UI is installed/enabled
 /wrl theme grant    - use the Grant purple/green theme
 /wrl theme isabella - use the Isabella pink/teal theme
@@ -90,8 +90,8 @@ Tune these in `Core/LegacyUnlocks.lua` and `Core/Rewards.lua`.
 
 Open `/wrl` and click the gear button near **Close** to choose the account-wide UI theme, or use `/wrl theme <id>`.
 
-- `classic` is the default Classic WoW-style theme.
-- `dark` is a restrained neutral dark theme.
+- `classic` is the default Classic WoW / BetterBags-style theme.
+- `dark` is the former dark default theme.
 - `gw2` uses the addon's GW2-inspired palette and is selectable only when [GW2 UI](https://github.com/Mortalknight/GW2_UI), including the TBC flavor, is installed and enabled.
 - `grant` uses jewel purples as the primary accent with greens as the secondary accent.
 - `isabella` uses jewel pinks as the primary accent with teals as the secondary accent.
@@ -116,10 +116,8 @@ WoWRoguelite/
 └── UI/
     ├── Theme.lua              palette + widget constructors
     ├── MainFrame.lua          main window + tabs + minimap button
-    ├── Tab_Contributions.lua  per-character contribution bars
-    ├── Tab_Tiers.lua          legacy unlock board
-    ├── Tab_Requests.lua       bank-side pending requests
-    └── Tab_NewRun.lua         requester-side kit selector
+    ├── Tab_Legacy.lua         account legacy economy + contributor roster
+    `-- Tab_Rewards.lua        role-aware requests and fulfillment
 ```
 
 ## Known limits

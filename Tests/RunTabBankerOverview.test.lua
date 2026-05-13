@@ -52,18 +52,17 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
 
     local left, right = tab:_BuildBankerOverviewLines("Bank-Realm")
 
-    assertContains(left[1], "You're the banker", "banker overview starts with banker identity")
-    assertContains(left[2], "Bank character", "banker overview names the role")
-    assertContains(left[3], "Total lifetime contributed: 123456c", "banker overview includes lifetime contributions")
-    assertContains(left[4], "Available legacy budget: 100000c", "banker overview includes available budget")
-    assertContains(left[5], "Pending requests: 2", "banker overview counts pending requests")
+    assertContains(left[1], "Name:", "banker overview starts with character identity")
+    assertContains(left[4], "Realm: Realm", "banker overview includes realm")
+    assertContains(left[5], "bank infrastructure", "banker overview names the bank run state")
+    assertContains(left[6], "Lives remaining: n/a", "banker overview avoids runner life accounting")
 
-    assertEqual(right[1], "|cffc0a060Your responsibilities|r", "right pane has responsibilities heading")
-    assertContains(right[2], "Fulfill pending requests", "responsibilities include request fulfillment")
-    assertContains(right[3], "Mail starter rewards", "responsibilities include mailing rewards")
-    assertContains(right[4], "Hold contributed gold", "responsibilities include bank storage")
-    assertContains(right[5], "Track legacy progression", "responsibilities include legacy progression")
-    assertContains(right[6], "Banker deaths do not retire", "responsibilities explain banker death exemption")
+    assertEqual(right[1], "|cffc0a060Character status|r", "right pane has character status heading")
+    assertContains(right[2], "legacy bank", "status identifies bank character")
+    assertContains(right[3], "do not run roguelite lives", "status avoids runner-only affordances")
+    assertContains(right[4], "do not retire", "status explains banker death exemption")
+    assertEqual(right[6], "|cffc0a060Estimated contribution|r", "right pane includes contribution heading")
+    assertContains(right[11], "Recent taint/warning entries: none", "right pane includes warning summary")
 end
 
 testBankerOverviewReplacesRunSnapshotCopy()

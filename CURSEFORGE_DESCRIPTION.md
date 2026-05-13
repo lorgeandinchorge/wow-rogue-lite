@@ -38,7 +38,7 @@ When a run dies permanently, the addon tracks its final contribution and adds it
 
 ### Starter Reward Requests
 
-On a new run, spend budget on the Tiers tab, then open the New Run tab and request any unlocked legacy rewards. On the bank character, open the Requests tab to see what is needed and fulfill it by mail or trade.
+On a new run, spend budget on the Legacy tab, then open the Rewards tab and request any unlocked legacy rewards. On the bank character, open the Rewards tab to see what is needed and fulfill it by mail or trade.
 
 ### Profiles, Rules, Boons, And Burdens
 

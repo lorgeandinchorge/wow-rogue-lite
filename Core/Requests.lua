@@ -2,7 +2,7 @@
 -- Request queue + fulfillment state machine.
 --
 -- A "request" is: <fromCharacter> wants <list of tier bundles> delivered.
--- The bank character sees these in the Requests tab. Fulfillment has two paths:
+-- The bank character sees these in the Rewards tab. Fulfillment has two paths:
 --
 --   Mail path:   bank opens mailbox → clicks "Send via Mail" on a request →
 --                addon auto-fills recipient + inserts attached items + gold.
@@ -339,7 +339,7 @@ end
 
 local MAX_BANK_FULFILLED_SHOWN = 12
 
--- Bank Requests tab: pending/gathering rows first, then recent fulfilled (audit).
+-- Bank Rewards tab: pending/gathering rows first, then recent fulfilled (audit).
 function R:BankRequestRows()
     local pending = self:PendingRequests()
     local fulfilled = {}
@@ -555,10 +555,10 @@ function R:OnTradeShow()
     end
     if not match then return end
     self._activeTrade = match
-    ns:Print("|cffc0a060Trade opened with %s.|r Use the Requests tab trade checklist, then trade manually.", partner)
+    ns:Print("|cffc0a060Trade opened with %s.|r Use the Rewards tab trade checklist, then trade manually.", partner)
 end
 
--- Called by the Requests tab's trade helper button.
+-- Called by the Rewards tab's trade helper button.
 function R:LoadActiveTrade()
     local req = self._activeTrade
     if not req then ns:Print("No matching trade window is open."); return end

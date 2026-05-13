@@ -5,14 +5,12 @@
 local ADDON_NAME, ns = ...
 local M = ns:NewModule("MainFrame")
 
-local TABS = { "Run", "Contributions", "Tiers", "Rules", "Requests", "NewRun" }
+local TABS = { "Run", "Achievements", "Legacy", "Rewards" }
 local TAB_LABELS = {
     Run = "Current Run",
-    Contributions = "Contributions",
-    Tiers = "Tiers",
-    Rules = "Rules",
-    Requests = "Requests",
-    NewRun = "New Run",
+    Achievements = "Achievements",
+    Legacy = "Legacy",
+    Rewards = "Rewards",
 }
 
 local FRAME_W, FRAME_H = 780, 480
@@ -140,15 +138,20 @@ function M:Init()
     self.header = header
 
     -- Build each panel.
-    if ns.Tab_Run           then ns.Tab_Run:Init(body) end
-    if ns.Tab_Contributions then ns.Tab_Contributions:Init(body) end
-    if ns.Tab_Tiers         then ns.Tab_Tiers:Init(body) end
-    if ns.Tab_Rules         then ns.Tab_Rules:Init(body) end
-    if ns.Tab_Requests      then ns.Tab_Requests:Init(body) end
-    if ns.Tab_NewRun        then ns.Tab_NewRun:Init(body) end
+    if ns.Tab_Run          then ns.Tab_Run:Init(body) end
+    if ns.Tab_Achievements then ns.Tab_Achievements:Init(body) end
+    if ns.Tab_Legacy       then ns.Tab_Legacy:Init(body) end
+    if ns.Tab_Rewards      then ns.Tab_Rewards:Init(body) end
 
     -- Default tab.
     local lastTab = (WRL_CharDB.ui and WRL_CharDB.ui.lastTab) or "Run"
+    if lastTab == "Contributions" or lastTab == "Tiers" then
+        lastTab = "Legacy"
+    elseif lastTab == "Requests" or lastTab == "NewRun" then
+        lastTab = "Rewards"
+    elseif lastTab == "Rules" then
+        lastTab = "Run"
+    end
     self:ShowTab(lastTab)
     self:RefreshHeader()
 
@@ -205,9 +208,6 @@ function M:ShowTab(key)
     WRL_CharDB.ui = WRL_CharDB.ui or {}
     WRL_CharDB.ui.lastTab = key
     self._activeTab = key
-    if key == "Tiers" then
-        ns:Debug("Tiers tab selected → Refresh")
-    end
     if self.panels[key] and self.panels[key].Refresh then self.panels[key]:Refresh() end
 end
 

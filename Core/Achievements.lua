@@ -161,6 +161,54 @@ function A:EarnedCount()
     return n
 end
 
+function A:Browse()
+    local earned = {}
+    local locked = {}
+    local visibleCount = 0
+
+    for _, def in ipairs(ACHIEVEMENTS) do
+        local entry = self:GetEarned(def.id)
+        if entry then
+            visibleCount = visibleCount + 1
+            earned[#earned + 1] = {
+                id = def.id,
+                name = def.name,
+                description = def.description,
+                requirement = def.requirement or def.description,
+                hidden = def.hidden and true or false,
+                when = entry.when,
+                characterKey = entry.characterKey,
+            }
+        elseif not def.hidden then
+            visibleCount = visibleCount + 1
+            locked[#locked + 1] = {
+                id = def.id,
+                name = def.name,
+                description = def.description,
+                requirement = def.requirement or def.description,
+                hidden = false,
+            }
+        end
+    end
+
+    table.sort(earned, function(a, b)
+        if (a.when or 0) ~= (b.when or 0) then
+            return (a.when or 0) > (b.when or 0)
+        end
+        return (a.name or a.id or "") < (b.name or b.id or "")
+    end)
+    table.sort(locked, function(a, b)
+        return (a.name or a.id or "") < (b.name or b.id or "")
+    end)
+
+    return {
+        earnedCount = #earned,
+        visibleCount = visibleCount,
+        earned = earned,
+        locked = locked,
+    }
+end
+
 function A:VisibleDefinitions()
     local out = {}
     for _, def in ipairs(ACHIEVEMENTS) do

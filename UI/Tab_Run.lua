@@ -51,6 +51,14 @@ local function newestPendingOutgoing()
     return best
 end
 
+local function requestTierLabel(req)
+    local tierIds = req and req.tierIds
+    if type(tierIds) ~= "table" or #tierIds == 0 then
+        return "unknown rewards"
+    end
+    return table.concat(tierIds, ", ")
+end
+
 local function rulesSummary(maxRules)
     local defs = ns.Rules and ns.Rules.Definitions and ns.Rules:Definitions() or {}
     local enabled = {}
@@ -211,55 +219,13 @@ local function recentDeaths(rec, maxShown)
     return rows
 end
 
-local function achievementsSummary(maxShown)
-    local rows = {}
-    if not ns.Achievements or not ns.Achievements.VisibleDefinitions then
-        rows[1] = "Achievements: unavailable"
-        return rows
+local function achievementSummaryLine()
+    if not ns.Achievements or not ns.Achievements.EarnedCount then
+        return "Achievements: unavailable"
     end
 
-    local defs = ns.Achievements:VisibleDefinitions()
     local earnedCount = ns.Achievements:EarnedCount()
-    rows[1] = ("Achievements: %d / %d visible earned"):format(earnedCount, #defs)
-
-    local earned = {}
-    for _, def in ipairs(defs) do
-        local entry = ns.Achievements:GetEarned(def.id)
-        if entry then
-            earned[#earned + 1] = { def = def, entry = entry }
-        end
-    end
-    table.sort(earned, function(a, b)
-        return (a.entry.when or 0) > (b.entry.when or 0)
-    end)
-
-    if #earned == 0 then
-        rows[#rows + 1] = " - No achievements earned yet."
-        return rows
-    end
-
-    local limit = math.min(maxShown or 5, #earned)
-    for i = 1, limit do
-        local item = earned[i]
-        rows[#rows + 1] = (" - %s (%s)"):format(item.def.name, fmtWhen(item.entry.when))
-    end
-    if #earned > limit then
-        rows[#rows + 1] = (" - ... and %d more"):format(#earned - limit)
-    end
-    return rows
-end
-
-local function pendingRequestCount()
-    local requests = WRL_DB and WRL_DB.requests
-    if type(requests) ~= "table" then return 0 end
-    local count = 0
-    for _, req in ipairs(requests) do
-        local status = req and req.status
-        if status == "pending" or status == "gathering" then
-            count = count + 1
-        end
-    end
-    return count
+    return ("Achievements: %d earned - open Achievements"):format(earnedCount)
 end
 
 local function writeLines(target, lines)
@@ -277,12 +243,6 @@ end
 
 function Tab:_BuildBankerOverviewLines(key)
     local name, realm = withRealm(key)
-    local total = ns.Database and ns.Database.TotalContributed and ns.Database:TotalContributed()
-        or (WRL_DB and WRL_DB.totalContributed) or 0
-    local spent = WRL_DB and WRL_DB.legacySpent or 0
-    local available = ns.LegacyUnlocks and ns.LegacyUnlocks.AvailableBudget
-        and ns.LegacyUnlocks:AvailableBudget()
-        or math.max(0, total - spent)
 
     local fmtMoney = function(copper)
         if ns.Tiers and ns.Tiers.FormatMoney then
@@ -292,28 +252,27 @@ function Tab:_BuildBankerOverviewLines(key)
     end
 
     local left = {
-        ("You're the banker: |cffc0a060%s|r"):format(name),
-        ("Bank character on %s"):format(realm),
-        ("Total lifetime contributed: %s"):format(fmtMoney(total)),
-        ("Available legacy budget: %s"):format(fmtMoney(available)),
-        ("Pending requests: %d"):format(pendingRequestCount()),
+        ("Name: |cffc0a060%s|r"):format(name),
+        "Class: Bank",
+        "Level: n/a",
+        ("Realm: %s"):format(realm),
         "Run state: bank infrastructure",
-        "Deaths on this character do not retire the bank.",
+        "Lives remaining: n/a",
+        achievementSummaryLine(),
     }
 
     local right = {
-        "|cffc0a060Your responsibilities|r",
-        "Fulfill pending requests from the Requests tab.",
-        "Mail starter rewards to run characters.",
-        "Hold contributed gold and items for future runs.",
-        "Track legacy progression through Tiers and Contributions.",
-        "Banker deaths do not retire this character or end account progress.",
+        "|cffc0a060Character status|r",
+        "This character is marked as the legacy bank.",
+        "Bank characters do not run roguelite lives.",
+        "Deaths on this character do not retire account progress.",
         "",
-        "|cffc0a060Suggested flow|r",
-        "1. Open Requests to see what runners asked for.",
-        "2. Gather gold and items from bank storage.",
-        "3. Use mailbox or trade fulfillment.",
-        "4. Check Contributions and Tiers after final-death mail arrives.",
+        "|cffc0a060Estimated contribution|r",
+        ("Estimated contribution: %s"):format(fmtMoney(0)),
+        "",
+        "|cffc0a060Run audit|r",
+        "Recent contribution receipts: none",
+        "Recent taint/warning entries: none",
     }
 
     return left, right
@@ -370,7 +329,7 @@ function Tab:Init(parent)
 
     self.rightLines = {}
     local prev = nil
-    for i = 1, 34 do
+    for i = 1, 60 do
         local fs = Theme:Text(content, 10, Theme.c.fg2)
         fs:SetWidth(360)
         fs:SetJustifyH("LEFT")
@@ -407,8 +366,8 @@ function Tab:Refresh()
 
     local name, realm = withRealm(key)
     if ns.Database:IsBankCharacter(key) then
-        self.hint:SetText("Bank characters manage the legacy economy instead of running roguelite lives.")
-        self.leftTitle:SetText("Banker Overview")
+        self.hint:SetText("Character-focused dashboard for the logged-in bank character.")
+        self.leftTitle:SetText("Character Dashboard")
         local left, right = self:_BuildBankerOverviewLines(key)
         writeLines(self.leftLines, left)
         writeLines(self.rightLines, right)
@@ -417,57 +376,55 @@ function Tab:Refresh()
         return
     end
 
-    self.hint:SetText("Snapshot of your current character's run state and audit trail.")
-    self.leftTitle:SetText("Run Snapshot")
+    self.hint:SetText("Character-focused dashboard for the logged-in runner.")
+    self.leftTitle:SetText("Character Dashboard")
 
     local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"
     local level = rec.levelCurrent or rec.levelAtCreate or (UnitLevel and UnitLevel("player")) or "?"
     local lives = rec.livesRemaining or 0
-    local profileId = (ns.Settings and ns.Settings.GetProfile and ns.Settings:GetProfile()) or "unknown"
-    local profileName = (ns.Settings and ns.Settings.ProfileDisplayName and ns.Settings:ProfileDisplayName(profileId)) or profileId
     local pending = newestPendingOutgoing()
     local money, bags, total = bagEstimate()
 
     local left = {
-        ("Character: |cffc0a060%s|r"):format(name),
+        ("Name: |cffc0a060%s|r"):format(name),
         ("Class: %s"):format(classLabel(rec.class)),
         ("Level: %s"):format(tostring(level)),
         ("Realm: %s"):format(realm),
         ("Run state: %s"):format(stateLabel(runState)),
         ("Lives remaining: %d"):format(math.max(0, lives)),
-        ("Profile: |cffc0a060%s|r"):format(profileName or "Unknown"),
+        achievementSummaryLine(),
+        "",
+        ("Estimated contribution: %s"):format(ns.Tiers:FormatMoney(total)),
+        (" - Money: %s"):format(ns.Tiers:FormatMoney(money)),
+        (" - Vendorable bags: %s"):format(ns.Tiers:FormatMoney(bags)),
     }
 
-    local ruleBits = rulesSummary(3)
-    for i = 1, #ruleBits do left[#left + 1] = ruleBits[i] end
-
-    local claimBits = claimedSummary(rec, 4)
-    for i = 1, #claimBits do left[#left + 1] = claimBits[i] end
-
-    local boonBits = activeBoonsSummary(rec)
-    for i = 1, #boonBits do left[#left + 1] = boonBits[i] end
-
-    local burdenBits = activeBurdensSummary(rec)
-    for i = 1, #burdenBits do left[#left + 1] = burdenBits[i] end
-
-    left[#left + 1] = ("Estimated contribution now: %s"):format(ns.Tiers:FormatMoney(total))
-    left[#left + 1] = (" - Money: %s"):format(ns.Tiers:FormatMoney(money))
-    left[#left + 1] = (" - Vendorable bags: %s"):format(ns.Tiers:FormatMoney(bags))
-
     if pending then
-        left[#left + 1] = ("Pending outgoing request: %s"):format(table.concat(pending.tierIds or {}, ", "))
+        left[#left + 1] = ""
+        left[#left + 1] = ("Pending outgoing request: %s"):format(requestTierLabel(pending))
         left[#left + 1] = (" - Status: %s | Sent: %s"):format(pending.status or "sent", fmtWhen(pending.when))
         left[#left + 1] = (" - Bank: %s"):format(shortName(pending.bank))
     else
+        left[#left + 1] = ""
         left[#left + 1] = "Pending outgoing request: none"
     end
 
     writeLines(self.leftLines, left)
 
     local right = {}
-    right[#right + 1] = "|cffc0a060Legacy achievements|r"
-    local achieves = achievementsSummary(6)
-    for i = 1, #achieves do right[#right + 1] = achieves[i] end
+    right[#right + 1] = "|cffc0a060Active rules|r"
+    local ruleBits = rulesSummary(6)
+    for i = 1, #ruleBits do right[#right + 1] = ruleBits[i] end
+    right[#right + 1] = ""
+    right[#right + 1] = "|cffc0a060Claimed rewards|r"
+    local claimBits = claimedSummary(rec, 6)
+    for i = 1, #claimBits do right[#right + 1] = claimBits[i] end
+    right[#right + 1] = ""
+    right[#right + 1] = "|cffc0a060Active boons and burdens|r"
+    local boonBits = activeBoonsSummary(rec)
+    for i = 1, #boonBits do right[#right + 1] = boonBits[i] end
+    local burdenBits = activeBurdensSummary(rec)
+    for i = 1, #burdenBits do right[#right + 1] = burdenBits[i] end
     right[#right + 1] = ""
     right[#right + 1] = "|cffc0a060Recent contribution receipts|r"
     local receipts = recentReceipts(key, 5)

@@ -99,7 +99,7 @@ end
 function D:Init()
     WRL_DB = WRL_DB or {}
     WRL_CharDB = WRL_CharDB or {}
-    WRL_CharDB.ui = WRL_CharDB.ui or { x = nil, y = nil, lastTab = "Contributions" }
+    WRL_CharDB.ui = WRL_CharDB.ui or { x = nil, y = nil, lastTab = "Legacy" }
     WRL_CharDB.outgoing = WRL_CharDB.outgoing or {}
 
     -- Merge defaults into existing DB (preserves saved fields).

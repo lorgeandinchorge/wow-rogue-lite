@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.2.1"
+ns.version     = "0.2.2"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -112,7 +112,7 @@ SlashCmdList["WRL"] = function(msg)
         local key = WRL_DB and WRL_DB.bankCharacter
         ns:Print("Bank character: %s", key or "not set (use /wrl setbank Name-Realm)")
     elseif cmd == "request" then
-        ns.MainFrame:ShowTab("NewRun")
+        ns.MainFrame:ShowTab("Rewards")
     elseif cmd == "settings" then
         -- Print current account-wide settings to chat for debug inspection.
         local s = WRL_DB and WRL_DB.settings
@@ -245,7 +245,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl setbank        - mark current char as the bank")
         ns:Print("  /wrl setbank NAME   - set an external bank character")
         ns:Print("  /wrl bank           - show current bank char")
-        ns:Print("  /wrl request        - open request builder (non-bank chars)")
+        ns:Print("  /wrl request        - open the Rewards tab")
         ns:Print("  /wrl settings       - print current settings to chat")
         ns:Print("  /wrl profile        - show active profile")
         ns:Print("  /wrl profile list   - list all profiles")

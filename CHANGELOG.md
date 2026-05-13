@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.2
+
+- Consolidate top-level UI into Current Run, Achievements, Legacy, and Rewards tabs.
+- Move rule profiles, rule toggles, and recent rule logs into the gear Settings popup.
+- Refresh the default theme with a BetterBags-style Classic WoW palette and move the previous default dark palette to the Dark theme.
+- Update reward/request docs and smoke-test guidance for the consolidated tabs.
+
 ## v0.2.1
 
 - Add Grant and Isabella personal UI themes.

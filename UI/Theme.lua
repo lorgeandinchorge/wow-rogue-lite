@@ -2,14 +2,14 @@
 -- Theme registry and widget constructors.
 --
 -- Palette (sRGB):
---   bg0   #0e0e10  (deepest, main frame fill)
---   bg1   #1c1c1f  (card / panel)
---   bg2   #2a2a2e  (elevated: buttons, tab bar)
---   bg3   #3a3a3f  (hover)
---   fg    #e6e0d4  (primary text)
---   fg2   #9a948a  (secondary text)
---   gold  #c0a060  (accent / borders / active tab)
---   goldH #e0c080  (hover gold)
+--   bg0   deepest main frame fill
+--   bg1   card / panel
+--   bg2   elevated: buttons, tab bar
+--   bg3   hover
+--   fg    primary text
+--   fg2   secondary text
+--   gold  accent / borders / active tab
+--   goldH hover gold
 --   red   #b85c5c  (error / retired)
 --   green #7ab27a  (success / alive)
 --
@@ -28,6 +28,26 @@ local PALETTES = {
         id = "classic",
         label = "Classic WoW",
         c = {
+            bg0       = {0.135, 0.082, 0.045, 0.98},
+            bg1       = {0.205, 0.140, 0.075, 1.00},
+            bg2       = {0.300, 0.215, 0.120, 1.00},
+            bg3       = {0.420, 0.310, 0.170, 1.00},
+            headerBg  = {0.240, 0.145, 0.070, 1.00},
+            navBg     = {0.105, 0.060, 0.035, 1.00},
+            rowBg     = {0.185, 0.120, 0.065, 1.00},
+            rowAccent = {0.960, 0.780, 0.360, 0.65},
+            fg        = {0.980, 0.895, 0.680, 1.00},
+            fg2       = {0.760, 0.640, 0.460, 1.00},
+            gold      = {1.000, 0.820, 0.360, 1.00},
+            goldH     = {1.000, 0.930, 0.520, 1.00},
+            red       = {0.790, 0.260, 0.180, 1.00},
+            green     = {0.365, 0.690, 0.420, 1.00},
+        },
+    },
+    dark = {
+        id = "dark",
+        label = "Dark",
+        c = {
             bg0       = {0.045, 0.047, 0.055, 0.98},
             bg1       = {0.095, 0.098, 0.112, 1.00},
             bg2       = {0.145, 0.150, 0.170, 1.00},
@@ -42,22 +62,6 @@ local PALETTES = {
             goldH     = {0.930, 0.800, 0.480, 1.00},
             red       = {0.760, 0.305, 0.300, 1.00},
             green     = {0.410, 0.690, 0.460, 1.00},
-        },
-    },
-    dark = {
-        id = "dark",
-        label = "Dark",
-        c = {
-            bg0   = {0.035, 0.038, 0.043, 0.98},
-            bg1   = {0.080, 0.086, 0.096, 1.00},
-            bg2   = {0.135, 0.145, 0.160, 1.00},
-            bg3   = {0.205, 0.218, 0.240, 1.00},
-            fg    = {0.890, 0.900, 0.900, 1.00},
-            fg2   = {0.575, 0.610, 0.620, 1.00},
-            gold  = {0.720, 0.650, 0.455, 1.00},
-            goldH = {0.880, 0.790, 0.560, 1.00},
-            red   = {0.760, 0.305, 0.330, 1.00},
-            green = {0.365, 0.680, 0.520, 1.00},
         },
     },
     gw2 = {

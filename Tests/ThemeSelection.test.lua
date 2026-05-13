@@ -306,7 +306,7 @@ local function testThemeCommandTextUsesThemeOrder()
     assertEqual(ns.Theme:ThemeSentenceText(), "classic, dark, gw2, grant, or isabella", "theme sentence text follows theme order")
 end
 
-local function testClassicPaletteIsConservativeDarkDefault()
+local function testClassicPaletteUsesBetterBagsStyleDefault()
     useCAddOns = false
     addonEnabled = false
     addonId = "GW2_UI"
@@ -314,9 +314,24 @@ local function testClassicPaletteIsConservativeDarkDefault()
     local ns = resetHarness()
 
     assertEqual(ns.Theme:GetActiveThemeId(), "classic", "classic remains the default active theme")
-    assertEqual(ns.Theme.c.bg0[1], 0.045, "classic default bg0 red channel is dark neutral")
-    assertEqual(ns.Theme.c.headerBg[1], 0.105, "classic default has conservative dark header token")
-    assertEqual(ns.Theme.c.gold[1], 0.780, "classic default has restrained gold accent")
+    assertEqual(ns.Theme.c.bg0[1], 0.135, "classic default uses a warmer Blizzard panel base")
+    assertEqual(ns.Theme.c.headerBg[1], 0.240, "classic default has a BetterBags-style panel header")
+    assertEqual(ns.Theme.c.gold[1], 1.000, "classic default uses brighter Blizzard title gold")
+end
+
+local function testDarkPaletteUsesPreviousClassicDarkDefault()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok = ns.Theme:SetTheme("dark")
+
+    assertEqual(ok, true, "dark theme can be selected")
+    assertEqual(ns.Theme.c.bg0[1], 0.045, "dark inherits the previous default bg0 red channel")
+    assertEqual(ns.Theme.c.headerBg[1], 0.105, "dark inherits the previous default header token")
+    assertEqual(ns.Theme.c.gold[1], 0.780, "dark inherits the previous default restrained gold")
 end
 
 local function testGw2PaletteUsesHeroicSurfaceTokens()
@@ -350,7 +365,8 @@ testGrantThemeCanBeSelected()
 testIsabellaThemeCanBeSelected()
 testPersonalThemesAppearInThemeListOrder()
 testThemeCommandTextUsesThemeOrder()
-testClassicPaletteIsConservativeDarkDefault()
+testClassicPaletteUsesBetterBagsStyleDefault()
+testDarkPaletteUsesPreviousClassicDarkDefault()
 testGw2PaletteUsesHeroicSurfaceTokens()
 
 print("ThemeSelection.test.lua: ok")

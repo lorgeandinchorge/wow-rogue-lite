@@ -79,15 +79,15 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] Open the addon on a different character.
   Expected: the same bank is visible account-wide.
 
-### 3. New Run Flow
+### 3. Rewards Flow
 
 - [ ] Open the addon on a non-bank character.
-  Expected: the run character can view Current Run, Rules, Tiers, and New Run cleanly.
+  Expected: the run character can view Current Run, Achievements, Legacy, and Rewards cleanly.
 
-- [ ] Open the New Run tab.
+- [ ] Open the Rewards tab.
   Expected: it clearly explains where rewards will be sent from.
 
-- [ ] Open the Tiers tab and unlock an affordable Storage, Stipend, or Fate node if budget is available.
+- [ ] Open the Legacy tab and unlock an affordable Storage, Stipend, or Fate node if budget is available.
   Expected: available budget decreases, the node becomes unlocked, and the UI refreshes cleanly.
 
 - [ ] Select any available boon or burden.
@@ -96,9 +96,9 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] If rewards are unlocked, try sending a request.
   Expected: the request sends cleanly and the addon gives clear feedback.
 
-### 4. Bank Request Flow
+### 4. Bank Rewards Flow
 
-- [ ] On the bank character, open the Requests tab.
+- [ ] On the bank character, open the Rewards tab.
   Expected: incoming requests appear clearly.
 
 - [ ] Check whether the shopping list is understandable.
@@ -135,7 +135,7 @@ If you want to go deeper, these are the main areas to cover.
 ### C. Profiles And Rules
 
 - [ ] Switching profiles works.
-- [ ] Rules tab reflects the selected profile.
+- [ ] The gear Settings popup reflects the selected profile.
 - [ ] Individual rule toggles behave sensibly.
 - [ ] Rule warnings are understandable when triggered.
 
@@ -154,9 +154,9 @@ If you want to go deeper, these are the main areas to cover.
 - [ ] Fulfilled requests do not double-credit rewards or lives.
 - [ ] Bank-side bag/item guidance is useful.
 
-### F. Contributions And Export
+### F. Legacy Contributions And Export
 
-- [ ] Contributions increase totals correctly.
+- [ ] Legacy contribution totals increase correctly.
 - [ ] Receipts and history feel believable.
 - [ ] `/wrl export` works and produces readable output.
 

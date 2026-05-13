@@ -44,7 +44,7 @@ function Options:Init()
     hint:SetPoint("TOPLEFT", openMain, "BOTTOMLEFT", 0, -16)
     hint:SetWidth(560)
     hint:SetJustifyH("LEFT")
-    hint:SetText("Most gameplay rules live inside /wrl > Rules. General addon preferences live in the gear settings popup.")
+    hint:SetText("Gameplay rules and general addon preferences live in the /wrl gear Settings popup.")
 
     if InterfaceOptions_AddCategory then
         InterfaceOptions_AddCategory(panel)

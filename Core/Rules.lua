@@ -27,7 +27,7 @@ local MAX_LOG_ENTRIES = 200
 -- Fields:
 --   id          (string)  – stable identifier; matches the key in WRL_DB.settings.rules
 --   name        (string)  – human-readable short name for UI
---   description (string)  – one-line explanation shown in Rules tab
+--   description (string)  – one-line explanation shown in Settings
 --   default     (bool)    – enabled state when no saved setting exists
 --   severity    (string)  – "warn" | "strict" (hint for UI coloring; enforcement is always soft)
 --   events      (table)   – WoW events that trigger the rule's handler
@@ -335,7 +335,7 @@ function Rules:GetDef(ruleId)
 end
 
 -- ── Claimed reward guard ─────────────────────────────────────────────────────
--- Called by Tab_NewRun / Requests before a claim is submitted.
+-- Called by the Rewards tab before a claim is submitted.
 -- Returns true when the tier is new; returns false when it was already claimed.
 
 function Rules:CheckTierClaimAvailable(characterKey, tierId)
