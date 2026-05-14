@@ -137,14 +137,14 @@ function Popup:Init()
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    Theme:Fill(f, Theme.c.bg0, true)
+    Theme:Fill(f, Theme.c.bg0, true, "frame")
     table.insert(UISpecialFrames, "WRL_SettingsPopup")
 
     local header = CreateFrame("Frame", nil, f)
     header:SetPoint("TOPLEFT", 0, 0)
     header:SetPoint("TOPRIGHT", 0, 0)
     header:SetHeight(52)
-    Theme:Fill(header, Theme.c.headerBg or Theme.c.bg1, false)
+    Theme:Fill(header, Theme.c.headerBg or Theme.c.bg1, false, "header")
     self.header = header
 
     local title = Theme:Header(header, "Settings", 18)
@@ -418,8 +418,8 @@ end
 function Popup:RefreshTheme()
     if not self.frame then return end
     local Theme = ns.Theme
-    Theme:Fill(self.frame, Theme.c.bg0, true)
-    if self.header then Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false) end
+    Theme:Fill(self.frame, Theme.c.bg0, true, "frame")
+    if self.header then Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false, "header") end
     if self.title then setTextColor(self.title, Theme.c.fg, 1) end
     if self.themeLabel then setTextColor(self.themeLabel, Theme.c.goldH, 1) end
     if self.deathLabel then setTextColor(self.deathLabel, Theme.c.goldH, 1) end

@@ -41,13 +41,13 @@ function M:Init()
         f:SetPoint("CENTER")
     end
 
-    Theme:Fill(f, Theme.c.bg0, true)
+    Theme:Fill(f, Theme.c.bg0, true, "frame")
 
     -- Header ---------------------------------------------------------------
     local header = CreateFrame("Frame", nil, f)
     header:SetPoint("TOPLEFT", 0, 0); header:SetPoint("TOPRIGHT", 0, 0)
     header:SetHeight(64)
-    Theme:Fill(header, Theme.c.headerBg or Theme.c.bg1, false)
+    Theme:Fill(header, Theme.c.headerBg or Theme.c.bg1, false, "header")
 
     local title = Theme:Header(header, "ROGUELITE", 22)
     title:SetPoint("TOPLEFT", 18, -14)
@@ -65,7 +65,7 @@ function M:Init()
     settings:SetPoint("RIGHT", close, "LEFT", -6, 0)
     settings.bg = settings:CreateTexture(nil, "BACKGROUND")
     settings.bg:SetAllPoints(settings)
-    settings.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+    Theme:ApplyButtonBackground(settings, "normal")
     settings.icon = settings:CreateTexture(nil, "ARTWORK")
     settings.icon:SetPoint("CENTER", 0, 0)
     settings.icon:SetSize(16, 16)
@@ -76,14 +76,14 @@ function M:Init()
         end
     end)
     settings:SetScript("OnEnter", function(self)
-        self.bg:SetColorTexture(Theme.c.bg3[1], Theme.c.bg3[2], Theme.c.bg3[3], 1)
+        Theme:ApplyButtonBackground(self, "hover")
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Settings")
         GameTooltip:AddLine("Open addon preferences.", 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     settings:SetScript("OnLeave", function(self)
-        self.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+        Theme:ApplyButtonBackground(self, "normal")
         GameTooltip:Hide()
     end)
     self.settingsButton = settings
@@ -106,7 +106,7 @@ function M:Init()
     tabBar:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, 0)
     tabBar:SetHeight(32)
     tabBar:SetFrameLevel(f:GetFrameLevel() + 10)
-    Theme:Fill(tabBar, Theme.c.navBg or Theme.c.bg1, false)
+    Theme:Fill(tabBar, Theme.c.navBg or Theme.c.bg1, false, "nav")
     self.tabBar = tabBar
 
     self.tabs = {}
@@ -127,7 +127,7 @@ function M:Init()
     body:SetPoint("TOPLEFT", tabBar, "BOTTOMLEFT", 0, 0)
     body:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
     body:SetFrameLevel(f:GetFrameLevel() + 1)
-    Theme:Fill(body, Theme.c.bg0, false)
+    Theme:Fill(body, Theme.c.bg0, false, "body")
     self.body = body
 
     -- Each tab panel is a child frame on `body`, hidden by default. Tabs
@@ -223,12 +223,12 @@ end
 function M:RefreshTheme()
     if not self.frame then return end
     local Theme = ns.Theme
-    Theme:Fill(self.frame, Theme.c.bg0, true)
-    Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false)
-    if self.tabBar then Theme:Fill(self.tabBar, Theme.c.navBg or Theme.c.bg1, false) end
-    if self.body then Theme:Fill(self.body, Theme.c.bg0, false) end
+    Theme:Fill(self.frame, Theme.c.bg0, true, "frame")
+    Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false, "header")
+    if self.tabBar then Theme:Fill(self.tabBar, Theme.c.navBg or Theme.c.bg1, false, "nav") end
+    if self.body then Theme:Fill(self.body, Theme.c.bg0, false, "body") end
     if self.settingsButton and self.settingsButton.bg then
-        self.settingsButton.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+        Theme:ApplyButtonBackground(self.settingsButton, "normal")
     end
     if self.statsTotal then
         self.statsTotal:SetTextColor(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 1)

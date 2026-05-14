@@ -133,7 +133,7 @@ end
 local function createInfoCard(parent, Theme, width, titleText)
     local f = CreateFrame("Frame", nil, parent)
     f:SetWidth(width)
-    Theme:Fill(f, Theme.c.bg1, true)
+    Theme:Fill(f, Theme.c.bg1, true, "panel")
 
     f.title = Theme:Text(f, 12, Theme.c.goldH)
     f.title:SetPoint("TOPLEFT", 12, -10)
@@ -515,17 +515,17 @@ function Tab:Init(parent)
     self.modWrap = CreateFrame("Frame", nil, p)
     self.modWrap:SetPoint("TOPLEFT", self.modHint, "BOTTOMLEFT", 0, -6)
     self.modWrap:SetSize(720, (MOD_ROW_H + 1) * 5 + 8)
-    Theme:Fill(self.modWrap, Theme.c.bg1, true)
+    Theme:Fill(self.modWrap, Theme.c.bg1, true, "panel")
 
     self.boonPanel = CreateFrame("Frame", nil, self.modWrap)
     self.boonPanel:SetPoint("TOPLEFT", 8, -5)
     self.boonPanel:SetSize(344, self.modWrap:GetHeight() - 10)
-    Theme:Fill(self.boonPanel, Theme.c.bg0, false)
+    Theme:Fill(self.boonPanel, Theme.c.bg0, false, "panel")
 
     self.burdenPanel = CreateFrame("Frame", nil, self.modWrap)
     self.burdenPanel:SetPoint("TOPRIGHT", -8, -5)
     self.burdenPanel:SetSize(344, self.modWrap:GetHeight() - 10)
-    Theme:Fill(self.burdenPanel, Theme.c.bg0, false)
+    Theme:Fill(self.burdenPanel, Theme.c.bg0, false, "panel")
 
     self.boonLabel = Theme:Text(self.boonPanel, 11, Theme.c.gold)
     self.boonLabel:SetPoint("TOPLEFT", 8, -4)
@@ -580,7 +580,7 @@ function Tab:Init(parent)
     footer:SetPoint("BOTTOMLEFT", 0, 0)
     footer:SetPoint("BOTTOMRIGHT", 0, 0)
     footer:SetHeight(46)
-    Theme:Fill(footer, Theme.c.bg1, false)
+    Theme:Fill(footer, Theme.c.bg1, false, "footer")
     self.footer = footer
 
     self.sendBtn = Theme:Button(footer, "Send Request", 140, 24)

@@ -211,7 +211,64 @@ function D:AnnounceMemorial(memorial)
     end
 end
 
-local RETIRE_SUBJECT = "Roguelite: final contribution"
+local RETIRE_SUBJECT = "WRL-CONTRIB:"
+
+local function ensureContributionMail()
+    WRL_DB.contributionMail = WRL_DB.contributionMail or {}
+    WRL_DB.contributionMail.outbox = WRL_DB.contributionMail.outbox or {}
+    WRL_DB.contributionMail.inbox = WRL_DB.contributionMail.inbox or {}
+    return WRL_DB.contributionMail
+end
+
+local function makeContributionMailId(rec)
+    local base = (rec and rec.uid) or (rec and rec.key) or (ns.UnitKey and ns:UnitKey()) or "unknown"
+    return tostring(base) .. "-" .. tostring(time and time() or 0)
+end
+
+local function parseContributionMailSubject(subject)
+    if type(subject) ~= "string" then return nil end
+    if subject:sub(1, #RETIRE_SUBJECT) ~= RETIRE_SUBJECT then return nil end
+    local id = subject:sub(#RETIRE_SUBJECT + 1):gsub("^%s+", ""):gsub("%s+$", "")
+    if id == "" then return nil end
+    return id
+end
+
+local function setSendMailCopper(copper)
+    copper = math.max(0, math.floor(copper or 0))
+    if MoneyInputFrame_SetCopper and SendMailMoney then
+        MoneyInputFrame_SetCopper(SendMailMoney, copper)
+    end
+
+    local gold = math.floor(copper / 10000)
+    local silver = math.floor((copper % 10000) / 100)
+    local copperOnly = copper % 100
+    local function setBox(box, value)
+        if not box then return end
+        if box.SetNumber then box:SetNumber(value) end
+        if box.SetText then box:SetText(tostring(value)) end
+    end
+    setBox(SendMailMoneyGold, gold)
+    setBox(SendMailMoneySilver, silver)
+    setBox(SendMailMoneyCopper, copperOnly)
+end
+
+local function itemSummary(items, limit)
+    if type(items) ~= "table" or #items == 0 then return "none" end
+    limit = limit or 6
+    local rows = {}
+    for i, it in ipairs(items) do
+        if i > limit then
+            rows[#rows + 1] = ("...and %d more"):format(#items - limit)
+            break
+        end
+        rows[#rows + 1] = ("x%d %s (%s)"):format(
+            it.count or 1,
+            it.link or "item",
+            ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(it.copper or 0) or tostring(it.copper or 0)
+        )
+    end
+    return table.concat(rows, "\n")
+end
 
 function D:Init()
     ns:On("PLAYER_DEAD",       function() self:OnPlayerDead() end)
@@ -553,24 +610,127 @@ function D:OpenMailToBank()
     self._awaitingMailbox = true
 end
 
-function D:OnMailShow()
-    if not self._awaitingMailbox then return end
-    self._awaitingMailbox = false
+function D:FillContributionMail()
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return false end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return false end
+    if not WRL_DB.bankCharacter then return false end
 
-    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
     if MailFrameTab2 and MailFrameTab2.Click then MailFrameTab2:Click() end
+
+    local snap = self:_GetDeathSnapshotForRec(rec)
+    local store = ensureContributionMail()
+    local mailId = rec._pendingContributionMailId
+    if not mailId or not store.outbox[mailId] then
+        mailId = makeContributionMailId(rec)
+        rec._pendingContributionMailId = mailId
+    end
+
+    local currentCopper = GetMoney and (GetMoney() or 0) or 0
+    local estimated = (snap and (snap.maximumPotential or snap.totalLiquid)) or currentCopper
+    store.outbox[mailId] = store.outbox[mailId] or {
+        id = mailId,
+        uid = rec.uid,
+        characterKey = rec.key,
+        createdAt = time and time() or 0,
+        status = "prepared",
+    }
+    local entry = store.outbox[mailId]
+    entry.uid = rec.uid
+    entry.characterKey = rec.key
+    entry.estimated = estimated
+    entry.preparedCopper = currentCopper
+    entry.status = entry.status == "received" and "received" or "prepared"
 
     local bank  = WRL_DB.bankCharacter
     local short = bank and (bank:match("^([^-]+)") or bank)
     if SendMailNameEditBox and short then SendMailNameEditBox:SetText(short) end
-    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(RETIRE_SUBJECT) end
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(RETIRE_SUBJECT .. " " .. mailId) end
     if SendMailBodyEditBox then
         SendMailBodyEditBox:SetText(string.format(
-            "Final run: %s (lvl %d).\nAttach bag contents + fill money. Press Send.",
-            rec.key, rec.levelCurrent or 0))
+            "WRL-CONTRIB-ID: %s\nFrom: %s\nEstimated max: %s\nAttached copper: %s\n\nEligible bag items to drag manually:\n%s",
+            mailId,
+            rec.key,
+            ns.Tiers:FormatMoney(estimated or 0),
+            ns.Tiers:FormatMoney(currentCopper),
+            itemSummary(snap and snap.bagItems or nil)
+        ))
     end
-    if MoneyInputFrame_SetCopper and SendMailMoney then
-        MoneyInputFrame_SetCopper(SendMailMoney, GetMoney() or 0)
+    setSendMailCopper(currentCopper)
+
+    ns:Print("Contribution mail filled for %s. Copper is filled; drag eligible items manually, then press Send.", bank)
+    if snap and snap.bagItems and #snap.bagItems > 0 then
+        ns:Print("Eligible bag items: %s", itemSummary(snap.bagItems, 4):gsub("\n", "; "))
+    end
+    return true
+end
+
+function D:OnMailShow()
+    self:ScanContributionInbox()
+
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return end
+
+    if self._awaitingMailbox then
+        self._awaitingMailbox = false
+        self:FillContributionMail()
+        return
+    end
+
+    -- If the player opens the mailbox while contribution is pending, fill the
+    -- Send Mail form even when they forgot to press the popup button first.
+    self:FillContributionMail()
+end
+
+function D:ScanContributionInbox()
+    if not (ns.Database and ns.Database:IsBankCharacter()) then return end
+    local count = GetInboxNumItems and (GetInboxNumItems() or 0) or 0
+    if count <= 0 then return end
+
+    local store = ensureContributionMail()
+    for i = 1, count do
+        local _, _, sender, subject, money, _, _, itemCount = GetInboxHeaderInfo(i)
+        local mailId = parseContributionMailSubject(subject)
+        if mailId and not store.inbox[mailId] then
+            local out = store.outbox[mailId] or {}
+            local characterKey = out.characterKey
+            if not characterKey and sender then
+                characterKey = sender:find("-", 1, true) and sender or nil
+            end
+
+            money = math.max(0, math.floor(money or 0))
+            store.inbox[mailId] = {
+                id = mailId,
+                sender = sender,
+                characterKey = characterKey,
+                money = money,
+                itemCount = itemCount or 0,
+                seenAt = time and time() or 0,
+            }
+
+            if out.receiptId or out.status == "received" then
+                store.inbox[mailId].receiptId = out.receiptId
+            elseif characterKey and money > 0 and ns.Contributions and ns.Contributions.Record then
+                local receipt = ns.Contributions:Record(characterKey, money, "final_contribution_mail", {
+                    confidence = "verified",
+                    note = ("bank inbox mail %s from %s, items=%d"):format(mailId, tostring(sender), itemCount or 0),
+                    mailId = mailId,
+                })
+                if receipt then
+                    store.inbox[mailId].receiptId = receipt.id
+                    out.receiptId = receipt.id
+                    out.receivedAt = time and time() or 0
+                    out.status = "received"
+                    store.outbox[mailId] = out
+                    ns:Print("|cffc0a060+%s|r contribution received from %s. Total lifetime: %s",
+                        ns.Tiers:FormatMoney(money),
+                        characterKey,
+                        ns.Tiers:FormatMoney(ns.Database:TotalContributed()))
+                end
+            else
+                out.status = out.status or "seen"
+                store.outbox[mailId] = out
+            end
+        end
     end
 end
 
@@ -590,6 +750,13 @@ function D:OnMailSent()
     ns.Run:SetState(key, "retired", "contribution_credited")
 
     if receipt then
+        local store = ensureContributionMail()
+        local mailId = rec._pendingContributionMailId
+        if mailId and store.outbox[mailId] then
+            store.outbox[mailId].status = "sent"
+            store.outbox[mailId].sentAt = time and time() or 0
+            store.outbox[mailId].receiptId = receipt.id
+        end
         ns:Print("|cffc0a060+%s|r contributed to the bank (est.). Total lifetime: %s",
             ns.Tiers:FormatMoney(receipt.amount),
             ns.Tiers:FormatMoney(ns.Database:TotalContributed()))

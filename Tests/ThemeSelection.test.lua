@@ -349,6 +349,47 @@ local function testGw2PaletteUsesHeroicSurfaceTokens()
     assertEqual(ns.Theme.c.gold[1], 0.850, "gw2 uses stronger metallic gold")
 end
 
+local function testClassicThemeUsesBlizzardTextureSkin()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    assertEqual(ns.Theme:SurfaceTexture("frame"), "Interface\\DialogFrame\\UI-DialogBox-Background", "classic frame uses Blizzard dialog background texture")
+    assertEqual(ns.Theme:SurfaceTexture("header"), "Interface\\DialogFrame\\UI-DialogBox-Header", "classic header uses Blizzard dialog header texture")
+    assertEqual(ns.Theme:SurfaceTexture("button"), "Interface\\Buttons\\UI-Panel-Button-Up", "classic buttons use Blizzard panel button texture")
+end
+
+local function testDarkThemeRemainsFlatTextureSkin()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok = ns.Theme:SetTheme("dark")
+
+    assertEqual(ok, true, "dark theme can be selected")
+    assertEqual(ns.Theme:SurfaceTexture("frame"), nil, "dark frame stays flat")
+    assertEqual(ns.Theme:SurfaceTexture("button"), nil, "dark buttons stay flat")
+end
+
+local function testGw2ThemeUsesGw2UiTextureSkinWhenActive()
+    useCAddOns = false
+    addonEnabled = true
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok = ns.Theme:SetTheme("gw2")
+
+    assertEqual(ok, true, "gw2 theme can be selected")
+    assertEqual(ns.Theme:SurfaceTexture("frame"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg", "gw2 frame uses GW2_UI bag body texture")
+    assertEqual(ns.Theme:SurfaceTexture("header"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagheader", "gw2 header uses GW2_UI bag header texture")
+    assertEqual(ns.Theme:SurfaceTexture("footer"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagfooter", "gw2 footer exposes GW2_UI bag footer texture")
+end
+
 testClassicIsDefault()
 testGw2CannotBeSelectedWhenUnavailable()
 testUnknownThemeIsRejected()
@@ -368,5 +409,8 @@ testThemeCommandTextUsesThemeOrder()
 testClassicPaletteUsesBetterBagsStyleDefault()
 testDarkPaletteUsesPreviousClassicDarkDefault()
 testGw2PaletteUsesHeroicSurfaceTokens()
+testClassicThemeUsesBlizzardTextureSkin()
+testDarkThemeRemainsFlatTextureSkin()
+testGw2ThemeUsesGw2UiTextureSkinWhenActive()
 
 print("ThemeSelection.test.lua: ok")
