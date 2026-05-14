@@ -14,9 +14,9 @@
 --   green #7ab27a  (success / alive)
 --
 -- Rendering notes:
---   - We don't use textured backdrops. Flat color via SetColorTexture gives the
---     clean GW2 look. A 1px gold line is emulated with a 1-tall texture at top
---     or bottom of the frame (cheap and crisp at all UI scales).
+--   - Themes may provide texture skins for large surfaces and buttons. Flat
+--     color remains the fallback for dark/personal themes and any unsupported
+--     client texture path.
 --   - Fonts: default FRIZQT__ keeps things readable; for headers we use
 --     MORPHEUS_.TTF (shipped by Blizzard) to approximate GW2's display face.
 
@@ -42,6 +42,15 @@ local PALETTES = {
             goldH     = {1.000, 0.930, 0.520, 1.00},
             red       = {0.790, 0.260, 0.180, 1.00},
             green     = {0.365, 0.690, 0.420, 1.00},
+        },
+        skin = {
+            frame       = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            body        = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            header      = "Interface\\DialogFrame\\UI-DialogBox-Header",
+            nav         = "Interface\\FrameGeneral\\UI-Background-Marble",
+            panel       = "Interface\\FrameGeneral\\UI-Background-Marble",
+            button      = "Interface\\Buttons\\UI-Panel-Button-Up",
+            buttonHover = "Interface\\Buttons\\UI-Panel-Button-Highlight",
         },
     },
     dark = {
@@ -83,6 +92,16 @@ local PALETTES = {
             goldH     = {1.000, 0.780, 0.350, 1.00},
             red       = {0.780, 0.250, 0.200, 1.00},
             green     = {0.460, 0.700, 0.460, 1.00},
+        },
+        skin = {
+            frame       = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg",
+            body        = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg",
+            header      = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagheader",
+            nav         = "Interface\\AddOns\\GW2_UI\\Textures\\addonSkins\\backdrop",
+            panel       = "Interface\\AddOns\\GW2_UI\\Textures\\addonSkins\\backdrop",
+            footer      = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagfooter",
+            button      = "Interface\\AddOns\\GW2_UI\\Textures\\addonSkins\\backdrop",
+            buttonHover = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitembackdrop",
         },
     },
     grant = {
@@ -232,6 +251,16 @@ local function isAddonEnabled(addonName)
     return addonEnabledById(addonName)
 end
 
+local applyTexture
+
+local function skinAlphaForRole(role)
+    return (role == "panel" or role == "nav") and 0.35 or 0.72
+end
+
+local function skinTilesForRole(role)
+    return role ~= "header" and role ~= "button"
+end
+
 function Theme:Init()
     self:ApplyConfiguredTheme()
     if ns.On then
@@ -291,6 +320,7 @@ function Theme:RefreshAvailability()
 end
 
 function Theme:NotifyThemeChanged()
+    self:RefreshRegisteredWidgets()
     if ns.MainFrame and ns.MainFrame.RefreshTheme then
         ns.MainFrame:RefreshTheme()
     end
@@ -298,6 +328,25 @@ function Theme:NotifyThemeChanged()
         ns.SettingsPopup:RefreshTheme()
     elseif ns.SettingsPopup and ns.SettingsPopup.Refresh then
         ns.SettingsPopup:Refresh()
+    end
+end
+
+function Theme:RefreshRegisteredWidgets()
+    for _, frame in ipairs(self._fills or {}) do
+        if frame._skinFill then
+            local role = frame._themeFillRole
+            applyTexture(frame._skinFill, role and self:SurfaceTexture(role) or nil, skinAlphaForRole(role), skinTilesForRole(role))
+        end
+    end
+
+    for _, b in ipairs(self._buttons or {}) do
+        self:ApplyButtonBackground(b, "normal")
+        if b.underline then
+            b.underline:SetColorTexture(self.c.gold[1], self.c.gold[2], self.c.gold[3], 0.9)
+        end
+        if b.label then
+            b.label:SetTextColor(self.c.fg[1], self.c.fg[2], self.c.fg[3], 1)
+        end
     end
 end
 
@@ -339,6 +388,27 @@ function Theme:ThemeLabel(themeId)
     return def and def.label or tostring(themeId)
 end
 
+function Theme:SurfaceTexture(role)
+    local active = self.activeThemeId or self:GetActiveThemeId()
+    local def = PALETTES[active]
+    return def and def.skin and def.skin[role] or nil
+end
+
+function Theme:ApplyButtonBackground(button, state)
+    local bg = button and button.bg
+    if not bg then return end
+
+    local hover = state == "hover"
+    local texture = self:SurfaceTexture(hover and "buttonHover" or "button")
+    if texture then
+        applyTexture(bg, texture, hover and 0.95 or 0.85, true)
+    else
+        local color = hover and self.c.bg3 or self.c.bg2
+        bg:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+        if bg.Show then bg:Show() end
+    end
+end
+
 function Theme:ThemeUsageText()
     return table.concat(THEME_ORDER, " | ")
 end
@@ -369,13 +439,38 @@ function Theme:NextAvailableTheme(themeId)
     return "classic"
 end
 
--- Fill a frame with a flat color. If border == true, adds a 1px gold top/bottom line.
-function Theme:Fill(frame, color, border)
+function applyTexture(tex, path, alpha, tile)
+    if not tex then return end
+    if path then
+        tex:SetTexture(path)
+        if tex.SetVertexColor then tex:SetVertexColor(1, 1, 1, alpha or 1) end
+        if tex.SetHorizTile then tex:SetHorizTile(tile == true) end
+        if tex.SetVertTile then tex:SetVertTile(tile == true) end
+        tex:Show()
+    else
+        tex:Hide()
+    end
+end
+
+-- Fill a frame with a themed surface. If border == true, adds a 1px accent line.
+function Theme:Fill(frame, color, border, role)
     color = color or self.c.bg1
     local tex = frame._fill or frame:CreateTexture(nil, "BACKGROUND")
     tex:SetAllPoints(frame)
     tex:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
     frame._fill = tex
+
+    local surfaceTexture = role and self:SurfaceTexture(role) or nil
+    local skin = frame._skinFill or frame:CreateTexture(nil, "BACKGROUND")
+    skin:SetAllPoints(frame)
+    frame._skinFill = skin
+    frame._themeFillRole = role
+    if not frame._themeFillRegistered then
+        self._fills = self._fills or {}
+        self._fills[#self._fills + 1] = frame
+        frame._themeFillRegistered = true
+    end
+    applyTexture(skin, surfaceTexture, skinAlphaForRole(role), skinTilesForRole(role))
 
     if border then
         local top = frame._borderTop or frame:CreateTexture(nil, "BORDER")
@@ -414,14 +509,16 @@ function Theme:Header(parent, text, size)
     return fs
 end
 
--- Minimalist button: flat bg2 rect, bg3 on hover, 1px gold underline on hover.
+-- Button with themed texture support, flat fallback, and a 1px accent underline.
 function Theme:Button(parent, label, width, height)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(width or 120, height or 24)
+    self._buttons = self._buttons or {}
+    self._buttons[#self._buttons + 1] = b
 
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints(b)
-    b.bg:SetColorTexture(self.c.bg2[1], self.c.bg2[2], self.c.bg2[3], 1)
+    self:ApplyButtonBackground(b, "normal")
 
     b.underline = b:CreateTexture(nil, "BORDER")
     b.underline:SetColorTexture(self.c.gold[1], self.c.gold[2], self.c.gold[3], 0.9)
@@ -435,12 +532,12 @@ function Theme:Button(parent, label, width, height)
     b.label:SetText(label or "")
 
     b:SetScript("OnEnter", function(self)
-        self.bg:SetColorTexture(Theme.c.bg3[1], Theme.c.bg3[2], Theme.c.bg3[3], 1)
+        Theme:ApplyButtonBackground(self, "hover")
         self.underline:Show()
         self.label:SetTextColor(Theme.c.goldH[1], Theme.c.goldH[2], Theme.c.goldH[3], 1)
     end)
     b:SetScript("OnLeave", function(self)
-        self.bg:SetColorTexture(Theme.c.bg2[1], Theme.c.bg2[2], Theme.c.bg2[3], 1)
+        Theme:ApplyButtonBackground(self, "normal")
         self.underline:Hide()
         self.label:SetTextColor(Theme.c.fg[1], Theme.c.fg[2], Theme.c.fg[3], 1)
     end)

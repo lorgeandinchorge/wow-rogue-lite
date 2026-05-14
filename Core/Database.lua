@@ -9,7 +9,7 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Database")
 
-local SCHEMA_VERSION = 10
+local SCHEMA_VERSION = 11
 
 local function normalizeCharacterKey(key)
     if not key or key == "" then return nil end
@@ -47,6 +47,7 @@ local function defaults()
         tiers = nil,             -- filled by Tiers:Init() from constants
         favorites = {},          -- [uid] = true; account-wide starred characters
         contributionReceipts = {}, -- account-wide ledger; owned by Core/Contributions.lua
+        contributionMail     = {}, -- contribution mail outbox/inbox reconciliation; owned by Core/Death.lua
         fulfillmentReceipts  = {}, -- account-wide fulfillment audit; owned by Core/Requests.lua
         settings             = {}, -- account-wide settings; owned by Core/Settings.lua
         memorials            = {}, -- [uid] = memorial entry; owned by Core/Death.lua
@@ -155,10 +156,16 @@ function D:Init()
             WRL_DB.legacyUnlocks = WRL_DB.legacyUnlocks or {}
             WRL_DB.legacySpent = WRL_DB.legacySpent or 0
         end
+        if WRL_DB.schema < 11 then
+            WRL_DB.contributionMail = WRL_DB.contributionMail or {}
+        end
         WRL_DB.schema = SCHEMA_VERSION
     end
 
     WRL_DB.achievements = WRL_DB.achievements or {}
+    WRL_DB.contributionMail = WRL_DB.contributionMail or {}
+    WRL_DB.contributionMail.outbox = WRL_DB.contributionMail.outbox or {}
+    WRL_DB.contributionMail.inbox = WRL_DB.contributionMail.inbox or {}
     WRL_DB.legacyUnlocks = WRL_DB.legacyUnlocks or {}
     WRL_DB.legacySpent = math.max(0, math.floor(WRL_DB.legacySpent or 0))
 

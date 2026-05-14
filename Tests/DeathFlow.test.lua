@@ -5,6 +5,8 @@ local printed = {}
 local currentDead = true
 local currentMoney = 12345
 local registeredEvents = {}
+local mailFields = {}
+local inboxHeaders = {}
 local hasDeadOrGhostApi = true
 local unitIsDead = false
 local unitIsGhost = false
@@ -15,6 +17,8 @@ local function resetHarness(opts)
     popupShown = {}
     printed = {}
     registeredEvents = {}
+    mailFields = {}
+    inboxHeaders = opts.inboxHeaders or {}
     deathScreenShows = {}
     currentDead = opts.currentDead
     if currentDead == nil then currentDead = true end
@@ -40,6 +44,9 @@ local function resetHarness(opts)
             },
         },
         memorials = {},
+        contributionReceipts = {},
+        contributionMail = {},
+        totalContributed = 0,
     }
 
     mockTime = 200
@@ -74,6 +81,22 @@ local function resetHarness(opts)
             SetScript     = function() end,
         }
     end
+    _G.MailFrame = { IsShown = function() return true end }
+    _G.MailFrameTab2 = { Click = function() mailFields.clickedSendTab = true end }
+    _G.SendMailNameEditBox = { SetText = function(_, value) mailFields.name = value end }
+    _G.SendMailSubjectEditBox = { SetText = function(_, value) mailFields.subject = value end }
+    _G.SendMailBodyEditBox = { SetText = function(_, value) mailFields.body = value end }
+    _G.SendMailMoney = {}
+    _G.SendMailMoneyGold = { SetNumber = function(_, value) mailFields.gold = value end, SetText = function(_, value) mailFields.goldText = value end }
+    _G.SendMailMoneySilver = { SetNumber = function(_, value) mailFields.silver = value end, SetText = function(_, value) mailFields.silverText = value end }
+    _G.SendMailMoneyCopper = { SetNumber = function(_, value) mailFields.copper = value end, SetText = function(_, value) mailFields.copperText = value end }
+    _G.MoneyInputFrame_SetCopper = function(_, value) mailFields.money = value end
+    _G.GetInboxNumItems = function() return #inboxHeaders end
+    _G.GetInboxHeaderInfo = function(index)
+        local h = inboxHeaders[index] or {}
+        return h.packageIcon, h.stationeryIcon, h.sender, h.subject, h.money, h.CODAmount,
+            h.daysLeft, h.itemCount, h.wasRead, h.wasReturned, h.textCreated
+    end
 
     local ns = {
         Database = {},
@@ -101,9 +124,10 @@ local function resetHarness(opts)
     end
     function ns:Debug() end
 
-    function ns.Database:IsBankCharacter() return false end
+    function ns.Database:IsBankCharacter() return opts.isBank or false end
     function ns.Database:GetCurrentCharacter() return WRL_DB.characters["Runner-Realm"] end
     function ns.Database:GetCharacter(key) return WRL_DB.characters[key] end
+    function ns.Database:TotalContributed() return WRL_DB.totalContributed or 0 end
     function ns.Database:RecordDeathEntry(key, level, zone, ctx)
         local rec = self:GetCharacter(key)
         rec.retiredAt = rec.retiredAt or time()
@@ -154,6 +178,23 @@ local function resetHarness(opts)
     function ns.Contributions:GetDeathSnapshot(key)
         local rec = WRL_DB.characters[key]
         return rec and rec.deathSnapshot or nil
+    end
+    function ns.Contributions:Record(characterKey, amount, source, info)
+        local rec = WRL_DB.characters[characterKey]
+        if not rec then return nil end
+        local receipt = {
+            id = "test-receipt-" .. tostring(#(WRL_DB.contributionReceipts or {}) + 1),
+            characterKey = characterKey,
+            amount = amount,
+            source = source,
+            note = info and info.note or "",
+            confidence = info and info.confidence or "estimated",
+        }
+        WRL_DB.contributionReceipts = WRL_DB.contributionReceipts or {}
+        WRL_DB.contributionReceipts[#WRL_DB.contributionReceipts + 1] = receipt
+        rec.contributed = (rec.contributed or 0) + amount
+        WRL_DB.totalContributed = (WRL_DB.totalContributed or 0) + amount
+        return receipt
     end
 
     function ns.Tiers:FormatMoney(copper)
@@ -474,6 +515,74 @@ local function testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
         "tiny final contribution warns about postage")
 end
 
+local function testContributionMailFillCreatesDurableMailRecordAndBody()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 12345,
+        estimatedBagValue = 2000,
+        estimatedGearValue = 3000,
+        totalLiquid = 14345,
+        maximumPotential = 17345,
+    }
+
+    ns.Death:OpenMailToBank()
+    registeredEvents.MAIL_SHOW()
+
+    assertEqual(mailFields.clickedSendTab, true,
+        "contribution mail switches to send tab")
+    assertEqual(mailFields.name, "Bank",
+        "contribution mail fills same-realm bank recipient")
+    assertEqual(mailFields.money, 12345,
+        "contribution mail fills current copper amount")
+    assertContains(mailFields.subject, "WRL-CONTRIB:",
+        "contribution mail uses importable subject prefix")
+    assertContains(mailFields.body, "WRL-CONTRIB-ID:",
+        "contribution mail body stores durable contribution id")
+    assertContains(mailFields.body, "Runner-Realm",
+        "contribution mail body stores source character")
+    assert(WRL_DB.contributionMail.outbox ~= nil,
+        "contribution mail creates outbox ledger")
+end
+
+local function testBankInboxContributionMailCreditsAttachedCopperOnce()
+    local mailId = "Runner-Realm#100-200"
+    resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        isBank = true,
+        inboxHeaders = {
+            { sender = "Runner", subject = "WRL-CONTRIB: " .. mailId, money = 4321, itemCount = 0 },
+        },
+    })
+    WRL_DB.contributionMail = {
+        outbox = {
+            [mailId] = {
+                id = mailId,
+                characterKey = "Runner-Realm",
+                uid = "Runner-Realm#100",
+                estimated = 14345,
+                status = "sent",
+            },
+        },
+        inbox = {},
+    }
+
+    registeredEvents.MAIL_SHOW()
+    registeredEvents.MAIL_SHOW()
+
+    local rec = WRL_DB.characters["Runner-Realm"]
+    assertEqual(rec.contributed, 4321,
+        "bank inbox scan credits attached contribution copper")
+    assertEqual(WRL_DB.totalContributed, 4321,
+        "bank inbox scan updates lifetime contribution")
+    assertEqual(#WRL_DB.contributionReceipts, 1,
+        "bank inbox scan does not double-credit the same contribution mail")
+    assertEqual(WRL_DB.contributionMail.outbox[mailId].status, "received",
+        "bank inbox scan marks contribution mail received")
+end
+
 local function testCombatDamageSourceCapturedBeforeDeath()
     -- Player alive on login (currentDead=false), 1 life → first PLAYER_DEAD is final.
     mockTime = 200
@@ -614,6 +723,8 @@ testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
 testDeathPopupExplainsNextStepsAndMaximumPotential()
 testFinalDeathPopupUsesSingleFormattedMessageArgument()
 testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
+testContributionMailFillCreatesDurableMailRecordAndBody()
+testBankInboxContributionMailCreditsAttachedCopperOnce()
 testCombatDamageSourceCapturedBeforeDeath()
 testEnvironmentalDamageSourceCapturedBeforeDeath()
 testFinalDeathMemorialIncludesSourceContext()
