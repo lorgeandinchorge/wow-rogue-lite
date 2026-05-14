@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.2.3
+
+- Add durable final contribution mail metadata with `WRL-CONTRIB:` subjects and body IDs.
+- Fill final contribution mail copper more reliably across Classic money input widgets.
+- Credit received final contribution mail from the bank inbox once, using a contribution-mail ledger to avoid duplicate totals.
+- Add Classic and GW2-style texture skins for major UI surfaces and buttons while keeping the Dark theme flat.
+- Add regression coverage for contribution mail filling, bank-side contribution crediting, and theme texture selection.
+
 ## v0.2.2
 
 - Consolidate top-level UI into Current Run, Achievements, Legacy, and Rewards tabs.

@@ -28,6 +28,13 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
+### Latest Update: v0.2.3
+
+- Final contribution mail now uses a concise `WRL-CONTRIB` subject/body marker so the bank can recognize it.
+- Bank characters can credit received contribution mail once from the inbox ledger.
+- Contribution mail fills carried copper more reliably; players still manually drag any item attachments and press Send.
+- Classic and GW2-style UI texture skins are available for testers, with the Dark theme kept flat.
+
 ### Bank And Run Structure
 
 Set one character as your bank with `/wrl setbank`. The bank is treated as infrastructure, not as a run, so it can handle storage, mail, trading, and reward fulfillment.
