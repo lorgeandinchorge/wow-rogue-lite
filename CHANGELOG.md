@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.5
+
+- Fix final-death popup formatting through a safe single-message StaticPopup path.
+- Centralize bag item API compatibility for Classic clients that expose `C_Container` instead of legacy container globals.
+- Prevent early bank-status updates from refreshing main-window UI before header widgets exist.
+- Add regression coverage for popup formatting, early bank-status refreshes, and `C_Container` request inventory scans.
+
 ## v0.2.4
 
 - Add a contribution amount confirmation popup before final-death mail is created.
