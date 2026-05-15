@@ -91,10 +91,11 @@ function B:Init()
 end
 
 function B:NotifyChanged()
-    if ns.MainFrame and ns.MainFrame.RefreshHeader then
+    if not (ns.MainFrame and ns.MainFrame.frame) then return end
+    if ns.MainFrame.RefreshHeader then
         ns.MainFrame:RefreshHeader()
     end
-    if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+    if ns.MainFrame.RefreshCurrentTab then
         ns.MainFrame:RefreshCurrentTab()
     end
 end

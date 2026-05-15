@@ -14,6 +14,10 @@ local function resetHarness()
     _G.SendMailNameEditBox = nil
     _G.SendMailSubjectEditBox = nil
     _G.SendMailBodyEditBox = nil
+    _G.NUM_BAG_SLOTS = nil
+    _G.GetContainerNumSlots = nil
+    _G.GetContainerItemInfo = nil
+    _G.C_Container = nil
 
     local ns = {
         Database = {},
@@ -36,6 +40,7 @@ local function resetHarness()
         return false
     end
 
+    assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/Requests.lua"))("WoWRoguelite", ns)
     return ns
 end
@@ -96,9 +101,44 @@ local function testBeginMailFallbackPrefillsMailbox()
     end
 end
 
+local function testRequestInventoryScansUseCContainerFallback()
+    local ns = resetHarness()
+    NUM_BAG_SLOTS = 0
+    C_Container = {
+        GetContainerNumSlots = function(bag)
+            return bag == 0 and 2 or 0
+        end,
+        GetContainerItemInfo = function(bag, slot)
+            if bag == 0 and slot == 1 then
+                return {
+                    stackCount = 3,
+                    hyperlink = "|cffffffff|Hitem:101::::::::|h[Test Cloth]|h|r",
+                    itemID = 101,
+                }
+            elseif bag == 0 and slot == 2 then
+                return {
+                    quantity = 1,
+                    itemLink = "|cffffffff|Hitem:202::::::::|h[Test Stone]|h|r",
+                }
+            end
+        end,
+    }
+
+    assertEqual(ns.Requests:CountItemInBags(101), 3,
+        "request inventory count uses C_Container table result")
+    assertEqual(ns.Requests:CountItemInBags(202), 1,
+        "request inventory count parses item id from C_Container link")
+
+    local bag, slot, count = ns.Requests:FindItemInBags(101)
+    assertEqual(bag, 0, "request inventory find returns C_Container bag")
+    assertEqual(slot, 1, "request inventory find returns C_Container slot")
+    assertEqual(count, 3, "request inventory find returns C_Container stack count")
+end
+
 testMailFallbackSubjectUsesRewardCsv()
 testOutgoingRequestKeepsMailFallbackSubject()
 testMailFallbackBodyNamesRequesterAndRewards()
 testBeginMailFallbackPrefillsMailbox()
+testRequestInventoryScansUseCContainerFallback()
 
 print("RequestMailFallback.test.lua: ok")

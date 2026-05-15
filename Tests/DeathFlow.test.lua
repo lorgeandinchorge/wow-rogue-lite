@@ -474,6 +474,8 @@ local function testFinalDeathPopupUsesSingleFormattedMessageArgument()
     local popup = popupShown[1]
     assert(popup ~= nil, "final death popup was shown")
     assertEqual(popup.name, "WRL_RETIRE_CONFIRM", "final death popup name")
+    assertEqual(StaticPopupDialogs["WRL_RETIRE_CONFIRM"].text, "%s",
+        "retire confirmation popup template accepts exactly one formatted message")
     assertEqual(#popup.args, 1, "final death popup passes one formatted body argument")
     assertContains(popup.args[1], "Runner-Realm", "formatted popup includes character key")
     assertContains(popup.args[1], "Current money: 12345c", "formatted popup includes current money")
