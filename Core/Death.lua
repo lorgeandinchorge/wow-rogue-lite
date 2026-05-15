@@ -303,6 +303,10 @@ local function itemSummary(items, limit)
     return table.concat(rows, "\n")
 end
 
+local function showTextPopup(name, body)
+    StaticPopup_Show(name, tostring(body or ""))
+end
+
 function D:Init()
     ns:On("PLAYER_DEAD",       function() self:OnPlayerDead() end)
     ns:On("PLAYER_ENTERING_WORLD", function()
@@ -442,7 +446,7 @@ function D:_ShowFinalDeathPopup(rec, snap)
         postageWarning,
         bank
     )
-    StaticPopup_Show("WRL_RETIRE_CONFIRM", body)
+    showTextPopup("WRL_RETIRE_CONFIRM", body)
 end
 
 -- Look up the most recent memorial belonging to this character record by uid.
@@ -709,7 +713,7 @@ function D:PromptContributionAmount()
         ns.Tiers:FormatMoney(currentCopper),
         ns.Tiers:FormatMoney(self._pendingContributionPrompt.estimatedCopper or 0)
     )
-    StaticPopup_Show("WRL_CONTRIBUTION_AMOUNT", body)
+    showTextPopup("WRL_CONTRIBUTION_AMOUNT", body)
     return true
 end
 

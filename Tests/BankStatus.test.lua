@@ -109,9 +109,27 @@ local function testStaleAddonPresenceFallsBackToUnknownWithoutChatPing()
     assertEqual(ns.Comm.sentPing, nil, "unknown bank is not auto-pinged from status refresh")
 end
 
+local function testNotifyChangedSkipsMainFrameRefreshBeforeFrameExists()
+    local ns = resetUnknownHarness(120)
+    local refreshes = 0
+    ns.MainFrame = {
+        RefreshHeader = function()
+            refreshes = refreshes + 1
+        end,
+        RefreshCurrentTab = function()
+            refreshes = refreshes + 1
+        end,
+    }
+
+    ns.BankStatus:NotifyChanged()
+
+    assertEqual(refreshes, 0, "bank status does not refresh UI before main frame exists")
+end
+
 testConfiguredBankIsNotSelfOnRunCharacter()
 testConfiguredBankIsSelfOnBankCharacter()
 testAddonPresenceMarksUnknownBankOnline()
 testStaleAddonPresenceFallsBackToUnknownWithoutChatPing()
+testNotifyChangedSkipsMainFrameRefreshBeforeFrameExists()
 
 print("BankStatus.test.lua: ok")

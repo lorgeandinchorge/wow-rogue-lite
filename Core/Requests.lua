@@ -381,15 +381,13 @@ end
 
 function R:CountItemInBags(itemId)
     local have = 0
+    local Container = ns.Container
     for bag = 0, NUM_BAG_SLOTS or 4 do
-        local slots = GetContainerNumSlots(bag) or 0
+        local slots = Container and Container.GetNumSlots and Container:GetNumSlots(bag) or 0
         for slot = 1, slots do
-            local _, count, _, _, _, _, link, _, _, id = GetContainerItemInfo(bag, slot)
-            if not id and link then
-                id = tonumber(link:match("item:(%d+)"))
-            end
-            if id == itemId then
-                have = have + (count or 1)
+            local info = Container and Container.GetItemInfo and Container:GetItemInfo(bag, slot)
+            if info and info.itemID == itemId then
+                have = have + (info.count or 1)
             end
         end
     end
@@ -582,12 +580,12 @@ end
 
 -- Scan bags for an itemID; return bag,slot,count of first stack found.
 function R:FindItemInBags(itemId)
+    local Container = ns.Container
     for bag = 0, NUM_BAG_SLOTS or 4 do
-        local slots = GetContainerNumSlots(bag) or 0
+        local slots = Container and Container.GetNumSlots and Container:GetNumSlots(bag) or 0
         for slot = 1, slots do
-            local _, count, _, _, _, _, link, _, _, id = GetContainerItemInfo(bag, slot)
-            if not id and link then id = tonumber(link:match("item:(%d+)")) end
-            if id == itemId then return bag, slot, count or 1 end
+            local info = Container and Container.GetItemInfo and Container:GetItemInfo(bag, slot)
+            if info and info.itemID == itemId then return bag, slot, info.count or 1 end
         end
     end
 end
