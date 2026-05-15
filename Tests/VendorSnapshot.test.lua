@@ -77,7 +77,7 @@ local function testFullCharacterSnapshotSeparatesMoneyBagsGearAndPotential()
     assertEqual(snap.money, 111, "snapshot records current money")
     assertEqual(snap.bagValue, 6, "snapshot records bag vendor value")
     assertEqual(snap.gearValue, 525, "snapshot records equipped gear vendor value")
-    assertEqual(snap.maximumPotential, 642, "maximum potential includes money, bags, and gear")
+    assertEqual(snap.maximumPotential, 612, "maximum potential subtracts 30c mail postage")
 end
 
 local function testBagsSnapshotUsesCContainerFallback()

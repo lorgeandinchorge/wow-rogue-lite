@@ -49,6 +49,16 @@ local function resetHarness()
         return WRL_DB.characters[key]
     end
 
+    function ns.Vendor:FullCharacterSnapshot()
+        return {
+            money = currentMoney,
+            bagValue = currentBagValue,
+            gearValue = currentGearValue,
+            bagItems = {},
+            gearItems = {},
+        }
+    end
+
     function ns.Vendor:BagsSnapshot()
         return currentBagValue
     end
@@ -116,8 +126,36 @@ local function testSoldGearValueCanBeCreditedUpToMaximumPotential()
     assertEqual(receipt.amount, 2200, "sold gear proceeds can credit up to maximum potential")
 end
 
+local function testSnapshotDeathSubtractsMailPostageFromMaximumPotential()
+    local contributions = resetHarness()
+    currentMoney = 100
+    currentBagValue = 20
+    currentGearValue = 10
+
+    local snap = contributions:SnapshotDeath("Runner-Realm")
+
+    assertEqual(snap.preMoney, 100, "snapshot keeps gross carried money")
+    assertEqual(snap.estimatedBagValue, 20, "snapshot keeps gross bag value")
+    assertEqual(snap.estimatedGearValue, 10, "snapshot keeps gross gear value")
+    assertEqual(snap.totalLiquid, 120, "snapshot keeps gross liquid value")
+    assertEqual(snap.maximumPotential, 100, "maximum potential is net of 30c postage")
+end
+
+local function testSnapshotDeathDoesNotGoNegativeAfterPostage()
+    local contributions = resetHarness()
+    currentMoney = 10
+    currentBagValue = 10
+    currentGearValue = 5
+
+    local snap = contributions:SnapshotDeath("Runner-Realm")
+
+    assertEqual(snap.maximumPotential, 0, "maximum potential floors at zero after postage")
+end
+
 testUnsentBagValueIsNotCredited()
 testBagValueDeltaIsCredited()
 testSoldGearValueCanBeCreditedUpToMaximumPotential()
+testSnapshotDeathSubtractsMailPostageFromMaximumPotential()
+testSnapshotDeathDoesNotGoNegativeAfterPostage()
 
 print("ContributionsCredit.test.lua: ok")

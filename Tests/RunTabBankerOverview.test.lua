@@ -17,6 +17,7 @@ local function resetHarness()
     local ns = {
         Database = {},
         LegacyUnlocks = {},
+        Run = {},
         Tiers = {},
     }
 
@@ -29,6 +30,7 @@ local function resetHarness()
     function ns:UnitKey() return "Bank-Realm" end
     function ns.Database:IsBankCharacter() return true end
     function ns.LegacyUnlocks:AvailableBudget() return 100000 end
+    function ns.Run:GetState(rec) return rec and rec.status or "unknown" end
     function ns.Tiers:FormatMoney(copper) return tostring(copper) .. "c" end
 
     assert(loadfile("UI/Tab_Run.lua"))("WoWRoguelite", ns)
@@ -65,6 +67,18 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(right[11], "Recent taint/warning entries: none", "right pane includes warning summary")
 end
 
+local function testContributionActionOnlyShowsForPendingContributionRuns()
+    local tab = resetHarness()
+
+    assertEqual(tab:_ShouldShowContributionAction({ status = "dead_pending_contribution" }), true,
+        "pending final contribution shows recovery action")
+    assertEqual(tab:_ShouldShowContributionAction({ status = "active" }), false,
+        "active runs do not show contribution recovery action")
+    assertEqual(tab:_ShouldShowContributionAction({ status = "retired" }), false,
+        "fully retired runs do not show contribution recovery action")
+end
+
 testBankerOverviewReplacesRunSnapshotCopy()
+testContributionActionOnlyShowsForPendingContributionRuns()
 
 print("RunTabBankerOverview.test.lua: ok")

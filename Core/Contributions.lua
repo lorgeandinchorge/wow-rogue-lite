@@ -26,12 +26,18 @@
 
 local ADDON_NAME, ns = ...
 local C = ns:NewModule("Contributions")
+local MAIL_POSTAGE_COPPER = 30
+ns.MAIL_POSTAGE_COPPER = ns.MAIL_POSTAGE_COPPER or MAIL_POSTAGE_COPPER
 
 local MAX_HISTORY_PER_CHAR = 50
 
 local CONFIDENCE = { verified = true, estimated = true, manual = true }
 
 local function now() return time() end
+
+local function netAfterPostage(copper)
+    return math.max(0, math.floor(copper or 0) - (ns.MAIL_POSTAGE_COPPER or MAIL_POSTAGE_COPPER))
+end
 
 -- Short, monotonically-unique receipt id.  We tag it with the sequence number
 -- so two receipts in the same second still get distinct ids after reload.
@@ -194,7 +200,7 @@ function C:SnapshotDeath(characterKey)
         estimatedBagValue = bagCopper,
         estimatedGearValue = gearCopper,
         totalLiquid       = money + bagCopper,
-        maximumPotential  = money + bagCopper + gearCopper,
+        maximumPotential  = netAfterPostage(money + bagCopper + gearCopper),
         bagItems          = bagItems,
         gearItems         = gearItems,
         credited          = false,

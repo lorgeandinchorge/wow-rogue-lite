@@ -278,6 +278,11 @@ function Tab:_BuildBankerOverviewLines(key)
     return left, right
 end
 
+function Tab:_ShouldShowContributionAction(rec)
+    local state = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec and rec.status
+    return state == "dead_pending_contribution"
+end
+
 function Tab:Init(parent)
     if self.panel then return end
     local Theme = ns.Theme
@@ -292,6 +297,15 @@ function Tab:Init(parent)
     self.hint = Theme:Text(p, 11, Theme.c.fg2)
     self.hint:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
     self.hint:SetText("Snapshot of your current character's run state and audit trail.")
+
+    self.contributionButton = Theme:Button(p, "Prepare Contribution Mail", 170, 22)
+    self.contributionButton:SetPoint("TOPRIGHT", -20, -18)
+    self.contributionButton:SetScript("OnClick", function()
+        if ns.Death and ns.Death.PrepareContributionMail then
+            ns.Death:PrepareContributionMail()
+        end
+    end)
+    self.contributionButton:Hide()
 
     Theme:Divider(p, "TOPLEFT", "TOPRIGHT", 0, -54, 0.2)
 
@@ -366,6 +380,7 @@ function Tab:Refresh()
 
     local name, realm = withRealm(key)
     if ns.Database:IsBankCharacter(key) then
+        if self.contributionButton then self.contributionButton:Hide() end
         self.hint:SetText("Character-focused dashboard for the logged-in bank character.")
         self.leftTitle:SetText("Character Dashboard")
         local left, right = self:_BuildBankerOverviewLines(key)
@@ -380,6 +395,13 @@ function Tab:Refresh()
     self.leftTitle:SetText("Character Dashboard")
 
     local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"
+    if self.contributionButton then
+        if self:_ShouldShowContributionAction(rec) then
+            self.contributionButton:Show()
+        else
+            self.contributionButton:Hide()
+        end
+    end
     local level = rec.levelCurrent or rec.levelAtCreate or (UnitLevel and UnitLevel("player")) or "?"
     local lives = rec.livesRemaining or 0
     local pending = newestPendingOutgoing()

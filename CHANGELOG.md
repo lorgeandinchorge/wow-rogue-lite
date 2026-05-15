@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.2.6
+
+- Change final contribution mail to a currency-only flow that assumes the player sells vendorable bags and gear first.
+- Automatically pre-fill the pending final contribution at the mailbox, reserving 30c for postage.
+- Add a Current Run button and `/wrl contribute` command to reopen pending final contribution mail preparation.
+- Change the retire popup's secondary action to defer contribution instead of permanently skipping it.
+- Add regression coverage for currency-only contribution mail, postage reservation, and the recovery action.
+
 ## v0.2.5
 
 - Fix final-death popup formatting through a safe single-message StaticPopup path.

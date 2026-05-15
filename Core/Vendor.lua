@@ -13,8 +13,14 @@ local ADDON_NAME, ns = ...
 local V = ns:NewModule("Vendor")
 local Container = ns.Container or {}
 ns.Container = Container
+local MAIL_POSTAGE_COPPER = 30
+ns.MAIL_POSTAGE_COPPER = ns.MAIL_POSTAGE_COPPER or MAIL_POSTAGE_COPPER
 
 function V:Init() end
+
+function V:NetAfterPostage(copper)
+    return math.max(0, math.floor(copper or 0) - (ns.MAIL_POSTAGE_COPPER or MAIL_POSTAGE_COPPER))
+end
 
 local function itemIDFromLink(link)
     return link and tonumber(tostring(link):match("item:(%d+)")) or nil
@@ -129,7 +135,7 @@ function V:FullCharacterSnapshot()
         money = money,
         bagValue = bagValue or 0,
         gearValue = gearValue or 0,
-        maximumPotential = money + (bagValue or 0) + (gearValue or 0),
+        maximumPotential = self:NetAfterPostage(money + (bagValue or 0) + (gearValue or 0)),
         bagItems = bagItems or {},
         gearItems = gearItems or {},
     }

@@ -4,7 +4,7 @@
 -- State transitions managed here (via ns.Run:SetState):
 --   final death  → dead_pending_contribution
 --   mail sent    → retired  (contribution credited)
---   "Not Now"    → retired  (contribution skipped)
+--   "Later"      → dead_pending_contribution (mail can be prepared again)
 --
 -- Soft deaths (livesRemaining > 0) do not change run state and do not create
 -- memorials.  A local notice is printed only when announceSoftDeaths = true.
@@ -266,6 +266,14 @@ local function plainMoney(copper)
     return string.format("%dg %ds %dc", gold, silver, copperOnly)
 end
 
+local function mailPostageCopper()
+    return ns.MAIL_POSTAGE_COPPER or 30
+end
+
+local function attachableAfterPostage(copper)
+    return math.max(0, math.floor(copper or 0) - mailPostageCopper())
+end
+
 local function parseContributionCopper(text)
     if type(text) ~= "string" then return nil end
     text = text:lower():gsub(",", " ")
@@ -351,12 +359,12 @@ function D:Init()
     StaticPopupDialogs["WRL_RETIRE_CONFIRM"] = {
         text = "%s",
         button1  = "Pre-Fill Mail",
-        button2  = "Not Now",
+        button2  = "Later",
         OnAccept = function() ns.Death:OpenMailToBank() end,
-        -- "Not Now" skips the contribution and finalises the retirement.
+        -- "Later" leaves the contribution pending so the Current Run button
+        -- or /wrl contribute can prepare the mail when the player is ready.
         OnCancel = function()
-            local key = ns:UnitKey()
-            if key then ns.Run:SetState(key, "retired", "skipped_contribution") end
+            ns:Print("Contribution deferred. Open Current Run or use /wrl contribute at a mailbox when ready.")
         end,
         timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
     }
@@ -432,11 +440,11 @@ function D:_ShowFinalDeathPopup(rec, snap)
         "Current money: %s\n" ..
         "Bag vendor value: %s\n" ..
         "Equipped gear vendor value: %s\n" ..
-        "Maximum possible contribution: %s%s\n\n" ..
+        "Expected final contribution: %s%s\n\n" ..
         "1. Go to a mailbox.\n" ..
-        "2. The addon will pre-fill mail to your bank (|cffffd700%s|r).\n" ..
-        "3. Send carried gold and eligible items you choose to contribute.\n" ..
-        "4. To reach the maximum, sell vendorable bags/gear first, then mail the gold.\n" ..
+        "2. Sell vendorable bags and gear first so the contribution is currency-only.\n" ..
+        "3. The addon will pre-fill mail to your bank (|cffffd700%s|r).\n" ..
+        "4. Press Send when ready; WRL reserves %s for postage.\n" ..
         "5. After mail sends, the addon records the contribution and retires the run.",
         rec.key,
         ns.Tiers:FormatMoney(money),
@@ -444,7 +452,8 @@ function D:_ShowFinalDeathPopup(rec, snap)
         ns.Tiers:FormatMoney(gearValue),
         ns.Tiers:FormatMoney(maxPotential),
         postageWarning,
-        bank
+        bank,
+        ns.Tiers:FormatMoney(mailPostageCopper())
     )
     showTextPopup("WRL_RETIRE_CONFIRM", body)
 end
@@ -676,16 +685,38 @@ function D:OpenMailToBank()
         ns:Print("No bank character set. Use /wrl setbank Name-Realm first.")
         return
     end
-    ns:Print("Walk to a mailbox; the send form will pre-fill for %s.", WRL_DB.bankCharacter)
-    self._awaitingMailbox = true
+    return self:PrepareContributionMail()
 end
 
 function D:_SuggestedContributionCopper(snap, currentCopper)
     currentCopper = math.max(0, math.floor(currentCopper or 0))
+    local attachable = attachableAfterPostage(currentCopper)
     local estimate = snap and (snap.maximumPotential or snap.totalLiquid or snap.preMoney) or currentCopper
     estimate = math.max(0, math.floor(estimate or 0))
-    if estimate <= 0 then return currentCopper end
-    return math.min(currentCopper, estimate)
+    if estimate <= 0 then return attachable end
+    return math.min(attachable, estimate)
+end
+
+function D:PrepareContributionMail()
+    if not WRL_DB.bankCharacter then
+        ns:Print("No bank character set. Use /wrl setbank Name-Realm first.")
+        return false
+    end
+
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return false end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then
+        ns:Print("No final contribution is pending for this character.")
+        return false
+    end
+
+    if not (MailFrame and MailFrame:IsShown()) then
+        ns:Print("Open a mailbox; the send form will pre-fill for %s.", WRL_DB.bankCharacter)
+        self._awaitingMailbox = true
+        return false
+    end
+
+    self._awaitingMailbox = false
+    return self:FillContributionMail()
 end
 
 function D:PromptContributionAmount()
@@ -734,11 +765,14 @@ function D:FillContributionMail(contributionCopper)
 
     local currentCopper = GetMoney and (GetMoney() or 0) or 0
     contributionCopper = math.max(0, math.floor(contributionCopper or self:_SuggestedContributionCopper(snap, currentCopper)))
-    if contributionCopper > currentCopper then
-        ns:Print("Contribution amount adjusted to current money: %s.", ns.Tiers:FormatMoney(currentCopper))
-        contributionCopper = currentCopper
+    local attachableCopper = attachableAfterPostage(currentCopper)
+    if contributionCopper > attachableCopper then
+        ns:Print("Contribution amount adjusted to leave %s postage: %s.",
+            ns.Tiers:FormatMoney(mailPostageCopper()),
+            ns.Tiers:FormatMoney(attachableCopper))
+        contributionCopper = attachableCopper
     end
-    local estimated = (snap and (snap.maximumPotential or snap.totalLiquid)) or currentCopper
+    local estimated = (snap and (snap.maximumPotential or snap.totalLiquid)) or attachableAfterPostage(currentCopper)
     store.outbox[mailId] = store.outbox[mailId] or {
         id = mailId,
         uid = rec.uid,
@@ -759,20 +793,18 @@ function D:FillContributionMail(contributionCopper)
     if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(RETIRE_SUBJECT .. " " .. mailId) end
     if SendMailBodyEditBox then
         SendMailBodyEditBox:SetText(string.format(
-            "WRL-CONTRIB-ID: %s\nFrom: %s\nEstimated max: %s\nAttached copper: %s\n\nEligible bag items to drag manually:\n%s",
+            "WRL-CONTRIB-ID: %s\nFrom: %s\nExpected final contribution: %s\nCurrent money: %s\nPostage reserved: %s\nAttached copper: %s\n\nSell vendorable bags and gear first, then send this currency contribution.",
             mailId,
             rec.key,
             ns.Tiers:FormatMoney(estimated or 0),
-            ns.Tiers:FormatMoney(contributionCopper),
-            itemSummary(snap and snap.bagItems or nil)
+            ns.Tiers:FormatMoney(currentCopper),
+            ns.Tiers:FormatMoney(mailPostageCopper()),
+            ns.Tiers:FormatMoney(contributionCopper)
         ))
     end
     setSendMailCopper(contributionCopper)
 
-    ns:Print("Contribution mail filled for %s. Copper is filled; drag eligible items manually, then press Send.", bank)
-    if snap and snap.bagItems and #snap.bagItems > 0 then
-        ns:Print("Eligible bag items: %s", itemSummary(snap.bagItems, 4):gsub("\n", "; "))
-    end
+    ns:Print("Contribution mail filled for %s. Currency is filled; press Send when ready.", bank)
     return true
 end
 
@@ -784,13 +816,14 @@ function D:OnMailShow()
 
     if self._awaitingMailbox then
         self._awaitingMailbox = false
-        self:PromptContributionAmount()
+        self:PrepareContributionMail()
         return
     end
 
-    -- If the player opens the mailbox while contribution is pending, ask for
-    -- the amount even when they forgot to press the popup button first.
-    self:PromptContributionAmount()
+    -- If the player opens the mailbox while contribution is pending, prepare
+    -- the currency-only contribution even when they forgot to press the popup
+    -- button first.
+    self:PrepareContributionMail()
 end
 
 function D:ScanContributionInbox()
