@@ -2,7 +2,7 @@
 
 A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one character as your **bank**; every other character is a **run**. Runs are hardcore: one final death and the character is retired, but everything they contribute to the bank becomes legacy budget for **Storage**, **Stipend**, and **Fate** unlocks that future runs can request as starter kits.
 
-> Status: **first draft (v0.2.3)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
+> Status: **first draft (v0.2.4)**: core tracking, UI, and request pipeline. Automatic mail/trade fulfillment is partially assisted: the addon pre-fills forms and tells you exactly what to drag, but Blizzard's addon API won't let it click Send for you.
 
 > Development note: This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -10,15 +10,15 @@ A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one 
 
 1. Copy the `WoWRoguelite` folder into `World of Warcraft\_classic_\Interface\AddOns\` so the full path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`.
 2. Enable it at the character select screen.
-3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.3 loaded.` in chat.
+3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.4 loaded.` in chat.
 
 ## Publish releases
 
 This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build and publish the CurseForge package:
 
 ```powershell
-git tag v0.2.3
-git push origin v0.2.3
+git tag v0.2.4
+git push origin v0.2.4
 ```
 
 To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable.
@@ -52,7 +52,7 @@ This marks that character as the bank. Bank characters are out-of-run infrastruc
 **On death (non-bank characters):**
 
 - If you have lives left from Fate unlocks, you get a soft popup and can carry on.
-- On final death, the addon snapshots your carried gold plus vendor value and offers to pre-fill a mail to the bank.
+- On final death, the addon snapshots your carried gold plus vendor value, asks how much gold/silver/copper to attach, and then pre-fills a mail to the bank.
 - The character is marked **retired**; further play will not be credited.
 
 ## Legacy unlocks
@@ -123,7 +123,7 @@ WoWRoguelite/
 ## Known limits
 
 - **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
-- **Contribution accounting is still estimated for items.** On final death the addon snapshots carried gold and bag vendor value, then on `MAIL_SEND_SUCCESS` credits only the gold and bag value that actually left the character since the snapshot.
+- **Contribution accounting is still estimated for items.** On final death the addon snapshots carried gold and bag vendor value, asks for the mail amount, then on `MAIL_SEND_SUCCESS` credits only the gold and bag value that actually left the character since the snapshot.
 - **Cross-realm addon whispers** are not guaranteed in BC; the mail fallback path exists for this reason.
 - **Retirement is soft.** The addon marks a character retired but does not delete them or block play; it just stops crediting further contributions.
 

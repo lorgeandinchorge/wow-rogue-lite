@@ -2,7 +2,7 @@ local function readFile(path)
     local f = assert(io.open(path, "rb"))
     local s = f:read("*a")
     f:close()
-    return s
+    return s:gsub("\r\n", "\n")
 end
 
 local function assertContains(haystack, needle, message)
@@ -44,8 +44,18 @@ local function testBankWorkflowHidesRunWorkflow()
         "bank characters should hide run controls before showing bank fulfillment")
 end
 
+local function testRequestsNotifyRewardsTab()
+    local src = readFile("Core/Requests.lua")
+
+    assertContains(src, 'ns.MainFrame:Notify("Rewards")',
+        "incoming reward requests should highlight the combined Rewards tab")
+    assertNotContains(src, 'ns.MainFrame:Notify("requests")',
+        "incoming reward requests should not target the removed lowercase requests tab")
+end
+
 testMainFrameUsesSingleRewardsTab()
 testTocLoadsRewardsPanel()
 testBankWorkflowHidesRunWorkflow()
+testRequestsNotifyRewardsTab()
 
 print("RewardsTabWiring.test.lua: ok")

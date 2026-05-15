@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.2.4
+
+- Add a contribution amount confirmation popup before final-death mail is created.
+- Parse player-entered gold, silver, and copper amounts and fill all Classic mail money widgets consistently.
+- Cap contribution mail copper to the character's current carried money to avoid impossible pre-fill amounts.
+- Fix incoming reward request tab notifications to highlight the consolidated Rewards tab.
+- Add regression coverage for contribution amount entry, gold/silver/copper mail filling, explicit zero contributions, and Rewards tab notification wiring.
+
 ## v0.2.3
 
 - Add durable final contribution mail metadata with `WRL-CONTRIB:` subjects and body IDs.

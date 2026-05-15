@@ -142,7 +142,7 @@ function R:OnIncoming(fromKey, tierIds, note, via, requestId)
     table.insert(WRL_DB.requests, req)
     ns:Print("|cffc0a060New legacy reward request|r from %s (rewards %s). Open /wrl to fulfill.",
         fromKey, table.concat(tierIds or {}, ","))
-    if ns.MainFrame and ns.MainFrame.Notify then ns.MainFrame:Notify("requests") end
+    if ns.MainFrame and ns.MainFrame.Notify then ns.MainFrame:Notify("Rewards") end
 end
 
 local function shallowCopyItems(items)

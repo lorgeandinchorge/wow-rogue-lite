@@ -239,9 +239,10 @@ local function setSendMailCopper(copper)
         MoneyInputFrame_SetCopper(SendMailMoney, copper)
     end
 
-    local gold = math.floor(copper / 10000)
-    local silver = math.floor((copper % 10000) / 100)
-    local copperOnly = copper % 100
+    local gold, silver, copperOnly = 0, 0, 0
+    gold = math.floor(copper / 10000)
+    silver = math.floor((copper % 10000) / 100)
+    copperOnly = copper % 100
     local function setBox(box, value)
         if not box then return end
         if box.SetNumber then box:SetNumber(value) end
@@ -250,6 +251,38 @@ local function setSendMailCopper(copper)
     setBox(SendMailMoneyGold, gold)
     setBox(SendMailMoneySilver, silver)
     setBox(SendMailMoneyCopper, copperOnly)
+end
+
+local function moneyParts(copper)
+    copper = math.max(0, math.floor(copper or 0))
+    local gold = math.floor(copper / 10000)
+    local silver = math.floor((copper % 10000) / 100)
+    local copperOnly = copper % 100
+    return gold, silver, copperOnly
+end
+
+local function plainMoney(copper)
+    local gold, silver, copperOnly = moneyParts(copper)
+    return string.format("%dg %ds %dc", gold, silver, copperOnly)
+end
+
+local function parseContributionCopper(text)
+    if type(text) ~= "string" then return nil end
+    text = text:lower():gsub(",", " ")
+    local gold = tonumber(text:match("(%d+)%s*g")) or 0
+    local silver = tonumber(text:match("(%d+)%s*s")) or 0
+    local copper = tonumber(text:match("(%d+)%s*c")) or 0
+    if text:find("%d+%s*[gsc]") then
+        return (gold * 10000) + (silver * 100) + copper
+    end
+
+    local a, b, c = text:match("^%s*(%d+)%s+(%d+)%s+(%d+)%s*$")
+    if a and b and c then
+        return (tonumber(a) * 10000) + (tonumber(b) * 100) + tonumber(c)
+    end
+
+    local raw = tonumber(text:match("^%s*(%d+)%s*$"))
+    return raw and math.floor(raw) or nil
 end
 
 local function itemSummary(items, limit)
@@ -326,6 +359,39 @@ function D:Init()
     StaticPopupDialogs["WRL_DEATH_SOFT"] = {
         text    = "You died.\n\n|cffc0a060%d|r %s remaining.\n(Contributions only recorded on final death.)",
         button1 = "OK",
+        timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
+    }
+    StaticPopupDialogs["WRL_CONTRIBUTION_AMOUNT"] = {
+        text = "%s",
+        button1 = "Create Mail",
+        button2 = "Cancel",
+        hasEditBox = 1,
+        OnShow = function(frame)
+            local data = ns.Death and ns.Death._pendingContributionPrompt
+            local amount = data and data.suggestedCopper or 0
+            if frame and frame.editBox then
+                frame.editBox:SetText(plainMoney(amount))
+                frame.editBox:SetFocus()
+                frame.editBox:HighlightText()
+            end
+        end,
+        OnAccept = function(frame)
+            local data = ns.Death and ns.Death._pendingContributionPrompt
+            local text = frame and frame.editBox and frame.editBox:GetText()
+            local amount = parseContributionCopper(text)
+            if not amount and data then amount = data.suggestedCopper end
+            if ns.Death then ns.Death:FillContributionMail(amount) end
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local parent = editBox and editBox:GetParent()
+            local dialog = StaticPopupDialogs["WRL_CONTRIBUTION_AMOUNT"]
+            if dialog and dialog.OnAccept then dialog.OnAccept(parent) end
+            if parent and parent.Hide then parent:Hide() end
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            local parent = editBox and editBox:GetParent()
+            if parent and parent.Hide then parent:Hide() end
+        end,
         timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
     }
 
@@ -610,7 +676,44 @@ function D:OpenMailToBank()
     self._awaitingMailbox = true
 end
 
-function D:FillContributionMail()
+function D:_SuggestedContributionCopper(snap, currentCopper)
+    currentCopper = math.max(0, math.floor(currentCopper or 0))
+    local estimate = snap and (snap.maximumPotential or snap.totalLiquid or snap.preMoney) or currentCopper
+    estimate = math.max(0, math.floor(estimate or 0))
+    if estimate <= 0 then return currentCopper end
+    return math.min(currentCopper, estimate)
+end
+
+function D:PromptContributionAmount()
+    local rec = ns.Database:GetCurrentCharacter(); if not rec then return false end
+    if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return false end
+    if not WRL_DB.bankCharacter then return false end
+
+    local snap = self:_GetDeathSnapshotForRec(rec)
+    local currentCopper = GetMoney and (GetMoney() or 0) or 0
+    local suggested = self:_SuggestedContributionCopper(snap, currentCopper)
+    self._pendingContributionPrompt = {
+        characterKey = rec.key,
+        suggestedCopper = suggested,
+        currentCopper = currentCopper,
+        estimatedCopper = snap and (snap.maximumPotential or snap.totalLiquid) or currentCopper,
+    }
+
+    local body = string.format(
+        "How much should this contribution mail attach?\n\n" ..
+        "Suggested: |cffc0a060%s|r\n" ..
+        "Current money: %s\n" ..
+        "Death estimate: %s\n\n" ..
+        "Enter as gold/silver/copper, for example: 1g 23s 45c",
+        plainMoney(suggested),
+        ns.Tiers:FormatMoney(currentCopper),
+        ns.Tiers:FormatMoney(self._pendingContributionPrompt.estimatedCopper or 0)
+    )
+    StaticPopup_Show("WRL_CONTRIBUTION_AMOUNT", body)
+    return true
+end
+
+function D:FillContributionMail(contributionCopper)
     local rec = ns.Database:GetCurrentCharacter(); if not rec then return false end
     if ns.Run:GetState(rec) ~= "dead_pending_contribution" then return false end
     if not WRL_DB.bankCharacter then return false end
@@ -626,6 +729,11 @@ function D:FillContributionMail()
     end
 
     local currentCopper = GetMoney and (GetMoney() or 0) or 0
+    contributionCopper = math.max(0, math.floor(contributionCopper or self:_SuggestedContributionCopper(snap, currentCopper)))
+    if contributionCopper > currentCopper then
+        ns:Print("Contribution amount adjusted to current money: %s.", ns.Tiers:FormatMoney(currentCopper))
+        contributionCopper = currentCopper
+    end
     local estimated = (snap and (snap.maximumPotential or snap.totalLiquid)) or currentCopper
     store.outbox[mailId] = store.outbox[mailId] or {
         id = mailId,
@@ -638,7 +746,7 @@ function D:FillContributionMail()
     entry.uid = rec.uid
     entry.characterKey = rec.key
     entry.estimated = estimated
-    entry.preparedCopper = currentCopper
+    entry.preparedCopper = contributionCopper
     entry.status = entry.status == "received" and "received" or "prepared"
 
     local bank  = WRL_DB.bankCharacter
@@ -651,11 +759,11 @@ function D:FillContributionMail()
             mailId,
             rec.key,
             ns.Tiers:FormatMoney(estimated or 0),
-            ns.Tiers:FormatMoney(currentCopper),
+            ns.Tiers:FormatMoney(contributionCopper),
             itemSummary(snap and snap.bagItems or nil)
         ))
     end
-    setSendMailCopper(currentCopper)
+    setSendMailCopper(contributionCopper)
 
     ns:Print("Contribution mail filled for %s. Copper is filled; drag eligible items manually, then press Send.", bank)
     if snap and snap.bagItems and #snap.bagItems > 0 then
@@ -672,13 +780,13 @@ function D:OnMailShow()
 
     if self._awaitingMailbox then
         self._awaitingMailbox = false
-        self:FillContributionMail()
+        self:PromptContributionAmount()
         return
     end
 
-    -- If the player opens the mailbox while contribution is pending, fill the
-    -- Send Mail form even when they forgot to press the popup button first.
-    self:FillContributionMail()
+    -- If the player opens the mailbox while contribution is pending, ask for
+    -- the amount even when they forgot to press the popup button first.
+    self:PromptContributionAmount()
 end
 
 function D:ScanContributionInbox()

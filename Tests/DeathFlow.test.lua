@@ -22,7 +22,7 @@ local function resetHarness(opts)
     deathScreenShows = {}
     currentDead = opts.currentDead
     if currentDead == nil then currentDead = true end
-    currentMoney = 12345
+    currentMoney = opts.currentMoney or 12345
     hasDeadOrGhostApi = opts.hasDeadOrGhostApi
     if hasDeadOrGhostApi == nil then hasDeadOrGhostApi = true end
     unitIsDead = opts.unitIsDead or false
@@ -530,6 +530,13 @@ local function testContributionMailFillCreatesDurableMailRecordAndBody()
     ns.Death:OpenMailToBank()
     registeredEvents.MAIL_SHOW()
 
+    assertEqual(popupShown[#popupShown].name, "WRL_CONTRIBUTION_AMOUNT",
+        "opening mailbox asks player to confirm contribution amount")
+
+    StaticPopupDialogs["WRL_CONTRIBUTION_AMOUNT"].OnAccept({
+        editBox = { GetText = function() return "1g 23s 45c" end },
+    })
+
     assertEqual(mailFields.clickedSendTab, true,
         "contribution mail switches to send tab")
     assertEqual(mailFields.name, "Bank",
@@ -544,6 +551,64 @@ local function testContributionMailFillCreatesDurableMailRecordAndBody()
         "contribution mail body stores source character")
     assert(WRL_DB.contributionMail.outbox ~= nil,
         "contribution mail creates outbox ledger")
+end
+
+local function testContributionMailUsesConfirmedGoldSilverCopperAmount()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 150000 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 150000,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 150000,
+        maximumPotential = 150000,
+    }
+
+    ns.Death:OpenMailToBank()
+    registeredEvents.MAIL_SHOW()
+    StaticPopupDialogs["WRL_CONTRIBUTION_AMOUNT"].OnAccept({
+        editBox = { GetText = function() return "2g 3s 4c" end },
+    })
+
+    assertEqual(mailFields.money, 20304,
+        "combined money frame receives confirmed copper")
+    assertEqual(mailFields.gold, 2,
+        "mail gold field receives confirmed gold")
+    assertEqual(mailFields.silver, 3,
+        "mail silver field receives confirmed silver")
+    assertEqual(mailFields.copper, 4,
+        "mail copper field receives confirmed copper")
+    assertContains(mailFields.body, "Attached copper: 20304c",
+        "mail body records exact confirmed contribution amount")
+end
+
+local function testContributionMailAllowsExplicitZeroCopper()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 150000 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 150000,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 150000,
+        maximumPotential = 150000,
+    }
+
+    ns.Death:OpenMailToBank()
+    registeredEvents.MAIL_SHOW()
+    StaticPopupDialogs["WRL_CONTRIBUTION_AMOUNT"].OnAccept({
+        editBox = { GetText = function() return "0g 0s 0c" end },
+    })
+
+    assertEqual(mailFields.money, 0,
+        "explicit zero contribution does not fall back to suggested amount")
+    assertEqual(mailFields.gold, 0,
+        "explicit zero fills zero gold")
+    assertEqual(mailFields.silver, 0,
+        "explicit zero fills zero silver")
+    assertEqual(mailFields.copper, 0,
+        "explicit zero fills zero copper")
 end
 
 local function testBankInboxContributionMailCreditsAttachedCopperOnce()
@@ -724,6 +789,8 @@ testDeathPopupExplainsNextStepsAndMaximumPotential()
 testFinalDeathPopupUsesSingleFormattedMessageArgument()
 testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
 testContributionMailFillCreatesDurableMailRecordAndBody()
+testContributionMailUsesConfirmedGoldSilverCopperAmount()
+testContributionMailAllowsExplicitZeroCopper()
 testBankInboxContributionMailCreditsAttachedCopperOnce()
 testCombatDamageSourceCapturedBeforeDeath()
 testEnvironmentalDamageSourceCapturedBeforeDeath()

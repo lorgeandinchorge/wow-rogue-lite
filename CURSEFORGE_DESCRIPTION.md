@@ -28,12 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.2.3
+### Latest Update: v0.2.4
 
-- Final contribution mail now uses a concise `WRL-CONTRIB` subject/body marker so the bank can recognize it.
-- Bank characters can credit received contribution mail once from the inbox ledger.
-- Contribution mail fills carried copper more reliably; players still manually drag any item attachments and press Send.
-- Classic and GW2-style UI texture skins are available for testers, with the Dark theme kept flat.
+- Final-death contribution mail now asks how much gold, silver, and copper to attach before creating the mail.
+- The addon fills the Classic mail gold, silver, and copper fields consistently from the confirmed amount.
+- Contribution mail is capped to the character's current carried money so the pre-filled amount stays realistic.
+- Incoming reward requests now highlight the consolidated Rewards tab correctly.
 
 ### Bank And Run Structure
 
