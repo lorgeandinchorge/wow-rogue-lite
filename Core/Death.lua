@@ -251,6 +251,35 @@ local function setSendMailCopper(copper)
     setBox(SendMailMoneyGold, gold)
     setBox(SendMailMoneySilver, silver)
     setBox(SendMailMoneyCopper, copperOnly)
+
+    if SendMailFrame_Update then
+        SendMailFrame_Update()
+    end
+end
+
+local function readMoneyBox(box)
+    if not box then return 0 end
+    local value
+    if box.GetNumber then value = box:GetNumber() end
+    if (value == nil or value == "") and box.GetText then value = box:GetText() end
+    return math.max(0, math.floor(tonumber(value) or 0))
+end
+
+local function getSendMailCopper()
+    if MoneyInputFrame_GetCopper and SendMailMoney then
+        local copper = MoneyInputFrame_GetCopper(SendMailMoney)
+        if copper ~= nil then
+            return math.max(0, math.floor(copper or 0))
+        end
+    end
+
+    local gold = readMoneyBox(SendMailMoneyGold)
+    local silver = readMoneyBox(SendMailMoneySilver)
+    local copper = readMoneyBox(SendMailMoneyCopper)
+    if gold > 0 or silver > 0 or copper > 0 then
+        return (gold * 10000) + (silver * 100) + copper
+    end
+    return nil
 end
 
 local function moneyParts(copper)
@@ -754,6 +783,7 @@ function D:FillContributionMail(contributionCopper)
     if not WRL_DB.bankCharacter then return false end
 
     if MailFrameTab2 and MailFrameTab2.Click then MailFrameTab2:Click() end
+    if SendMailFrame and SendMailFrame.Show then SendMailFrame:Show() end
 
     local snap = self:_GetDeathSnapshotForRec(rec)
     local store = ensureContributionMail()
@@ -885,7 +915,31 @@ function D:OnMailSent()
 
     local key     = ns:UnitKey()
     local snap    = ns.Contributions:GetDeathSnapshot(key)
-    local receipt = ns.Contributions:CreditFinalDeath(key)
+    local store   = ensureContributionMail()
+    local mailId  = rec._pendingContributionMailId
+    local out     = mailId and store.outbox[mailId] or nil
+    local preparedCopper = out and math.max(0, math.floor(out.preparedCopper or 0)) or getSendMailCopper()
+    local receipt
+
+    if preparedCopper ~= nil and preparedCopper > 0 and ns.Contributions and ns.Contributions.Record then
+        receipt = ns.Contributions:Record(key, preparedCopper, "final_contribution_mail", {
+            confidence = "verified",
+            note = ("prepared mail %s attached copper=%d"):format(tostring(mailId), preparedCopper),
+            mailId = mailId,
+            preMoney = snap and snap.preMoney,
+            estimatedBagValue = snap and snap.estimatedBagValue,
+            estimatedGearValue = snap and snap.estimatedGearValue,
+        })
+        if snap then
+            snap.credited = true
+            snap.creditedAt = time and time() or 0
+            snap.creditedId = receipt and receipt.id or nil
+            rec.deathSnapshot = snap
+            rec._pendingContribution = nil
+        end
+    else
+        receipt = ns.Contributions:CreditFinalDeath(key)
+    end
 
     if not snap then
         ns.Run:SetState(key, "retired", "mail_sent_no_snapshot")
@@ -895,8 +949,6 @@ function D:OnMailSent()
     ns.Run:SetState(key, "retired", "contribution_credited")
 
     if receipt then
-        local store = ensureContributionMail()
-        local mailId = rec._pendingContributionMailId
         if mailId and store.outbox[mailId] then
             store.outbox[mailId].status = "sent"
             store.outbox[mailId].sentAt = time and time() or 0

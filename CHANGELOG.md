@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.7
+
+- Fix final contribution send-credit accounting so prefilled gold, silver, and copper are all counted.
+- Add a field-readback fallback for prepared contribution mail when the durable outbox amount is missing.
+- Refresh the send-mail frame after contribution prefill so reopening `/wrl contribute` is more reliable when the send tab is already open.
+- Add regression coverage for the `1s 11c` style fallback case that previously credited only copper.
+
 ## v0.2.6
 
 - Change final contribution mail to a currency-only flow that assumes the player sells vendorable bags and gear first.

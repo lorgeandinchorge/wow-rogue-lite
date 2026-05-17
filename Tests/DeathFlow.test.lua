@@ -87,9 +87,24 @@ local function resetHarness(opts)
     _G.SendMailSubjectEditBox = { SetText = function(_, value) mailFields.subject = value end }
     _G.SendMailBodyEditBox = { SetText = function(_, value) mailFields.body = value end }
     _G.SendMailMoney = {}
-    _G.SendMailMoneyGold = { SetNumber = function(_, value) mailFields.gold = value end, SetText = function(_, value) mailFields.goldText = value end }
-    _G.SendMailMoneySilver = { SetNumber = function(_, value) mailFields.silver = value end, SetText = function(_, value) mailFields.silverText = value end }
-    _G.SendMailMoneyCopper = { SetNumber = function(_, value) mailFields.copper = value end, SetText = function(_, value) mailFields.copperText = value end }
+    _G.SendMailMoneyGold = {
+        SetNumber = function(_, value) mailFields.gold = value end,
+        SetText = function(_, value) mailFields.goldText = value end,
+        GetNumber = function() return mailFields.gold end,
+        GetText = function() return mailFields.goldText end,
+    }
+    _G.SendMailMoneySilver = {
+        SetNumber = function(_, value) mailFields.silver = value end,
+        SetText = function(_, value) mailFields.silverText = value end,
+        GetNumber = function() return mailFields.silver end,
+        GetText = function() return mailFields.silverText end,
+    }
+    _G.SendMailMoneyCopper = {
+        SetNumber = function(_, value) mailFields.copper = value end,
+        SetText = function(_, value) mailFields.copperText = value end,
+        GetNumber = function() return mailFields.copper end,
+        GetText = function() return mailFields.copperText end,
+    }
     _G.MoneyInputFrame_SetCopper = function(_, value) mailFields.money = value end
     _G.GetInboxNumItems = function() return #inboxHeaders end
     _G.GetInboxHeaderInfo = function(index)
@@ -195,6 +210,19 @@ local function resetHarness(opts)
         rec.contributed = (rec.contributed or 0) + amount
         WRL_DB.totalContributed = (WRL_DB.totalContributed or 0) + amount
         return receipt
+    end
+    function ns.Contributions:CreditFinalDeath(key)
+        local rec = WRL_DB.characters[key]
+        local snap = rec and rec.deathSnapshot
+        if not snap or snap.credited then return nil end
+        local amount = math.min(snap.maximumPotential or snap.totalLiquid or 0,
+            math.max(0, (snap.preMoney or 0) - currentMoney))
+        snap.credited = true
+        if amount <= 0 then return nil end
+        return self:Record(key, amount, "final_contribution", {
+            confidence = "estimated",
+            note = "legacy delta estimate",
+        })
     end
 
     function ns.Tiers:FormatMoney(copper)
@@ -679,6 +707,62 @@ local function testBankInboxContributionMailCreditsAttachedCopperOnce()
         "bank inbox scan marks contribution mail received")
 end
 
+local function testMailSendCreditsPreparedCopperInsteadOfWalletDelta()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 135 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 135,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 135,
+        maximumPotential = 105,
+    }
+
+    ns.Death:PrepareContributionMail()
+    assertEqual(mailFields.money, 105, "setup attaches 105c and reserves 30c")
+
+    currentMoney = 46
+    registeredEvents.MAIL_SEND_SUCCESS()
+
+    local receipt = WRL_DB.contributionReceipts[1]
+    assert(receipt ~= nil, "mail send creates contribution receipt")
+    assertEqual(receipt.amount, 105,
+        "mail send credits the prepared attached copper, not wallet delta")
+    assertEqual(receipt.source, "final_contribution_mail",
+        "prepared mail credit is recorded as mail contribution")
+    assertEqual(rec.status, "retired", "mail send retires the run")
+end
+
+local function testMailSendFallbackCountsGoldSilverAndCopperFields()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 141 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 141,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 141,
+        maximumPotential = 111,
+    }
+
+    ns.Death:PrepareContributionMail()
+    assertEqual(mailFields.silver, 1, "setup fills silver field")
+    assertEqual(mailFields.copper, 11, "setup fills copper field")
+
+    WRL_DB.contributionMail.outbox = {}
+    rec._pendingContributionMailId = nil
+    currentMoney = 130
+    registeredEvents.MAIL_SEND_SUCCESS()
+
+    local receipt = WRL_DB.contributionReceipts[1]
+    assert(receipt ~= nil, "mail send creates fallback contribution receipt")
+    assertEqual(receipt.amount, 111,
+        "mail send fallback credits gold+silver+copper fields, not only copper")
+    assertEqual(receipt.source, "final_contribution_mail",
+        "field readback is recorded as mail contribution")
+end
+
 local function testCombatDamageSourceCapturedBeforeDeath()
     -- Player alive on login (currentDead=false), 1 life → first PLAYER_DEAD is final.
     mockTime = 200
@@ -825,6 +909,8 @@ testContributionMailUsesExpectedContributionWhenEnoughCurrencyRemains()
 testContributionMailLeavesPostageWhenCurrencyIsBelowExpected()
 testPrepareContributionMailCanBeReopenedWhenMailboxIsAlreadyOpen()
 testBankInboxContributionMailCreditsAttachedCopperOnce()
+testMailSendCreditsPreparedCopperInsteadOfWalletDelta()
+testMailSendFallbackCountsGoldSilverAndCopperFields()
 testCombatDamageSourceCapturedBeforeDeath()
 testEnvironmentalDamageSourceCapturedBeforeDeath()
 testFinalDeathMemorialIncludesSourceContext()
