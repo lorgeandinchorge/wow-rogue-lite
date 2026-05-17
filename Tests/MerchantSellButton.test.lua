@@ -132,23 +132,23 @@ local function resetHarness(opts)
     return ns
 end
 
-local function testSellButtonVisibleOnlyForPendingDeadRunAtMerchant()
+local function testSellButtonVisibleWheneverMerchantIsOpen()
     local ns = resetHarness()
 
     assertEqual(ns.Merchant:ShouldShowSellButton(), true,
         "pending dead run at merchant can see sell button")
 
     ns = resetHarness({ state = "active" })
-    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
-        "active runs cannot see sell button")
+    assertEqual(ns.Merchant:ShouldShowSellButton(), true,
+        "active runs can see sell button at merchant")
 
     ns = resetHarness({ state = "retired" })
-    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
-        "retired runs cannot see sell button")
+    assertEqual(ns.Merchant:ShouldShowSellButton(), true,
+        "retired runs can see sell button at merchant")
 
     ns = resetHarness({ state = "dead_pending_contribution", isBank = true })
-    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
-        "bank characters cannot see sell button")
+    assertEqual(ns.Merchant:ShouldShowSellButton(), true,
+        "bank characters can see sell button at merchant")
 
     ns = resetHarness({ state = "dead_pending_contribution", merchantOpen = false })
     assertEqual(ns.Merchant:ShouldShowSellButton(), false,
@@ -181,6 +181,16 @@ local function testConfirmAndSellExecutesPlanButKeepsContributionPending()
     assertEqual(#soldInventorySlots, 2, "sale executor sells equipped gear")
     assertEqual(ns.Run:GetState(ns.Database:GetCurrentCharacter()), "dead_pending_contribution",
         "sale does not retire the run")
+end
+
+local function testSellFinalRunItemsNoLongerRequiresPendingDeath()
+    local ns = resetHarness({ state = "active" })
+
+    local sold = ns.Merchant:SellFinalRunItems()
+
+    assertEqual(sold, true, "sale executor can sell from the always-visible merchant button")
+    assertEqual(#soldBagItems, 1, "sale executor sells bag item without pending death")
+    assertEqual(#soldInventorySlots, 2, "sale executor sells equipped gear without pending death")
 end
 
 local function testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
@@ -279,9 +289,10 @@ local function testPromptFinalRunSellPrintsClearMessageOutsideMerchant()
     assert(found, "PromptFinalRunSell prints 'Open a vendor' when merchant is closed")
 end
 
-testSellButtonVisibleOnlyForPendingDeadRunAtMerchant()
+testSellButtonVisibleWheneverMerchantIsOpen()
 testBuildSellPlanIncludesBagsAndEquippedGear()
 testConfirmAndSellExecutesPlanButKeepsContributionPending()
+testSellFinalRunItemsNoLongerRequiresPendingDeath()
 testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
 testSellButtonVisibleWithColdItemCache()
 testPromptFinalRunSellPrintsMessageWhenNothingVendorable()

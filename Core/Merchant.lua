@@ -65,7 +65,7 @@ function M:_EnsureButton()
     if self.button or not CreateFrame or not MerchantFrame then return end
 
     local button = CreateFrame("Button", "WoWRogueliteMerchantSellButton", MerchantFrame, "UIPanelButtonTemplate")
-    if button.SetText then button:SetText("WRL: Sell Final Run") end
+    if button.SetText then button:SetText("WRL: Sell All") end
     if button.SetSize then button:SetSize(142, 22) end
     if button.SetPoint then button:SetPoint("TOPRIGHT", MerchantFrame, "TOPRIGHT", -32, -42) end
     if button.SetScript then
@@ -162,12 +162,11 @@ end
 -- Intentionally does NOT consult BuildFinalRunSellPlan: GetItemInfo() is
 -- frequently uncached at MERCHANT_SHOW time, causing every item to report a
 -- zero sell price and the plan to appear empty even when the player has
--- vendorable gear.  The sell-plan check (and the "nothing found" message) is
--- deferred to PromptFinalRunSell(), which runs at click/command time when the
--- cache is warmer.
+-- vendorable gear. It also does not consult run state; the confirmation dialog
+-- is the safety gate, and the user asked for the button to always be present
+-- at vendors.
 function M:ShouldShowSellButton()
-    if not merchantOpen() then return false end
-    return self:IsPendingFinalContribution()
+    return merchantOpen()
 end
 
 function M:_ConfirmationText(plan)
@@ -178,12 +177,12 @@ function M:_ConfirmationText(plan)
     end
 
     return string.format(
-        "Sell all vendorable inventory items and equipped gear for this dead run?\n\n" ..
+        "Sell all vendorable inventory items and equipped gear?\n\n" ..
         "Current money: %s\n" ..
         "Bag vendor value: %s\n" ..
         "Equipped gear vendor value: %s\n" ..
         "Expected contribution after postage: %s\n\n" ..
-        "This will automatically sell equipped gear. The run will stay pending until you mail the currency to your bank.",
+        "This will automatically sell equipped gear. Use this only when you are ready to liquidate the character's current inventory and gear.",
         formatMoney(money),
         formatMoney(plan and plan.bagValue or 0),
         formatMoney(plan and plan.gearValue or 0),
@@ -261,13 +260,6 @@ function M:PromptFinalRunSell()
         if ns.Print then ns:Print("Open a vendor to sell final-run items.") end
         return false
     end
-    -- Guard 2: character must be in dead_pending_contribution (and not bank).
-    if not self:IsPendingFinalContribution() then
-        if ns.Print then ns:Print("No final-run vendor sale is available right now.") end
-        self:UpdateButton()
-        return false
-    end
-
     -- Build the sell plan now, at action time, when GetItemInfo() is most
     -- likely to be cached (merchant has been open for a moment).
     local plan = self:BuildFinalRunSellPlan()
@@ -303,11 +295,6 @@ function M:SellFinalRunItems()
         if ns.Print then ns:Print("Final-run sale stopped because the merchant is closed.") end
         return false
     end
-    if not self:IsPendingFinalContribution() then
-        if ns.Print then ns:Print("No final contribution is pending for this character.") end
-        return false
-    end
-
     local plan = self:BuildFinalRunSellPlan()
     if (#plan.bags + #plan.gear) == 0 then
         if ns.Print then ns:Print("No vendorable final-run items were found.") end
@@ -337,8 +324,13 @@ function M:SellFinalRunItems()
     end
 
     if ns.Print then
-        ns:Print("Sold final-run items: %d bag stacks, %d equipped items. Go to a mailbox and use /wrl contribute.",
-            soldBags, soldGear)
+        if self:IsPendingFinalContribution() then
+            ns:Print("Sold items: %d bag stacks, %d equipped items. Go to a mailbox and use /wrl contribute.",
+                soldBags, soldGear)
+        else
+            ns:Print("Sold items: %d bag stacks, %d equipped items.",
+                soldBags, soldGear)
+        end
         if #plan.skipped > 0 then
             ns:Print("Skipped %d item(s) with no value, unknown price, or locked state.", #plan.skipped)
         end

@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.9.2
+
+- Make the vendor `WRL: Sell All` button appear whenever a merchant is open, regardless of run state.
+- Keep the private confirmation dialog before selling vendorable bag contents and equipped gear.
+- Keep `/wrl sellfinal` and `/wrl vendorfinal` as command fallbacks for the same vendor sell prompt.
+- Update regression coverage and user-facing copy for the always-visible vendor button.
+
 ## v0.2.9.1
 
 - Keep the final-run vendor button visible for dead pending runs even when item sell prices are not cached at merchant-open time.

@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.2.9.1"
+ns.version     = "0.2.9.2"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -247,10 +247,9 @@ SlashCmdList["WRL"] = function(msg)
             ns:Print("Usage: /wrl export | /wrl export run | /wrl export account")
         end
     elseif cmd == "sellfinal" or cmd == "vendorfinal" then
-        -- Sell all vendorable bag and equipped items for a dead_pending_contribution
-        -- character at the currently open merchant.  Guards are inside
-        -- Merchant:PromptFinalRunSell(): merchant must be open, character must be
-        -- dead_pending_contribution, and not a bank character.
+        -- Sell all vendorable bag and equipped items at the currently open
+        -- merchant. Merchant:PromptFinalRunSell() owns the merchant-open guard
+        -- and confirmation dialog.
         if ns.Merchant and ns.Merchant.PromptFinalRunSell then
             ns.Merchant:PromptFinalRunSell()
         else
@@ -264,7 +263,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl bank           - show current bank char")
         ns:Print("  /wrl request        - open the Rewards tab")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")
-        ns:Print("  /wrl sellfinal      - sell final-run items at the current vendor")
+        ns:Print("  /wrl sellfinal      - sell bags and equipped gear at the current vendor")
         ns:Print("  /wrl settings       - print current settings to chat")
         ns:Print("  /wrl profile        - show active profile")
         ns:Print("  /wrl profile list   - list all profiles")

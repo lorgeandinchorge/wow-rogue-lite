@@ -28,12 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.2.9.1
+### Latest Update: v0.2.9.2
 
-- Keeps the final-run vendor button visible for dead pending runs even when item sell prices are not cached at merchant-open time.
-- Adds `/wrl sellfinal` and `/wrl vendorfinal` so testers can open the same final-run vendor sell prompt from chat.
-- Moves the sell-plan check to click/command time and prints a clear message when no vendorable items are found.
-- Adds regression coverage for cold item-cache merchant opens and the new vendor sell slash commands.
+- Makes the vendor **WRL: Sell All** button appear whenever a merchant is open.
+- Keeps the private confirmation dialog before selling vendorable bag contents and equipped gear.
+- Keeps `/wrl sellfinal` and `/wrl vendorfinal` as command fallbacks for the same vendor sell prompt.
+- Updates regression coverage and copy for the always-visible vendor button.
 
 ### Bank And Run Structure
 
@@ -41,7 +41,7 @@ Set one character as your bank with `/wrl setbank`. The bank is treated as infra
 
 ### Account-Wide Progression
 
-When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. At a vendor, dead pending runs can use **WRL: Sell Final Run** to confirm and liquidate vendorable bags plus equipped gear before mailing currency to the bank. That total becomes spendable budget for permanent legacy unlocks.
+When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. At a vendor, use **WRL: Sell All** to confirm and liquidate vendorable bags plus equipped gear before mailing currency to the bank. That total becomes spendable budget for permanent legacy unlocks.
 
 ### Starter Reward Requests
 
