@@ -836,6 +836,56 @@ local function testFinalDeathMemorialIncludesSourceContext()
         "testFinalDeathMemorialIncludesSourceContext: deathLog ctx.sourceName")
 end
 
+local function testCombatLogGetCurrentEventInfoSourceCapturedBeforeDeath()
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    mockTime = 199
+    _G.CombatLogGetCurrentEventInfo = function()
+        return 199, "SPELL_DAMAGE", nil,
+            "Creature-0-0002", "Murloc Tidehunter", 0, 0,
+            "Player-1-00000001", "Runner", 0, 0,
+            133, "Fireball", 4, 999
+    end
+
+    ns.Death:OnCombatLogEvent()
+    _G.CombatLogGetCurrentEventInfo = nil
+
+    mockTime = 200
+    currentDead = true
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testCombatLogGetCurrentEventInfoSourceCapturedBeforeDeath: memorial created")
+    assertEqual(memorial.sourceName, "Murloc Tidehunter",
+        "testCombatLogGetCurrentEventInfoSourceCapturedBeforeDeath: memorial.sourceName")
+end
+
+local function testCombatLogGetCurrentEventInfoEnvironmentalDeathCaptured()
+    mockTime = 200
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+
+    mockTime = 199
+    _G.CombatLogGetCurrentEventInfo = function()
+        return 199, "ENVIRONMENTAL_DAMAGE", nil,
+            nil, nil, 0, 0,
+            "Player-1-00000001", "Runner", 0, 0,
+            "Drowning", 999
+    end
+
+    ns.Death:OnCombatLogEvent()
+    _G.CombatLogGetCurrentEventInfo = nil
+
+    mockTime = 200
+    currentDead = true
+    registeredEvents.PLAYER_DEAD()
+
+    local memorial = WRL_DB.memorials["Runner-Realm#100"]
+    assert(memorial ~= nil, "testCombatLogGetCurrentEventInfoEnvironmentalDeathCaptured: memorial created")
+    assertEqual(memorial.environmentalType, "Drowning",
+        "testCombatLogGetCurrentEventInfoEnvironmentalDeathCaptured: environmentalType")
+end
+
 local function testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
     mockTime = 200
     local ns = resetHarness({ currentDead = false, livesRemaining = 2 })
@@ -914,6 +964,8 @@ testMailSendFallbackCountsGoldSilverAndCopperFields()
 testCombatDamageSourceCapturedBeforeDeath()
 testEnvironmentalDamageSourceCapturedBeforeDeath()
 testFinalDeathMemorialIncludesSourceContext()
+testCombatLogGetCurrentEventInfoSourceCapturedBeforeDeath()
+testCombatLogGetCurrentEventInfoEnvironmentalDeathCaptured()
 testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
 testStaleLastAttackerIsIgnoredAfterTimeout()
 testMissingMapAPIsDoNotBreakDeathHandling()

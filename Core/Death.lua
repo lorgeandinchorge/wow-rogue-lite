@@ -86,18 +86,31 @@ local function playerGuid()
 end
 
 -- Called from a dedicated frame for COMBAT_LOG_EVENT_UNFILTERED.
--- In TBC Classic, combat log args are passed directly to OnEvent rather
--- than via CombatLogGetCurrentEventInfo(), so we receive them as varargs.
+-- Classic clients differ here: some pass combat log args directly to OnEvent,
+-- while others require CombatLogGetCurrentEventInfo().
 -- Only tracks damage sub-events where the destination is the player.
 function D:OnCombatLogEvent(timestamp, subevent, _hiddenArg,
                              srcGUID, srcName, _srcFlags, _srcRaidFlags,
                              dstGUID, _dstName, _dstFlags, _dstRaidFlags, ...)
+    local extraArgs
+    if not timestamp and CombatLogGetCurrentEventInfo then
+        local function pack(...)
+            return { n = select("#", ...), ... }
+        end
+        local ev = pack(CombatLogGetCurrentEventInfo())
+        timestamp, subevent, _hiddenArg = ev[1], ev[2], ev[3]
+        srcGUID, srcName, _srcFlags, _srcRaidFlags = ev[4], ev[5], ev[6], ev[7]
+        dstGUID, _dstName, _dstFlags, _dstRaidFlags = ev[8], ev[9], ev[10], ev[11]
+        extraArgs = {}
+        for i = 12, ev.n do extraArgs[#extraArgs + 1] = ev[i] end
+    end
+
     local myGuid = playerGuid()
     if myGuid and dstGUID ~= myGuid then return end
 
     if subevent == "ENVIRONMENTAL_DAMAGE" then
         -- args after destRaidFlags: environmentalType, amount, ...
-        local envType = select(1, ...)
+        local envType = extraArgs and extraArgs[1] or select(1, ...)
         D_ctx.lastEnvironmentalDamageType = envType
         D_ctx.lastAttackSourceName        = nil
         D_ctx.lastAttackSourceGuid        = nil

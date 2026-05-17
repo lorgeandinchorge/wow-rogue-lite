@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.9
+
+- Fix the final-run vendor button so it appears even when Blizzard's `MerchantFrame` loads after WRL initialization.
+- Replace the vendor sell confirmation StaticPopup with a private WRL confirmation frame to avoid tainting Blizzard's quit/logout dialog path.
+- Improve final-death source capture on Classic clients that require `CombatLogGetCurrentEventInfo()`, reducing `Slain by Unknown` deaths when live combat-log context is available.
+- Add regression coverage for late merchant-frame button creation and both direct and `CombatLogGetCurrentEventInfo()` combat-log capture paths.
+
 ## v0.2.8
 
 - Add a vendor-only `WRL: Sell Final Run` button for characters in `dead_pending_contribution`.

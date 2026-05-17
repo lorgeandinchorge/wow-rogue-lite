@@ -5,8 +5,6 @@
 local ADDON_NAME, ns = ...
 local M = ns:NewModule("Merchant")
 
-local POPUP_NAME = "WRL_SELL_FINAL_RUN_CONFIRM"
-
 local EQUIPMENT_SLOTS = {
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     11, 12, 13, 14, 15, 16, 17, 18, 19,
@@ -53,7 +51,6 @@ local function clearCursor()
 end
 
 function M:Init()
-    self:_EnsurePopup()
     self:_EnsureButton()
 
     if ns.On then
@@ -62,23 +59,6 @@ function M:Init()
         ns:On("BAG_UPDATE", function() self:UpdateButton() end)
         ns:On("PLAYER_EQUIPMENT_CHANGED", function() self:UpdateButton() end)
     end
-end
-
-function M:_EnsurePopup()
-    StaticPopupDialogs = StaticPopupDialogs or {}
-    if StaticPopupDialogs[POPUP_NAME] then return end
-
-    StaticPopupDialogs[POPUP_NAME] = {
-        text = "%s",
-        button1 = "Sell Final Run",
-        button2 = CANCEL or "Cancel",
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        OnAccept = function()
-            M:SellFinalRunItems()
-        end,
-    }
 end
 
 function M:_EnsureButton()
@@ -96,6 +76,7 @@ function M:_EnsureButton()
 end
 
 function M:UpdateButton()
+    if not self.button then self:_EnsureButton() end
     if not self.button then return end
     if self:ShouldShowSellButton() then
         if self.button.Show then self.button:Show() end
@@ -206,6 +187,70 @@ function M:_ConfirmationText(plan)
     )
 end
 
+function M:_EnsureConfirmFrame()
+    if self.confirmFrame or not CreateFrame or not UIParent then return self.confirmFrame end
+
+    local frame = CreateFrame("Frame", "WoWRogueliteMerchantSellConfirm", UIParent)
+    if frame.SetFrameStrata then frame:SetFrameStrata("DIALOG") end
+    if frame.SetSize then frame:SetSize(430, 250) end
+    if frame.SetPoint then frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0) end
+    if frame.EnableMouse then frame:EnableMouse(true) end
+    if frame.Hide then frame:Hide() end
+
+    if frame.CreateTexture then
+        local bg = frame:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(frame)
+        bg:SetColorTexture(0.04, 0.035, 0.03, 0.96)
+        frame._bg = bg
+
+        local border = frame:CreateTexture(nil, "BORDER")
+        border:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+        border:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+        border:SetHeight(2)
+        border:SetColorTexture(0.78, 0.18, 0.18, 0.95)
+        frame._border = border
+    end
+
+    local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+    local text
+    if frame.CreateFontString then
+        text = frame:CreateFontString(nil, "OVERLAY")
+        text:SetFont(font, 13, "")
+        text:SetTextColor(0.92, 0.86, 0.76, 1)
+        text:SetJustifyH("LEFT")
+        text:SetJustifyV("TOP")
+        text:SetWidth(380)
+        text:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -24)
+        frame._text = text
+    end
+
+    local sellButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    if sellButton.SetText then sellButton:SetText("Sell Final Run") end
+    if sellButton.SetSize then sellButton:SetSize(130, 24) end
+    if sellButton.SetPoint then sellButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 20) end
+    if sellButton.SetScript then
+        sellButton:SetScript("OnClick", function()
+            if frame.Hide then frame:Hide() end
+            M:SellFinalRunItems()
+        end)
+    end
+    frame._sellButton = sellButton
+
+    local cancelButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    if cancelButton.SetText then cancelButton:SetText(CANCEL or "Cancel") end
+    if cancelButton.SetSize then cancelButton:SetSize(100, 24) end
+    if cancelButton.SetPoint then cancelButton:SetPoint("RIGHT", sellButton, "LEFT", -10, 0) end
+    if cancelButton.SetScript then
+        cancelButton:SetScript("OnClick", function()
+            if frame.Hide then frame:Hide() end
+        end)
+    end
+    frame._cancelButton = cancelButton
+
+    self.confirmFrame = frame
+    return frame
+end
+
 function M:PromptFinalRunSell()
     if not self:ShouldShowSellButton() then
         if ns.Print then ns:Print("No final-run vendor sale is available right now.") end
@@ -215,10 +260,13 @@ function M:PromptFinalRunSell()
 
     local plan = self:BuildFinalRunSellPlan()
     self._pendingSellPlan = plan
-    self:_EnsurePopup()
 
-    if StaticPopup_Show then
-        StaticPopup_Show(POPUP_NAME, self:_ConfirmationText(plan))
+    local frame = self:_EnsureConfirmFrame()
+    if frame then
+        if frame._text and frame._text.SetText then
+            frame._text:SetText(self:_ConfirmationText(plan))
+        end
+        if frame.Show then frame:Show() end
         return true
     end
 

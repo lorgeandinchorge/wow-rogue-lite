@@ -182,8 +182,30 @@ local function testConfirmAndSellExecutesPlanButKeepsContributionPending()
         "sale does not retire the run")
 end
 
+local function testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
+    _G.MerchantFrame = nil
+    local ns = resetHarness()
+    _G.MerchantFrame = nil
+    ns.Merchant.button = nil
+
+    ns.Merchant:Init()
+    assertEqual(ns.Merchant.button, nil,
+        "merchant button is not created before MerchantFrame exists")
+
+    _G.MerchantFrame = {
+        IsShown = function() return true end,
+    }
+    ns.Merchant:UpdateButton()
+
+    assert(ns.Merchant.button ~= nil,
+        "merchant button is created after MerchantFrame becomes available")
+    assertEqual(ns.Merchant.button:IsShown(), true,
+        "late-created merchant button is shown for pending dead run")
+end
+
 testSellButtonVisibleOnlyForPendingDeadRunAtMerchant()
 testBuildSellPlanIncludesBagsAndEquippedGear()
 testConfirmAndSellExecutesPlanButKeepsContributionPending()
+testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
 
 print("MerchantSellButton.test.lua: ok")

@@ -28,12 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.2.8
+### Latest Update: v0.2.9
 
-- Dead pending runs now get a vendor-only **WRL: Sell Final Run** button.
-- After confirmation, the addon sells vendorable bag contents and equipped gear automatically.
-- The run stays pending contribution, so the existing mailbox flow still pre-fills currency to your bank and waits for you to press Send.
-- New regression coverage protects merchant visibility, sell planning, skipped items, and equipped-gear sale execution.
+- Fixes the final-run vendor button so it appears after Blizzard's merchant frame loads.
+- Replaces the vendor sell confirmation popup with a private WRL confirmation frame to avoid quit/logout taint.
+- Improves death-screen **Slain by** capture on Classic clients that require `CombatLogGetCurrentEventInfo()`.
+- Adds regression coverage for late merchant-frame button creation and combat-log killer capture.
 
 ### Bank And Run Structure
 
