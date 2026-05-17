@@ -1,140 +1,173 @@
 # WoW Roguelite
 
-A rogue-lite addon for **WoW Classic: Burning Crusade (Anniversary)**. Pick one character as your **bank**; every other character is a **run**. Runs are hardcore: one final death and the character is retired, but everything they contribute to the bank becomes legacy budget for **Storage**, **Stipend**, and **Fate** unlocks that future runs can request as starter kits.
+A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> Status: **first draft (v0.2.6)**: core tracking, UI, and request pipeline. Mail/trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it click Send for you.
+> **Status:** v0.2.8 — core tracking, UI, run lifecycle, request pipeline, and final-run vendor liquidation. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
 
-> Development note: This project was built with AI assistance, with human direction, review, and testing throughout.
+> **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
-## Install
+---
 
-1. Copy the `WoWRoguelite` folder into `World of Warcraft\_classic_\Interface\AddOns\` so the full path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`.
-2. Enable it at the character select screen.
-3. `/reload` in-game to verify it loaded. You'll see `[Roguelite] v0.2.6 loaded.` in chat.
+## For Players
 
-## Publish releases
+> This section is the canonical user-facing description and is mirrored to the CurseForge project page. If you're editing the README, edit here and copy the rendered text over.
 
-This repo includes a GitHub Actions release workflow. Push a version tag matching the TOC version to build and publish the CurseForge package:
+### Core loop
 
-```powershell
-git tag v0.2.6
-git push origin v0.2.6
-```
+One character is your bank. Every other character is a run. When a run dies for good, its carried gold (and the value it could have vendored) flows back to the bank and becomes part of your lifetime contribution total. That total turns into spendable legacy budget you allocate into permanent unlock tracks — **Storage** (better starter bags), **Stipend** (starter gold), and **Fate** (extra lives) — that new runs can request as starter kits.
 
-To enable automatic CurseForge uploads, set `CF_API_KEY` as a GitHub repository secret and `CF_PROJECT_ID` as a GitHub repository variable.
+The bank itself is infrastructure, not a run. It can freely handle storage, mail, trading, the auction house, travel, and reward fulfillment.
 
-## First-time setup
+### Install
 
-On your designated bank character:
+Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 
 ```text
-/wrl setbank
+World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-This marks that character as the bank. Bank characters are out-of-run infrastructure and may handle storage, mail, trading, Auction House work, travel, deaths, and fulfillment freely.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.2.8 loaded.` in chat.
 
-## How a run works
+### Quick start
 
-**On a new character:**
+1. On the character you want as your bank: `/wrl setbank`.
+2. Roll a new character — that's your first run.
+3. Type `/wrl` to open the main window.
+4. Use the **Legacy** tab to spend any available budget, the **Rewards** tab to request unlocked starter kits, and the **Current Run** tab to track in-progress state.
 
-- Open `/wrl` -> **Legacy** to review lifetime contribution history and spend available legacy budget into Storage, Stipend, and Fate.
-- Open `/wrl` -> **Rewards**.
-- Tick any unlocked legacy rewards you want sent to you.
-- Click **Send Request**. This addon-whispers your bank character.
-- If the bank is offline, use the mail fallback at any mailbox; the bank picks it up on next login.
+### How a run works
 
-**On your bank character:**
+**On a run character.** Open `/wrl` → **Legacy** to review lifetime contributions and spend available legacy budget into Storage, Stipend, and Fate. Open `/wrl` → **Rewards**, tick any unlocked legacy rewards you want sent to you, and click **Send Request**. The addon whispers your bank character; if the bank is offline, the mail fallback at any mailbox carries the same payload and the bank picks it up on next login.
 
-- Open `/wrl` -> **Rewards** to see incoming kits with a shopping list.
-- Go to a mailbox and click **Fulfill via Mail**: name, subject, and gold pre-fill; drag items into attachment slots; press Send.
-- Or open a **Trade** window with the requester and click **Load into Trade** for the manual trade checklist.
+**On your bank character.** Open `/wrl` → **Rewards** to see incoming kits with a shopping list. At a mailbox, **Fulfill via Mail** pre-fills name, subject, and gold; drag items into the attachment slots and press Send. Or open a Trade window with the requester and **Load into Trade** to step through the manual checklist.
 
-**On death (non-bank characters):**
+**On death (non-bank characters).** If you have lives left from Fate unlocks, you get a soft popup and carry on. On a final death, the addon snapshots your carried currency plus vendor value. Visit a vendor while the run is pending and click **WRL: Sell Final Run** to confirm and automatically sell vendorable bag contents plus equipped gear. At a mailbox the contribution mail is pre-filled in currency only, reserving 30c for postage; press Send when ready. If you defer or close the prompt, the **Current Run** tab has a **Prepare Contribution Mail** button and `/wrl contribute` reopens it. The character is then marked **retired** and further play won't be credited.
 
-- If you have lives left from Fate unlocks, you get a soft popup and can carry on.
-- On final death, the addon snapshots carried currency plus vendor value, assuming you sell vendorable bags and gear before mailing.
-- At a mailbox, the addon pre-fills a currency-only contribution to your bank, reserving 30c for postage; press Send when ready.
-- If you defer or misclick, open **Current Run** and click **Prepare Contribution Mail**, or use `/wrl contribute`.
-- The character is marked **retired**; further play will not be credited.
+### Profiles, rules, boons, and burdens
 
-## Legacy unlocks
+Built-in profiles cover the common shapes of run: **Casual Roguelite**, **Banked Hardcore**, **Solo Self Found**, **Ironman**. Apply one with `/wrl profile <id>` or via the gear → Settings popup. Individual rule toggles and the per-run **boon / burden** modifiers live in the same Settings popup; rule taints and warnings are logged per character and viewable with `/wrl rules log`.
 
-Lifetime contributions become spendable legacy budget. Spending budget does not reduce the lifetime total; it records how much of that total has been allocated into permanent unlock tracks.
+### Legacy unlocks
 
-| Track | Costs | Grants |
-|------|-------|--------|
+Lifetime contributions become spendable legacy budget. Spending budget does not reduce the lifetime total — it just records how much of that total has been allocated into permanent unlock tracks.
+
+| Track   | Costs                         | Grants                                  |
+| ------- | ----------------------------- | --------------------------------------- |
 | Storage | 3g, 10g, 25g, 75g, 250g, 750g | Better starter bags and storage support |
-| Stipend | 3g, 10g, 25g, 75g, 250g, 750g | Starter gold at each purchased rank |
-| Fate | 25g, 750g | +1 extra life at ranks 3 and 6 |
+| Stipend | 3g, 10g, 25g, 75g, 250g, 750g | Starter gold at each purchased rank     |
+| Fate    | 25g, 750g                     | +1 extra life at ranks 3 and 6          |
 
 You can buy two ranks of Storage, come back for Stipend rank one, then later keep filling out every track. Eventually everything can be unlocked.
 
-Tune these in `Core/LegacyUnlocks.lua` and `Core/Rewards.lua`.
-
-## Slash commands
+### Slash commands
 
 ```text
-/wrl                - toggle the main window
-/wrl setbank        - designate the current character as the bank
-/wrl bank           - show which character is currently the bank
-/wrl request        - jump to the Rewards tab
-/wrl contribute     - prepare pending final contribution mail
-/wrl theme          - show the current UI theme
-/wrl theme classic  - use the Classic WoW / BetterBags-style default theme
-/wrl theme dark     - use the former dark default theme
-/wrl theme gw2      - use the GW2 UI theme when GW2 UI is installed/enabled
-/wrl theme grant    - use the Grant purple/green theme
-/wrl theme isabella - use the Isabella pink/teal theme
-/wrl debug          - toggle debug logging
-/wrl reset confirm  - wipe saved data (cannot be undone)
+Window
+  /wrl                  toggle the main window
+  /wrl request          jump to the Rewards tab
+
+Bank identity
+  /wrl setbank          mark the current character as the bank
+  /wrl setbank NAME     set an external bank character by Name-Realm
+  /wrl bank             show the current bank character
+
+Run lifecycle
+  /wrl contribute       reopen pending final-contribution mail prep
+
+Configuration
+  /wrl settings         print current settings to chat
+  /wrl profile          show active profile
+  /wrl profile list     list available profiles
+  /wrl profile <id>     apply a profile
+  /wrl rules            list rules and their enabled state
+  /wrl rules log        print recent taint/warn log entries
+  /wrl theme            show the active UI theme
+  /wrl theme <id>       set UI theme (classic, dark, gw2, grant, isabella)
+
+Export
+  /wrl export           export current run summary (copyable popup)
+  /wrl export run       same as /wrl export
+  /wrl export account   export account-wide legacy summary
+
+Maintenance
+  /wrl reqrefresh       refresh bag item indicators
+  /wrl debug            toggle debug logging
+  /wrl reset confirm    wipe ALL addon data (cannot be undone)
+  /wrl help             print this command list
 ```
 
-## UI themes
+`/roguelite` is an alias for `/wrl`.
 
-Open `/wrl` and click the gear button near **Close** to choose the account-wide UI theme, or use `/wrl theme <id>`.
+### UI themes
 
-- `classic` is the default Classic WoW / BetterBags-style theme.
-- `dark` is the former dark default theme.
-- `gw2` uses the addon's GW2-inspired palette and is selectable only when [GW2 UI](https://github.com/Mortalknight/GW2_UI), including the TBC flavor, is installed and enabled.
-- `grant` uses jewel purples as the primary accent with greens as the secondary accent.
-- `isabella` uses jewel pinks as the primary accent with teals as the secondary accent.
+Open `/wrl` and click the gear button to choose the account-wide theme, or use `/wrl theme <id>`.
+
+- `classic` — Classic WoW / BetterBags-style palette (default).
+- `dark` — the former dark default palette.
+- `gw2` — GW2 UI-inspired palette; only available when [GW2 UI](https://github.com/Mortalknight/GW2_UI) (including the TBC flavor) is installed and enabled.
+- `grant` — jewel purples primary, greens secondary.
+- `isabella` — jewel pinks primary, teals secondary.
 
 Theme changes apply immediately to open addon windows.
 
-## File layout
-
-```text
-WoWRoguelite/
-├── WoWRoguelite.toc           addon manifest
-├── WoWRoguelite.lua           bootstrap, slash commands, module registry
-├── Core/
-│   ├── Database.lua           SavedVariables schema + character records
-│   ├── Tiers.lua              money formatting + legacy compatibility helpers
-│   ├── LegacyUnlocks.lua      Storage, Stipend, and Fate unlock economy
-│   ├── Rewards.lua            reward bundle definitions and filters
-│   ├── Vendor.lua             vendor-value calculation
-│   ├── Comm.lua               addon-whisper protocol between characters
-│   ├── Requests.lua           request queue + mail/trade fulfillment
-│   └── Death.lua              PLAYER_DEAD handler + retirement flow
-└── UI/
-    ├── Theme.lua              palette + widget constructors
-    ├── MainFrame.lua          main window + tabs + minimap button
-    ├── Tab_Legacy.lua         account legacy economy + contributor roster
-    `-- Tab_Rewards.lua        role-aware requests and fulfillment
-```
-
-## Known limits
+### Known limits
 
 - **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
-- **Contribution item value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value, expects the player to sell vendorable bags and gear, then pre-fills a currency-only mail contribution while reserving 30c for postage.
-- **Cross-realm addon whispers** are not guaranteed in BC; the mail fallback path exists for this reason.
-- **Retirement is soft.** The addon marks a character retired but does not delete them or block play; it just stops crediting further contributions.
+- **Contribution value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value. The vendor-only **WRL: Sell Final Run** button appears only while the character is pending final contribution and can sell vendorable bags plus equipped gear after confirmation. Mail contribution remains currency-only and reserves 30c for postage.
+- **Cross-realm addon whispers** aren't guaranteed in TBC; the mail fallback path exists for this reason.
+- **Retirement is soft.** The addon marks a character retired but doesn't delete them or block play; it just stops crediting further contributions.
 
-## Next steps / backlog
+---
 
-- Add a manual reconciliation UI for rare cases where a final contribution mail needs adjustment.
-- Gather-helper tooltip on item icons in bags, showing "needed for request from X".
-- Per-character class tint on the contribution bars.
-- Sound/toast on incoming request.
-- Config panel for legacy unlock costs and reward items.
-- Export run history as CSV for players who want to chart their own progress.
+## For Developers
+
+### Architecture in three sentences
+
+Every file receives the addon namespace as `local ADDON_NAME, ns = ...`. Modules register themselves with `ns:NewModule("Name")` and communicate through `ns.<ModuleName>`. A single shared event frame dispatches via `ns:On(event, callback)`, and real initialization happens on `PLAYER_LOGIN` so SavedVariables (`WRL_DB` account-wide, `WRL_CharDB` per-character) are guaranteed to be loaded first.
+
+The `Core/` and `UI/` folders in this repo are the live source of truth for file layout. Start with `WoWRoguelite.toc` for load order, then `WoWRoguelite.lua` for initialization order and slash commands.
+
+### Install from source
+
+Copy the `WoWRoguelite` folder into:
+
+```text
+World of Warcraft\_anniversary_\Interface\AddOns\WoWRoguelite\
+```
+
+The folder must be named `WoWRoguelite` and contain `WoWRoguelite.toc` at its root.
+
+### Tests
+
+Tests are plain Lua and live under `Tests/`. They stub the WoW APIs they need and print `<test name>: ok` on success.
+
+```bash
+cd WoWRoguelite
+lua Tests/DeathFlow.test.lua
+lua Tests/RewardsTabWiring.test.lua
+# ...etc.
+```
+
+The suite is the safety net for the death flow, reward bundle refactor, contribution credit, and tab wiring. Run the relevant tests before claiming a change is complete.
+
+### Release process
+
+Releases are tag-driven through `.github/workflows/release.yml`, which invokes the BigWigs packager and uploads to CurseForge. See [`RELEASE.md`](RELEASE.md) for the exact tagging sequence and the GitHub Actions secrets and variables it requires.
+
+### Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md) for release-by-release notes.
+
+### License
+
+All Rights Reserved (matching the CurseForge project listing).
+
+---
+
+## Maintainer notes
+
+The **For Players** section above is the canonical user-facing description. When you change it, copy the rendered text into the CurseForge project description so the two surfaces stay in sync.
+
+The CurseForge page may additionally lead with a short "Latest Update: vX.Y" highlight block — that lives only on CurseForge and is intentionally not duplicated here, since this repo already has `CHANGELOG.md` and the GitHub Releases page.
+
+`CURSEFORGE_DESCRIPTION.md` is a working copy used for that mirroring step. It is excluded from the packaged release by `.pkgmeta` and is not what CurseForge displays — the CurseForge description is edited through the project's web UI.

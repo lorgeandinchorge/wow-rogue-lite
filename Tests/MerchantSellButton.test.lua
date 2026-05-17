@@ -1,0 +1,189 @@
+local bagItems = {}
+local inventoryLinks = {}
+local sellPrices = {}
+local currentMoney = 2500
+local isBank = false
+local merchantOpen = true
+local soldBagItems = {}
+local soldInventorySlots = {}
+local popupShown = {}
+local printed = {}
+
+local function assertEqual(actual, expected, message)
+    if actual ~= expected then
+        error(string.format("%s: expected %s, got %s", message, tostring(expected), tostring(actual)), 2)
+    end
+end
+
+local function resetHarness(opts)
+    opts = opts or {}
+    bagItems = {
+        [0] = {
+            [1] = { count = 2, link = "|cffffffff|Hitem:300::::::::|h[Linen Cloth]|h|r", hasNoValue = false },
+            [2] = { count = 1, link = "|cffffffff|Hitem:400::::::::|h[Quest Thing]|h|r", hasNoValue = true },
+            [3] = { count = 1, link = "|cffffffff|Hitem:500::::::::|h[Unknown Relic]|h|r", hasNoValue = false },
+            [4] = { count = 1, link = "|cffffffff|Hitem:600::::::::|h[Locked Buckle]|h|r", hasNoValue = false, locked = true },
+        },
+    }
+    inventoryLinks = {
+        [1] = "|cff9d9d9d|Hitem:100::::::::|h[Old Hat]|h|r",
+        [16] = "|cff1eff00|Hitem:200::::::::|h[Green Axe]|h|r",
+    }
+    sellPrices = {
+        ["|cff9d9d9d|Hitem:100::::::::|h[Old Hat]|h|r"] = 25,
+        ["|cff1eff00|Hitem:200::::::::|h[Green Axe]|h|r"] = 500,
+        ["|cffffffff|Hitem:300::::::::|h[Linen Cloth]|h|r"] = 3,
+        ["|cffffffff|Hitem:600::::::::|h[Locked Buckle]|h|r"] = 10,
+    }
+    currentMoney = opts.currentMoney or 2500
+    isBank = opts.isBank or false
+    merchantOpen = opts.merchantOpen
+    if merchantOpen == nil then merchantOpen = true end
+    soldBagItems = {}
+    soldInventorySlots = {}
+    popupShown = {}
+    printed = {}
+
+    _G.NUM_BAG_SLOTS = 0
+    _G.GetMoney = function() return currentMoney end
+    _G.GetContainerNumSlots = function(bag)
+        local slots = bagItems[bag]
+        if not slots then return 0 end
+        local max = 0
+        for slot in pairs(slots) do if slot > max then max = slot end end
+        return max
+    end
+    _G.GetContainerItemInfo = function(bag, slot)
+        local item = bagItems[bag] and bagItems[bag][slot]
+        if not item then return nil end
+        return nil, item.count, item.locked, nil, nil, nil, item.link, nil, item.hasNoValue
+    end
+    _G.GetInventoryItemLink = function(_, slot) return inventoryLinks[slot] end
+    _G.GetItemInfo = function(link)
+        return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, sellPrices[link] or 0
+    end
+    _G.UseContainerItem = function(bag, slot)
+        soldBagItems[#soldBagItems + 1] = { bag = bag, slot = slot }
+    end
+    _G.PickupInventoryItem = function(slot)
+        soldInventorySlots[#soldInventorySlots + 1] = slot
+    end
+    _G.SellCursorItem = function() end
+    _G.ClearCursor = function() end
+    _G.MerchantFrame = {
+        IsShown = function() return merchantOpen end,
+    }
+    _G.StaticPopupDialogs = {}
+    _G.StaticPopup_Show = function(name, ...)
+        popupShown[#popupShown + 1] = { name = name, args = { ... } }
+    end
+    _G.CreateFrame = function()
+        return {
+            SetText = function() end,
+            SetSize = function() end,
+            SetPoint = function() end,
+            SetScript = function() end,
+            Show = function(self) self.shown = true end,
+            Hide = function(self) self.shown = false end,
+            IsShown = function(self) return self.shown end,
+        }
+    end
+
+    local ns = {
+        Database = {},
+        Run = {},
+        Tiers = {},
+    }
+    function ns:NewModule(name)
+        local module = {}
+        self[name] = module
+        return module
+    end
+    function ns:Print(msg, ...)
+        if select("#", ...) > 0 then msg = msg:format(...) end
+        printed[#printed + 1] = msg
+    end
+    function ns:On() end
+    function ns.Database:GetCurrentCharacter()
+        return {
+            key = "Runner-Realm",
+            status = opts.state or "dead_pending_contribution",
+            deathSnapshot = {
+                estimatedBagValue = 6,
+                estimatedGearValue = 525,
+                maximumPotential = 3001,
+            },
+        }
+    end
+    function ns.Database:IsBankCharacter()
+        return isBank
+    end
+    function ns.Run:GetState(rec)
+        if rec and rec.isArchived then return "archived" end
+        return rec and rec.status or "active"
+    end
+    function ns.Tiers:FormatMoney(copper)
+        return tostring(copper or 0) .. "c"
+    end
+
+    assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
+    assert(loadfile("Core/Merchant.lua"))("WoWRoguelite", ns)
+    return ns
+end
+
+local function testSellButtonVisibleOnlyForPendingDeadRunAtMerchant()
+    local ns = resetHarness()
+
+    assertEqual(ns.Merchant:ShouldShowSellButton(), true,
+        "pending dead run at merchant can see sell button")
+
+    ns = resetHarness({ state = "active" })
+    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
+        "active runs cannot see sell button")
+
+    ns = resetHarness({ state = "retired" })
+    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
+        "retired runs cannot see sell button")
+
+    ns = resetHarness({ state = "dead_pending_contribution", isBank = true })
+    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
+        "bank characters cannot see sell button")
+
+    ns = resetHarness({ state = "dead_pending_contribution", merchantOpen = false })
+    assertEqual(ns.Merchant:ShouldShowSellButton(), false,
+        "button is hidden when merchant frame is closed")
+end
+
+local function testBuildSellPlanIncludesBagsAndEquippedGear()
+    local ns = resetHarness()
+
+    local plan = ns.Merchant:BuildFinalRunSellPlan()
+
+    assertEqual(#plan.bags, 1, "sell plan includes one vendorable unlocked bag item")
+    assertEqual(plan.bags[1].bag, 0, "bag sell entry records bag")
+    assertEqual(plan.bags[1].slot, 1, "bag sell entry records slot")
+    assertEqual(plan.bagValue, 6, "bag sell value includes stack count")
+    assertEqual(#plan.gear, 2, "sell plan includes vendorable equipped gear")
+    assertEqual(plan.gearValue, 525, "gear sell value includes equipped items")
+    assertEqual(#plan.skipped, 3, "sell plan records no-value, unknown-price, and locked skips")
+end
+
+local function testConfirmAndSellExecutesPlanButKeepsContributionPending()
+    local ns = resetHarness()
+
+    local sold = ns.Merchant:SellFinalRunItems()
+
+    assertEqual(sold, true, "sale executor reports items were sold")
+    assertEqual(#soldBagItems, 1, "sale executor sells bag item")
+    assertEqual(soldBagItems[1].bag, 0, "sale executor uses bag id")
+    assertEqual(soldBagItems[1].slot, 1, "sale executor uses bag slot")
+    assertEqual(#soldInventorySlots, 2, "sale executor sells equipped gear")
+    assertEqual(ns.Run:GetState(ns.Database:GetCurrentCharacter()), "dead_pending_contribution",
+        "sale does not retire the run")
+end
+
+testSellButtonVisibleOnlyForPendingDeadRunAtMerchant()
+testBuildSellPlanIncludesBagsAndEquippedGear()
+testConfirmAndSellExecutesPlanButKeepsContributionPending()
+
+print("MerchantSellButton.test.lua: ok")

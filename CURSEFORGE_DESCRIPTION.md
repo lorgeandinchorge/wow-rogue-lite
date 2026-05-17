@@ -28,12 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.2.4
+### Latest Update: v0.2.8
 
-- Final-death contribution mail now asks how much gold, silver, and copper to attach before creating the mail.
-- The addon fills the Classic mail gold, silver, and copper fields consistently from the confirmed amount.
-- Contribution mail is capped to the character's current carried money so the pre-filled amount stays realistic.
-- Incoming reward requests now highlight the consolidated Rewards tab correctly.
+- Dead pending runs now get a vendor-only **WRL: Sell Final Run** button.
+- After confirmation, the addon sells vendorable bag contents and equipped gear automatically.
+- The run stays pending contribution, so the existing mailbox flow still pre-fills currency to your bank and waits for you to press Send.
+- New regression coverage protects merchant visibility, sell planning, skipped items, and equipped-gear sale execution.
 
 ### Bank And Run Structure
 
@@ -41,7 +41,7 @@ Set one character as your bank with `/wrl setbank`. The bank is treated as infra
 
 ### Account-Wide Progression
 
-When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. That total becomes spendable budget for permanent legacy unlocks.
+When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. At a vendor, dead pending runs can use **WRL: Sell Final Run** to confirm and liquidate vendorable bags plus equipped gear before mailing currency to the bank. That total becomes spendable budget for permanent legacy unlocks.
 
 ### Starter Reward Requests
 

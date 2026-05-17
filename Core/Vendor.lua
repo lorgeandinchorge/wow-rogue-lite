@@ -33,6 +33,7 @@ local function normaliseItemInfo(first, stackCount, _locked, _quality, _readable
         return {
             count = info.stackCount or info.quantity or info.count or 1,
             link = link,
+            locked = info.isLocked or info.locked,
             hasNoValue = info.hasNoValue,
             itemID = info.itemID or itemIDFromLink(link),
         }
@@ -41,6 +42,7 @@ local function normaliseItemInfo(first, stackCount, _locked, _quality, _readable
     return {
         count = stackCount or 1,
         link = itemLink,
+        locked = _locked,
         hasNoValue = hasNoValue,
         itemID = itemID or itemIDFromLink(itemLink),
     }
@@ -87,6 +89,7 @@ function V:BagsSnapshot()
                 if copper > 0 then
                     total = total + copper
                     items[#items+1] = {
+                        bag = bag, slot = slot,
                         link = info.link, count = info.count or 1,
                         sellPrice = copper / (info.count or 1),
                         copper = copper,

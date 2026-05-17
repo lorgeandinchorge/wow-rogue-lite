@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.2.7"
+ns.version     = "0.2.8"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -75,6 +75,7 @@ ns:On("PLAYER_LOGIN", function()
     ns.Tiers:Init()
     ns.LegacyUnlocks:Init()
     ns.Vendor:Init()
+    ns.Merchant:Init()
     ns.Contributions:Init() -- must follow Database + Vendor; used by Death
     ns.Achievements:Init()  -- must follow Contributions/Run/Rules/Tiers for criteria checks
     ns.Comm:Init()

@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.8
+
+- Add a vendor-only `WRL: Sell Final Run` button for characters in `dead_pending_contribution`.
+- Require confirmation before automatically selling vendorable bag contents and equipped gear.
+- Keep the run pending after vendor liquidation so the existing `/wrl contribute` mail flow still handles currency-only contribution and manual Send.
+- Add regression coverage for merchant button visibility, sell planning, skipped items, and equipped-gear sale execution.
+
 ## v0.2.7
 
 - Fix final contribution send-credit accounting so prefilled gold, silver, and copper are all counted.

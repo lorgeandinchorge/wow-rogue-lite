@@ -1,5 +1,21 @@
+# AI agents: read AI_READ_FIRST_PROJECT_MAP.md before editing this addon.
+# Keep this file for Git ignore patterns only; project guidance lives there.
+
+# Release/package outputs
 dist/
 .release/
-*.tmp.*
+
+# Local AI/editor working state
 .cursor/
 .superpowers/
+AI_READ_FIRST_PROJECT_MAP.md
+
+# Temporary files
+*.tmp.*
+*.bak
+*.swp
+*~
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
