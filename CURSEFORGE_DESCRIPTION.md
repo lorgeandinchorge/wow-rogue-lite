@@ -28,12 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.2.9
+### Latest Update: v0.2.9.1
 
-- Fixes the final-run vendor button so it appears after Blizzard's merchant frame loads.
-- Replaces the vendor sell confirmation popup with a private WRL confirmation frame to avoid quit/logout taint.
-- Improves death-screen **Slain by** capture on Classic clients that require `CombatLogGetCurrentEventInfo()`.
-- Adds regression coverage for late merchant-frame button creation and combat-log killer capture.
+- Keeps the final-run vendor button visible for dead pending runs even when item sell prices are not cached at merchant-open time.
+- Adds `/wrl sellfinal` and `/wrl vendorfinal` so testers can open the same final-run vendor sell prompt from chat.
+- Moves the sell-plan check to click/command time and prints a clear message when no vendorable items are found.
+- Adds regression coverage for cold item-cache merchant opens and the new vendor sell slash commands.
 
 ### Bank And Run Structure
 
@@ -82,6 +82,8 @@ Because of Blizzard API restrictions, the addon cannot click protected buttons f
 /wrl profile
 /wrl rules
 /wrl export
+/wrl contribute
+/wrl sellfinal
 ```
 
 ## Good Fit If You Want

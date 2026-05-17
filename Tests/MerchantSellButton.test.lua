@@ -70,6 +70,7 @@ local function resetHarness(opts)
     end
     _G.SellCursorItem = function() end
     _G.ClearCursor = function() end
+    _G.UIParent = {}           -- needed so _EnsureConfirmFrame() can create the dialog
     _G.MerchantFrame = {
         IsShown = function() return merchantOpen end,
     }
@@ -203,9 +204,88 @@ local function testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
         "late-created merchant button is shown for pending dead run")
 end
 
+-- ── New tests covering the item-cache race fix ───────────────────────────────
+
+-- Before the fix, ShouldShowSellButton() called BuildFinalRunSellPlan(), which
+-- calls GetItemInfo().  When MERCHANT_SHOW fires the cache is cold, so every
+-- item reports a zero sell price and the plan appears empty → button hidden.
+-- After the fix the button is visible whenever state + merchant are right,
+-- regardless of whether item prices are cached.
+local function testSellButtonVisibleWithColdItemCache()
+    local ns = resetHarness()
+    -- Simulate cold cache: GetItemInfo returns 0 for every link.
+    _G.GetItemInfo = function(_link) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, 0 end
+
+    -- Confirm the precondition: plan is genuinely empty with cold cache.
+    local plan = ns.Merchant:BuildFinalRunSellPlan()
+    assertEqual(#plan.bags + #plan.gear, 0,
+        "cold-cache precondition: plan has no items")
+
+    -- The button must still be shown (state = dead_pending_contribution, merchant open).
+    assertEqual(ns.Merchant:ShouldShowSellButton(), true,
+        "button is visible for pending dead run at merchant even with cold item cache")
+end
+
+-- When PromptFinalRunSell() is called with a cold cache it should print a
+-- friendly WRL message and return false rather than silently doing nothing.
+local function testPromptFinalRunSellPrintsMessageWhenNothingVendorable()
+    local ns = resetHarness()
+    _G.GetItemInfo = function(_link) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, 0 end
+
+    local ok = ns.Merchant:PromptFinalRunSell()
+    assertEqual(ok, false, "PromptFinalRunSell returns false when no vendorable items found")
+
+    local found = false
+    for _, msg in ipairs(printed) do
+        if msg:find("vendorable", 1, true) then found = true; break end
+    end
+    assert(found, "PromptFinalRunSell prints a 'no vendorable items' message to chat")
+end
+
+-- The button can be visible when the cache is cold, but PromptFinalRunSell()
+-- should succeed once the cache warms between button-show and the click.
+-- This confirms the plan is built at action time, not at button-visibility time.
+local function testPromptFinalRunSellBuildsAtActionTime()
+    local ns = resetHarness()
+
+    -- Cold cache: button is shown but plan is empty.
+    _G.GetItemInfo = function(_link) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, 0 end
+    assertEqual(ns.Merchant:ShouldShowSellButton(), true, "button shown with cold cache")
+
+    -- Cache warms before the player clicks.
+    _G.GetItemInfo = function(link)
+        return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, sellPrices[link] or 0
+    end
+
+    -- PromptFinalRunSell now finds items and either shows the confirm frame
+    -- (if UIParent is available) or falls through to SellFinalRunItems().
+    -- Either way it must return true.
+    local ok = ns.Merchant:PromptFinalRunSell()
+    assertEqual(ok, true, "PromptFinalRunSell succeeds when item cache warms before click")
+end
+
+-- Calling via slash command (/wrl sellfinal) when no merchant is open should
+-- print a clear instructional message, not crash or silently fail.
+local function testPromptFinalRunSellPrintsClearMessageOutsideMerchant()
+    local ns = resetHarness({ merchantOpen = false })
+
+    local ok = ns.Merchant:PromptFinalRunSell()
+    assertEqual(ok, false, "PromptFinalRunSell returns false when merchant not open")
+
+    local found = false
+    for _, msg in ipairs(printed) do
+        if msg:find("Open a vendor", 1, true) then found = true; break end
+    end
+    assert(found, "PromptFinalRunSell prints 'Open a vendor' when merchant is closed")
+end
+
 testSellButtonVisibleOnlyForPendingDeadRunAtMerchant()
 testBuildSellPlanIncludesBagsAndEquippedGear()
 testConfirmAndSellExecutesPlanButKeepsContributionPending()
 testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
+testSellButtonVisibleWithColdItemCache()
+testPromptFinalRunSellPrintsMessageWhenNothingVendorable()
+testPromptFinalRunSellBuildsAtActionTime()
+testPromptFinalRunSellPrintsClearMessageOutsideMerchant()
 
 print("MerchantSellButton.test.lua: ok")

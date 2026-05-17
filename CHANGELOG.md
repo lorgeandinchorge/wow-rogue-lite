@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.2.9.1
+
+- Keep the final-run vendor button visible for dead pending runs even when item sell prices are not cached at merchant-open time.
+- Add `/wrl sellfinal` and `/wrl vendorfinal` as tester-friendly ways to open the same final-run vendor sell prompt.
+- Move the final-run sell-plan check to click/command time and print a clear message when no vendorable items are found.
+- Add regression coverage for cold item-cache merchant opens and the new vendor sell slash commands.
+
 ## v0.2.9
 
 - Fix the final-run vendor button so it appears even when Blizzard's `MerchantFrame` loads after WRL initialization.

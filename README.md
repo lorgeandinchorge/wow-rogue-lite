@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.2.9 — core tracking, UI, run lifecycle, request pipeline, and final-run vendor liquidation. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
+> **Status:** v0.2.9.1 — core tracking, UI, run lifecycle, request pipeline, and final-run vendor liquidation. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.2.9 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.2.9.1 loaded.` in chat.
 
 ### Quick start
 
@@ -73,6 +73,8 @@ Bank identity
 
 Run lifecycle
   /wrl contribute       reopen pending final-contribution mail prep
+  /wrl sellfinal        open final-run vendor sell prompt
+  /wrl vendorfinal      alias for /wrl sellfinal
 
 Configuration
   /wrl settings         print current settings to chat

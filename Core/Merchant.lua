@@ -158,12 +158,16 @@ function M:BuildFinalRunSellPlan()
     return plan
 end
 
+-- Returns true whenever the button should be visible.
+-- Intentionally does NOT consult BuildFinalRunSellPlan: GetItemInfo() is
+-- frequently uncached at MERCHANT_SHOW time, causing every item to report a
+-- zero sell price and the plan to appear empty even when the player has
+-- vendorable gear.  The sell-plan check (and the "nothing found" message) is
+-- deferred to PromptFinalRunSell(), which runs at click/command time when the
+-- cache is warmer.
 function M:ShouldShowSellButton()
     if not merchantOpen() then return false end
-    if not self:IsPendingFinalContribution() then return false end
-
-    local plan = self:BuildFinalRunSellPlan()
-    return (#plan.bags + #plan.gear) > 0
+    return self:IsPendingFinalContribution()
 end
 
 function M:_ConfirmationText(plan)
@@ -252,14 +256,35 @@ function M:_EnsureConfirmFrame()
 end
 
 function M:PromptFinalRunSell()
-    if not self:ShouldShowSellButton() then
+    -- Guard 1: merchant must be open (also the meaningful message for /wrl sellfinal).
+    if not merchantOpen() then
+        if ns.Print then ns:Print("Open a vendor to sell final-run items.") end
+        return false
+    end
+    -- Guard 2: character must be in dead_pending_contribution (and not bank).
+    if not self:IsPendingFinalContribution() then
         if ns.Print then ns:Print("No final-run vendor sale is available right now.") end
         self:UpdateButton()
         return false
     end
 
+    -- Build the sell plan now, at action time, when GetItemInfo() is most
+    -- likely to be cached (merchant has been open for a moment).
     local plan = self:BuildFinalRunSellPlan()
     self._pendingSellPlan = plan
+
+    -- Guard 3: if nothing is vendorable (e.g. all items truly have no price),
+    -- print a clear message rather than silently doing nothing.
+    if (#plan.bags + #plan.gear) == 0 then
+        if ns.Print then
+            ns:Print(
+                "No vendorable final-run items found. " ..
+                "Items with no sell price, locked items, and " ..
+                "no-value items are skipped.")
+        end
+        self:UpdateButton()
+        return false
+    end
 
     local frame = self:_EnsureConfirmFrame()
     if frame then
