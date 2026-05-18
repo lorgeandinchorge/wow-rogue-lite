@@ -20,16 +20,16 @@ WoWRoguelite.toc
 1. Update `## Version:` in `WoWRoguelite.toc`.
 2. Add notes to `CHANGELOG.md`.
 3. Commit and push `main`.
-4. Create and push a matching version tag.
+4. Create and push a matching version tag. For hotfixes on a milestone release, use letter suffixes such as `0.3.0a`, `0.3.0b`, and `0.3.0c`.
 
 Example:
 
 ```powershell
 git add WoWRoguelite.toc WoWRoguelite.lua CHANGELOG.md README.md CURSEFORGE_DESCRIPTION.md RELEASE.md
-git commit -m "Release v0.3.0.1"
+git commit -m "Release v0.3.0a"
 git push origin main
-git tag -a v0.3.0.1 -m "0.3.0.1 GW2 UI theme texture hotfix"
-git push origin v0.3.0.1
+git tag -a v0.3.0a -m "0.3.0a GW2 UI theme texture hotfix"
+git push origin v0.3.0a
 ```
 
 The workflow packages the addon and uploads it to CurseForge.

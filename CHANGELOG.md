@@ -1,6 +1,6 @@
 # WoW Roguelite Changelog
 
-## v0.3.0.1
+## v0.3.0a
 
 - Fix the GW2 UI theme texture paths so the skin loads upstream `.png` assets instead of falling back to color-only surfaces.
 - Resolve GW2 UI texture roots from the active enabled flavor, including TBC/Mainline/Vanilla/Mists/Wrath installs.
