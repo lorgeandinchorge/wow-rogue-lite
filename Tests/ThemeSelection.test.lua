@@ -385,9 +385,23 @@ local function testGw2ThemeUsesGw2UiTextureSkinWhenActive()
     local ok = ns.Theme:SetTheme("gw2")
 
     assertEqual(ok, true, "gw2 theme can be selected")
-    assertEqual(ns.Theme:SurfaceTexture("frame"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg", "gw2 frame uses GW2_UI bag body texture")
-    assertEqual(ns.Theme:SurfaceTexture("header"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagheader", "gw2 header uses GW2_UI bag header texture")
-    assertEqual(ns.Theme:SurfaceTexture("footer"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagfooter", "gw2 footer exposes GW2_UI bag footer texture")
+    assertEqual(ns.Theme:SurfaceTexture("frame"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg.png", "gw2 frame uses GW2_UI bag body texture")
+    assertEqual(ns.Theme:SurfaceTexture("header"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagheader.png", "gw2 header uses GW2_UI bag header texture")
+    assertEqual(ns.Theme:SurfaceTexture("footer"), "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagfooter.png", "gw2 footer exposes GW2_UI bag footer texture")
+end
+
+local function testGw2ThemeUsesActiveFlavorTextureRoot()
+    useCAddOns = false
+    addonEnabled = true
+    addonId = "GW2_UI_TBC"
+    addonTitle = "|cffffedbaGW2 UI|r |cFF888888TBC|r"
+    local ns = resetHarness()
+
+    local ok = ns.Theme:SetTheme("gw2")
+
+    assertEqual(ok, true, "gw2 theme can be selected for TBC flavor")
+    assertEqual(ns.Theme:SurfaceTexture("frame"), "Interface\\AddOns\\GW2_UI_TBC\\Textures\\bag\\bagbg.png", "gw2 frame uses active flavor folder")
+    assertEqual(ns.Theme:SurfaceTexture("panel"), "Interface\\AddOns\\GW2_UI_TBC\\Textures\\addonSkins\\backdrop.png", "gw2 panel uses active flavor addonSkins texture")
 end
 
 testClassicIsDefault()
@@ -412,5 +426,6 @@ testGw2PaletteUsesHeroicSurfaceTokens()
 testClassicThemeUsesBlizzardTextureSkin()
 testDarkThemeRemainsFlatTextureSkin()
 testGw2ThemeUsesGw2UiTextureSkinWhenActive()
+testGw2ThemeUsesActiveFlavorTextureRoot()
 
 print("ThemeSelection.test.lua: ok")

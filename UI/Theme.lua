@@ -94,14 +94,14 @@ local PALETTES = {
             green     = {0.460, 0.700, 0.460, 1.00},
         },
         skin = {
-            frame       = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg",
-            body        = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagbg",
-            header      = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagheader",
-            nav         = "Interface\\AddOns\\GW2_UI\\Textures\\addonSkins\\backdrop",
-            panel       = "Interface\\AddOns\\GW2_UI\\Textures\\addonSkins\\backdrop",
-            footer      = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagfooter",
-            button      = "Interface\\AddOns\\GW2_UI\\Textures\\addonSkins\\backdrop",
-            buttonHover = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitembackdrop",
+            frame       = "Textures\\bag\\bagbg.png",
+            body        = "Textures\\bag\\bagbg.png",
+            header      = "Textures\\bag\\bagheader.png",
+            nav         = "Textures\\addonSkins\\backdrop.png",
+            panel       = "Textures\\addonSkins\\backdrop.png",
+            footer      = "Textures\\bag\\bagfooter.png",
+            button      = "Textures\\uistuff\\button.png",
+            buttonHover = "Textures\\uistuff\\button_hover.png",
         },
     },
     grant = {
@@ -279,6 +279,10 @@ function Theme:HasGW2UI()
     return findEnabledGW2UIAddon() ~= nil
 end
 
+function Theme:GetGW2UIAddonName()
+    return findEnabledGW2UIAddon()
+end
+
 function Theme:IsThemeAvailable(themeId)
     local def = PALETTES[themeId]
     if not def then return false end
@@ -391,7 +395,12 @@ end
 function Theme:SurfaceTexture(role)
     local active = self.activeThemeId or self:GetActiveThemeId()
     local def = PALETTES[active]
-    return def and def.skin and def.skin[role] or nil
+    local path = def and def.skin and def.skin[role] or nil
+    if active == "gw2" and path then
+        local addonName = self:GetGW2UIAddonName() or "GW2_UI"
+        return "Interface\\AddOns\\" .. addonName .. "\\" .. path
+    end
+    return path
 end
 
 function Theme:ApplyButtonBackground(button, state)
