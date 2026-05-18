@@ -35,6 +35,8 @@ WoW Roguelite turns your account into a run-based progression system:
 /wrl profile list
 /wrl rules
 /wrl export
+/wrl contribute
+/wrl sellfinal
 /reload
 ```
 
@@ -113,7 +115,7 @@ If you only have 10 to 15 minutes, please do this section.
   Expected: the addon handles the death state cleanly.
 
 - [ ] If it is a final death, follow the retirement/contribution flow.
-  Expected: the character becomes retired and the contribution flow is understandable.
+  Expected: **WRL: Sell All** appears at a vendor, **WRL: Contribute** appears at a mailbox, the character becomes retired after sending the contribution, and the contribution flow is understandable.
 
 ## Full Test Pass
 

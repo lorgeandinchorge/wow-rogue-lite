@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.3.0 - Contributions Done, Next Up BANKING
+
+- Complete the final contribution loop with always-available vendor liquidation and mailbox contribution helpers.
+- Make the merchant `WRL: Sell All` button refresh directly from vendor open timing, with command fallbacks still available.
+- Add a mailbox `WRL: Contribute` button in the mail header, keep it aligned with the mailbox lifecycle, and preserve the manual Send requirement.
+- Harden late-frame and open/close timing behavior for merchant and mail UI buttons so testers do not need to buy, sell, or run slash commands to wake the controls.
+- Add regression coverage for merchant open refreshes, mailbox contribution placement, mailbox hide behavior, and contribution button click recovery.
+
 ## v0.2.9.2
 
 - Make the vendor `WRL: Sell All` button appear whenever a merchant is open, regardless of run state.

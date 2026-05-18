@@ -11,6 +11,8 @@ local hasDeadOrGhostApi = true
 local unitIsDead = false
 local unitIsGhost = false
 local deathScreenShows = {}    -- captured ns.DeathScreen:Show invocations
+local createdButtons = {}
+local scheduledTimers = {}
 
 local function resetHarness(opts)
     opts = opts or {}
@@ -20,6 +22,8 @@ local function resetHarness(opts)
     mailFields = {}
     inboxHeaders = opts.inboxHeaders or {}
     deathScreenShows = {}
+    createdButtons = {}
+    scheduledTimers = {}
     currentDead = opts.currentDead
     if currentDead == nil then currentDead = true end
     currentMoney = opts.currentMoney or 12345
@@ -75,13 +79,42 @@ local function resetHarness(opts)
             string.format(dialog.text, ...)
         end
     end
-    _G.CreateFrame = function(_frameType)
-        return {
+    _G.CreateFrame = function(frameType, name, parent, template)
+        local frame = {
+            frameType = frameType,
+            name = name,
+            parent = parent,
+            template = template,
             RegisterEvent = function() end,
-            SetScript     = function() end,
+            SetScript     = function(self, script, handler)
+                if script == "OnClick" then self.onClick = handler end
+            end,
+            SetText       = function(self, value) self.text = value end,
+            SetSize       = function(self, width, height) self.width = width; self.height = height end,
+            SetPoint      = function(self, ...) self.point = { ... } end,
+            SetParent     = function(self, value) self.parent = value end,
+            SetFrameStrata = function(self, value) self.frameStrata = value end,
+            SetFrameLevel = function(self, value) self.frameLevel = value end,
+            ClearAllPoints = function(self) self.pointsCleared = true end,
+            HookScript    = function(self, script, handler) self.hooks = self.hooks or {}; self.hooks[script] = handler end,
+            Show          = function(self) self.shown = true end,
+            Hide          = function(self) self.shown = false end,
+            IsShown       = function(self) return self.shown end,
         }
+        if frameType == "Button" then createdButtons[#createdButtons + 1] = frame end
+        return frame
     end
-    _G.MailFrame = { IsShown = function() return true end }
+    _G.UIParent = {}
+    _G.C_Timer = {
+        After = function(_, cb)
+            scheduledTimers[#scheduledTimers + 1] = cb
+        end,
+    }
+    _G.MailFrame = {
+        shown = true,
+        IsShown = function(self) return self.shown end,
+        HookScript = function(self, script, handler) self.hooks = self.hooks or {}; self.hooks[script] = handler end,
+    }
     _G.MailFrameTab2 = { Click = function() mailFields.clickedSendTab = true end }
     _G.SendMailNameEditBox = { SetText = function(_, value) mailFields.name = value end }
     _G.SendMailSubjectEditBox = { SetText = function(_, value) mailFields.subject = value end }
@@ -670,6 +703,119 @@ local function testPrepareContributionMailCanBeReopenedWhenMailboxIsAlreadyOpen(
         "recovery action fills expected contribution")
 end
 
+local function testMailboxContributionButtonShowsWhenMailboxOpen()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    ns.Death:Init()
+
+    assert(ns.Death.contributionButton ~= nil,
+        "mailbox contribution button is created during Death init")
+
+    registeredEvents.MAIL_SHOW()
+
+    assertEqual(ns.Death.contributionButton:IsShown(), true,
+        "mailbox contribution button is visible when mailbox is open")
+    assertEqual(ns.Death.contributionButton.text, "WRL: Contribute",
+        "mailbox contribution button has expected label")
+    assertEqual(ns.Death.contributionButton.width, 112,
+        "mailbox contribution button is compact enough for the header")
+    assertEqual(ns.Death.contributionButton.point[1], "TOPLEFT",
+        "mailbox contribution button anchors in the mail header strip")
+    assertEqual(ns.Death.contributionButton.point[3], "TOPLEFT",
+        "mailbox contribution button uses the mail header as anchor reference")
+    assertEqual(ns.Death.contributionButton.point[4], 56,
+        "mailbox contribution button sits in the top-left header after the mail icon")
+    assertEqual(ns.Death.contributionButton.point[5], -1,
+        "mailbox contribution button sits near the top edge of the header strip")
+end
+
+local function testMailboxContributionButtonClickPreparesMail()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 12345,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 12345,
+        maximumPotential = 12315,
+    }
+    ns.Death:Init()
+    registeredEvents.MAIL_SHOW()
+
+    ns.Death.contributionButton.onClick()
+
+    assertEqual(mailFields.name, "Bank",
+        "mailbox contribution button fills contribution recipient")
+end
+
+local function testMailShowRetriesWhenMailFrameAppearsAfterEvent()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    _G.MailFrame = nil
+    ns.Death.contributionButton = nil
+
+    ns.Death:UpdateContributionButton()
+    assertEqual(ns.Death.contributionButton, nil,
+        "mail contribution button is not created before MailFrame exists")
+    assert(#scheduledTimers > 0,
+        "mail contribution button schedules a retry when MailFrame is missing")
+
+    _G.MailFrame = {
+        IsShown = function() return true end,
+        GetFrameLevel = function() return 9 end,
+    }
+    scheduledTimers[1]()
+
+    assert(ns.Death.contributionButton ~= nil,
+        "mail contribution button is created by deferred retry after MailFrame appears")
+    assertEqual(ns.Death.contributionButton:IsShown(), true,
+        "deferred mail contribution button is shown when mailbox is open")
+    assertEqual(ns.Death.contributionButton.parent, UIParent,
+        "mail contribution button is parented to UIParent so MailFrame refreshes cannot hide it")
+    assertEqual(ns.Death.contributionButton.frameStrata, "DIALOG",
+        "mail contribution button is raised above mailbox internals")
+    assertEqual(ns.Death.contributionButton.frameLevel, 29,
+        "mail contribution button is raised relative to MailFrame")
+end
+
+local function testMailShowRefreshesAfterFrameBecomesShown()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    local mailOpen = false
+    _G.MailFrame = {
+        IsShown = function() return mailOpen end,
+        GetFrameLevel = function() return 6 end,
+    }
+    ns.Death.contributionButton = nil
+    ns.Death:_EnsureContributionButton()
+
+    registeredEvents.MAIL_SHOW()
+    assertEqual(ns.Death.contributionButton:IsShown(), false,
+        "first mail-show pass can still see MailFrame as hidden")
+    assert(#scheduledTimers > 0,
+        "MAIL_SHOW schedules a follow-up refresh for the visible frame")
+
+    mailOpen = true
+    scheduledTimers[#scheduledTimers]()
+
+    assertEqual(ns.Death.contributionButton:IsShown(), true,
+        "follow-up mail-show refresh shows button once mailbox is visible")
+end
+
+local function testMailboxContributionButtonHidesWhenMailFrameHides()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    registeredEvents.MAIL_SHOW()
+
+    assertEqual(ns.Death.contributionButton:IsShown(), true,
+        "setup shows mailbox contribution button")
+    assert(MailFrame.hooks and MailFrame.hooks.OnHide,
+        "mail contribution button hooks MailFrame OnHide")
+
+    MailFrame.shown = false
+    MailFrame.hooks.OnHide()
+
+    assertEqual(ns.Death.contributionButton:IsShown(), false,
+        "mailbox contribution button hides with MailFrame")
+end
+
 local function testBankInboxContributionMailCreditsAttachedCopperOnce()
     local mailId = "Runner-Realm#100-200"
     resetHarness({
@@ -958,6 +1104,11 @@ testContributionMailFillCreatesDurableMailRecordAndBody()
 testContributionMailUsesExpectedContributionWhenEnoughCurrencyRemains()
 testContributionMailLeavesPostageWhenCurrencyIsBelowExpected()
 testPrepareContributionMailCanBeReopenedWhenMailboxIsAlreadyOpen()
+testMailboxContributionButtonShowsWhenMailboxOpen()
+testMailboxContributionButtonClickPreparesMail()
+testMailShowRetriesWhenMailFrameAppearsAfterEvent()
+testMailShowRefreshesAfterFrameBecomesShown()
+testMailboxContributionButtonHidesWhenMailFrameHides()
 testBankInboxContributionMailCreditsAttachedCopperOnce()
 testMailSendCreditsPreparedCopperInsteadOfWalletDelta()
 testMailSendFallbackCountsGoldSilverAndCopperFields()

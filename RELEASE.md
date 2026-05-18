@@ -25,11 +25,11 @@ WoWRoguelite.toc
 Example:
 
 ```powershell
-git add WoWRoguelite.toc CHANGELOG.md README.md
-git commit -m "chore: release v0.1.2"
+git add WoWRoguelite.toc WoWRoguelite.lua CHANGELOG.md README.md CURSEFORGE_DESCRIPTION.md RELEASE.md
+git commit -m "Release v0.3.0"
 git push origin main
-git tag -a v0.1.2 -m "WoWRoguelite v0.1.2"
-git push origin v0.1.2
+git tag -a v0.3.0 -m "3.0 Contributions Done, Next Up BANKING"
+git push origin v0.3.0
 ```
 
 The workflow packages the addon and uploads it to CurseForge.

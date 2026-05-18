@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.2.9.2 — core tracking, UI, run lifecycle, request pipeline, and final-run vendor liquidation. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
+> **Status:** v0.3.0 — contributions done; next up is BANKING. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, and mailbox contribution prep are in place. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.2.9.2 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.0 loaded.` in chat.
 
 ### Quick start
 
@@ -41,7 +41,7 @@ so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addo
 
 **On your bank character.** Open `/wrl` → **Rewards** to see incoming kits with a shopping list. At a mailbox, **Fulfill via Mail** pre-fills name, subject, and gold; drag items into the attachment slots and press Send. Or open a Trade window with the requester and **Load into Trade** to step through the manual checklist.
 
-**On death (non-bank characters).** If you have lives left from Fate unlocks, you get a soft popup and carry on. On a final death, the addon snapshots your carried currency plus vendor value. Visit a vendor and click **WRL: Sell All** to confirm and automatically sell vendorable bag contents plus equipped gear. At a mailbox the contribution mail is pre-filled in currency only, reserving 30c for postage; press Send when ready. If you defer or close the prompt, the **Current Run** tab has a **Prepare Contribution Mail** button and `/wrl contribute` reopens it. The character is then marked **retired** and further play won't be credited.
+**On death (non-bank characters).** If you have lives left from Fate unlocks, you get a soft popup and carry on. On a final death, the addon snapshots your carried currency plus vendor value. Visit a vendor and click **WRL: Sell All** to confirm and automatically sell vendorable bag contents plus equipped gear. At a mailbox, click **WRL: Contribute** in the mail header to prepare the currency-only contribution mail, reserving 30c for postage; press Send when ready. If you defer or close the prompt, the **Current Run** tab has a **Prepare Contribution Mail** button and `/wrl contribute` reopens it. The character is then marked **retired** and further play won't be credited.
 
 ### Profiles, rules, boons, and burdens
 

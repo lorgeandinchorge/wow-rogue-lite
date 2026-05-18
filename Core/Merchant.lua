@@ -1,6 +1,6 @@
 -- Core/Merchant.lua
--- Merchant-frame helper for final-death liquidation. The destructive sell
--- action is gated to dead_pending_contribution and requires player confirm.
+-- Merchant-frame helper for selling vendorable bags and equipped gear. The
+-- destructive sell action requires player confirmation.
 
 local ADDON_NAME, ns = ...
 local M = ns:NewModule("Merchant")
@@ -12,6 +12,13 @@ local EQUIPMENT_SLOTS = {
 
 local function merchantOpen()
     return MerchantFrame and MerchantFrame.IsShown and MerchantFrame:IsShown()
+end
+
+local function frameLevel(frame)
+    if frame and frame.GetFrameLevel then
+        return frame:GetFrameLevel() or 0
+    end
+    return 0
 end
 
 local function formatMoney(copper)
@@ -54,24 +61,74 @@ function M:Init()
     self:_EnsureButton()
 
     if ns.On then
-        ns:On("MERCHANT_SHOW", function() self:UpdateButton() end)
+        ns:On("MERCHANT_SHOW", function() self:OnMerchantShow() end)
         ns:On("MERCHANT_CLOSED", function() self:UpdateButton() end)
         ns:On("BAG_UPDATE", function() self:UpdateButton() end)
         ns:On("PLAYER_EQUIPMENT_CHANGED", function() self:UpdateButton() end)
     end
 end
 
-function M:_EnsureButton()
-    if self.button or not CreateFrame or not MerchantFrame then return end
+function M:_ScheduleButtonRefresh(delay)
+    if not (C_Timer and C_Timer.After) then return end
+    C_Timer.After(delay or 0, function()
+        self:UpdateButton()
+    end)
+end
 
-    local button = CreateFrame("Button", "WoWRogueliteMerchantSellButton", MerchantFrame, "UIPanelButtonTemplate")
+function M:OnMerchantShow()
+    self:UpdateButton()
+    self:_ScheduleButtonRefresh(0)
+end
+
+function M:_ScheduleButtonRetry()
+    if self._buttonRetryScheduled then return end
+    self._buttonRetryScheduled = true
+
+    local function retry()
+        self._buttonRetryScheduled = false
+        self:UpdateButton()
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, retry)
+    end
+end
+
+function M:_PositionButton()
+    if not self.button or not MerchantFrame then return end
+
+    if self.button.SetParent and UIParent then
+        self.button:SetParent(UIParent)
+    end
+    if self.button.SetFrameStrata then
+        self.button:SetFrameStrata("DIALOG")
+    end
+    if self.button.SetFrameLevel then
+        self.button:SetFrameLevel(frameLevel(MerchantFrame) + 20)
+    end
+    if self.button.ClearAllPoints then
+        self.button:ClearAllPoints()
+    end
+    if self.button.SetPoint then
+        self.button:SetPoint("TOPRIGHT", MerchantFrame, "TOPRIGHT", -32, -42)
+    end
+end
+
+function M:_EnsureButton()
+    if self.button or not CreateFrame then return end
+    if not MerchantFrame then
+        self:_ScheduleButtonRetry()
+        return
+    end
+
+    local button = CreateFrame("Button", "WoWRogueliteMerchantSellButton", UIParent or MerchantFrame, "UIPanelButtonTemplate")
     if button.SetText then button:SetText("WRL: Sell All") end
     if button.SetSize then button:SetSize(142, 22) end
-    if button.SetPoint then button:SetPoint("TOPRIGHT", MerchantFrame, "TOPRIGHT", -32, -42) end
     if button.SetScript then
         button:SetScript("OnClick", function() M:PromptFinalRunSell() end)
     end
     self.button = button
+    self:_PositionButton()
     self:UpdateButton()
 end
 
@@ -79,6 +136,7 @@ function M:UpdateButton()
     if not self.button then self:_EnsureButton() end
     if not self.button then return end
     if self:ShouldShowSellButton() then
+        self:_PositionButton()
         if self.button.Show then self.button:Show() end
     else
         if self.button.Hide then self.button:Hide() end

@@ -28,12 +28,13 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.2.9.2
+### Latest Update: v0.3.0 - Contributions Done, Next Up BANKING
 
-- Makes the vendor **WRL: Sell All** button appear whenever a merchant is open.
-- Keeps the private confirmation dialog before selling vendorable bag contents and equipped gear.
-- Keeps `/wrl sellfinal` and `/wrl vendorfinal` as command fallbacks for the same vendor sell prompt.
-- Updates regression coverage and copy for the always-visible vendor button.
+- Completes the final contribution loop for testers.
+- Makes the vendor **WRL: Sell All** button appear from the vendor window opening, without needing a buy/sell refresh.
+- Adds a mailbox **WRL: Contribute** button in the mail header and hides it with the mailbox.
+- Keeps private confirmation before selling vendorable bag contents and equipped gear, and keeps the final mail Send button manual.
+- Next major focus: BANKING.
 
 ### Bank And Run Structure
 
@@ -41,7 +42,7 @@ Set one character as your bank with `/wrl setbank`. The bank is treated as infra
 
 ### Account-Wide Progression
 
-When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. At a vendor, use **WRL: Sell All** to confirm and liquidate vendorable bags plus equipped gear before mailing currency to the bank. That total becomes spendable budget for permanent legacy unlocks.
+When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. At a vendor, use **WRL: Sell All** to confirm and liquidate vendorable bags plus equipped gear. At a mailbox, use **WRL: Contribute** to prepare the currency-only handoff to the bank. That total becomes spendable budget for permanent legacy unlocks.
 
 ### Starter Reward Requests
 

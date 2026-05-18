@@ -357,7 +357,112 @@ local function showTextPopup(name, body)
     StaticPopup_Show(name, tostring(body or ""))
 end
 
+local CONTRIBUTION_BUTTON_X = 56
+local CONTRIBUTION_BUTTON_Y = -1
+local CONTRIBUTION_BUTTON_WIDTH = 112
+
+local function uiFrameLevel(frame)
+    if frame and frame.GetFrameLevel then
+        return frame:GetFrameLevel() or 0
+    end
+    return 0
+end
+
+function D:_ScheduleContributionButtonRetry()
+    if self._contributionButtonRetryScheduled then return end
+    self._contributionButtonRetryScheduled = true
+
+    local function retry()
+        self._contributionButtonRetryScheduled = false
+        self:UpdateContributionButton()
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, retry)
+    end
+end
+
+function D:_ScheduleContributionButtonRefresh(delay)
+    if not (C_Timer and C_Timer.After) then return end
+    C_Timer.After(delay or 0, function()
+        self:UpdateContributionButton()
+        self:OnMailShow()
+    end)
+end
+
+function D:OnMailShowEvent()
+    self:UpdateContributionButton()
+    self:OnMailShow()
+    self:_ScheduleContributionButtonRefresh(0)
+end
+
+function D:_PositionContributionButton()
+    if not self.contributionButton or not MailFrame then return end
+
+    if self._contributionHookedMailFrame ~= MailFrame and MailFrame.HookScript then
+        MailFrame:HookScript("OnShow", function()
+            D:UpdateContributionButton()
+        end)
+        MailFrame:HookScript("OnHide", function()
+            if D.contributionButton and D.contributionButton.Hide then
+                D.contributionButton:Hide()
+            end
+        end)
+        self._contributionHookedMailFrame = MailFrame
+    end
+
+    if self.contributionButton.SetParent and UIParent then
+        self.contributionButton:SetParent(UIParent)
+    end
+    if self.contributionButton.SetFrameStrata then
+        self.contributionButton:SetFrameStrata("DIALOG")
+    end
+    if self.contributionButton.SetFrameLevel then
+        self.contributionButton:SetFrameLevel(uiFrameLevel(MailFrame) + 20)
+    end
+    if self.contributionButton.ClearAllPoints then
+        self.contributionButton:ClearAllPoints()
+    end
+    if self.contributionButton.SetPoint then
+        self.contributionButton:SetPoint("TOPLEFT", MailFrame, "TOPLEFT", CONTRIBUTION_BUTTON_X, CONTRIBUTION_BUTTON_Y)
+    end
+end
+
+function D:_EnsureContributionButton()
+    if self.contributionButton or not CreateFrame then return end
+    if not MailFrame then
+        self:_ScheduleContributionButtonRetry()
+        return
+    end
+
+    local button = CreateFrame("Button", "WoWRogueliteMailContributionButton", UIParent or MailFrame, "UIPanelButtonTemplate")
+    if button.SetText then button:SetText("WRL: Contribute") end
+    if button.SetSize then button:SetSize(CONTRIBUTION_BUTTON_WIDTH, 22) end
+    if button.SetScript then
+        button:SetScript("OnClick", function()
+            D:PrepareContributionMail()
+        end)
+    end
+    self.contributionButton = button
+    self:_PositionContributionButton()
+    self:UpdateContributionButton()
+end
+
+function D:UpdateContributionButton()
+    if not self.contributionButton then self:_EnsureContributionButton() end
+    if not self.contributionButton then return end
+
+    if MailFrame and MailFrame.IsShown and MailFrame:IsShown() then
+        self:_PositionContributionButton()
+        if self.contributionButton.Show then self.contributionButton:Show() end
+    else
+        if self.contributionButton.Hide then self.contributionButton:Hide() end
+    end
+end
+
 function D:Init()
+    self:_EnsureContributionButton()
+
     ns:On("PLAYER_DEAD",       function() self:OnPlayerDead() end)
     ns:On("PLAYER_ENTERING_WORLD", function()
         self:ReconcileCurrentDeath("entering_world")
@@ -373,7 +478,8 @@ function D:Init()
     end)
     ns:On("PLAYER_UNGHOST",    function() self:OnRevive() end)
     ns:On("PLAYER_ALIVE",      function() self:OnRevive() end)
-    ns:On("MAIL_SHOW",         function() self:OnMailShow() end)
+    ns:On("MAIL_SHOW",         function() self:OnMailShowEvent() end)
+    ns:On("MAIL_CLOSED",       function() self:UpdateContributionButton() end)
     ns:On("MAIL_SEND_SUCCESS", function() self:OnMailSent() end)
 
     -- Combat-log context capture uses a dedicated frame because ns:On() does

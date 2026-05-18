@@ -8,6 +8,8 @@ local soldBagItems = {}
 local soldInventorySlots = {}
 local popupShown = {}
 local printed = {}
+local scheduledTimers = {}
+local registeredEvents = {}
 
 local function assertEqual(actual, expected, message)
     if actual ~= expected then
@@ -43,6 +45,8 @@ local function resetHarness(opts)
     soldInventorySlots = {}
     popupShown = {}
     printed = {}
+    scheduledTimers = {}
+    registeredEvents = {}
 
     _G.NUM_BAG_SLOTS = 0
     _G.GetMoney = function() return currentMoney end
@@ -74,16 +78,29 @@ local function resetHarness(opts)
     _G.MerchantFrame = {
         IsShown = function() return merchantOpen end,
     }
+    _G.C_Timer = {
+        After = function(delay, cb)
+            scheduledTimers[#scheduledTimers + 1] = { delay = delay, cb = cb }
+        end,
+    }
     _G.StaticPopupDialogs = {}
     _G.StaticPopup_Show = function(name, ...)
         popupShown[#popupShown + 1] = { name = name, args = { ... } }
     end
-    _G.CreateFrame = function()
+    _G.CreateFrame = function(frameType, name, parent, template)
         return {
+            frameType = frameType,
+            name = name,
+            parent = parent,
+            template = template,
             SetText = function() end,
             SetSize = function() end,
             SetPoint = function() end,
             SetScript = function() end,
+            SetParent = function(self, value) self.parent = value end,
+            SetFrameStrata = function(self, value) self.frameStrata = value end,
+            SetFrameLevel = function(self, value) self.frameLevel = value end,
+            ClearAllPoints = function(self) self.pointsCleared = true end,
             Show = function(self) self.shown = true end,
             Hide = function(self) self.shown = false end,
             IsShown = function(self) return self.shown end,
@@ -104,7 +121,9 @@ local function resetHarness(opts)
         if select("#", ...) > 0 then msg = msg:format(...) end
         printed[#printed + 1] = msg
     end
-    function ns:On() end
+    function ns:On(event, cb)
+        registeredEvents[event] = cb
+    end
     function ns.Database:GetCurrentCharacter()
         return {
             key = "Runner-Realm",
@@ -214,6 +233,54 @@ local function testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
         "late-created merchant button is shown for pending dead run")
 end
 
+local function testMerchantShowRetriesWhenMerchantFrameAppearsAfterEvent()
+    local ns = resetHarness()
+    _G.MerchantFrame = nil
+    ns.Merchant.button = nil
+
+    ns.Merchant:UpdateButton()
+    assertEqual(ns.Merchant.button, nil,
+        "merchant button is not created before MerchantFrame exists")
+    assert(#scheduledTimers > 0,
+        "merchant button schedules a retry when MerchantFrame is missing")
+
+    _G.MerchantFrame = {
+        IsShown = function() return true end,
+        GetFrameLevel = function() return 7 end,
+    }
+    scheduledTimers[1].cb()
+
+    assert(ns.Merchant.button ~= nil,
+        "merchant button is created by deferred retry after MerchantFrame appears")
+    assertEqual(ns.Merchant.button:IsShown(), true,
+        "deferred merchant button is shown when merchant is open")
+    assertEqual(ns.Merchant.button.parent, UIParent,
+        "merchant button is parented to UIParent so MerchantFrame refreshes cannot hide it")
+    assertEqual(ns.Merchant.button.frameStrata, "DIALOG",
+        "merchant button is raised above merchant internals")
+    assertEqual(ns.Merchant.button.frameLevel, 27,
+        "merchant button is raised relative to MerchantFrame")
+end
+
+local function testMerchantShowRefreshesAfterFrameBecomesShown()
+    local ns = resetHarness({ merchantOpen = false })
+    ns.Merchant:Init()
+    assert(registeredEvents.MERCHANT_SHOW ~= nil,
+        "merchant module registers MERCHANT_SHOW")
+
+    registeredEvents.MERCHANT_SHOW()
+    assertEqual(ns.Merchant.button:IsShown(), false,
+        "first merchant-show pass can still see MerchantFrame as hidden")
+    assert(#scheduledTimers > 0,
+        "MERCHANT_SHOW schedules a follow-up refresh for the visible frame")
+
+    merchantOpen = true
+    scheduledTimers[#scheduledTimers].cb()
+
+    assertEqual(ns.Merchant.button:IsShown(), true,
+        "follow-up merchant-show refresh shows button once vendor window is visible")
+end
+
 -- ── New tests covering the item-cache race fix ───────────────────────────────
 
 -- Before the fix, ShouldShowSellButton() called BuildFinalRunSellPlan(), which
@@ -294,6 +361,8 @@ testBuildSellPlanIncludesBagsAndEquippedGear()
 testConfirmAndSellExecutesPlanButKeepsContributionPending()
 testSellFinalRunItemsNoLongerRequiresPendingDeath()
 testMerchantShowCreatesButtonWhenMerchantFrameLoadsLate()
+testMerchantShowRetriesWhenMerchantFrameAppearsAfterEvent()
+testMerchantShowRefreshesAfterFrameBecomesShown()
 testSellButtonVisibleWithColdItemCache()
 testPromptFinalRunSellPrintsMessageWhenNothingVendorable()
 testPromptFinalRunSellBuildsAtActionTime()
