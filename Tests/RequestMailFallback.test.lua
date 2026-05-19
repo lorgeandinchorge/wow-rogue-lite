@@ -130,6 +130,43 @@ local function testFulfillmentMailUsesBankerFlavorAndRewardDetails()
     end
 end
 
+local function testBeginMailFulfillmentPrefillsBankDeskMailAndMarksGathering()
+    local ns = resetHarness()
+    ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
+    ns.Rewards = {
+        BuildRewardForTierIds = function()
+            return { gold = 1200, extraLives = 0, items = { { id = 101, qty = 2, note = "thread" } } }
+        end,
+    }
+    ns.Container = {
+        GetNumSlots = function() return 0 end,
+        GetItemInfo = function() return nil end,
+    }
+    WRL_DB.requests[1] = { id = "req-1", from = "Graham-Realm", tierIds = { 101 }, status = "pending" }
+
+    local fields = {}
+    MailFrame = { IsShown = function() return true end }
+    MailFrameTab2 = { Click = function() fields.clickedSendTab = true end }
+    SendMailNameEditBox = { SetText = function(_, value) fields.name = value end }
+    SendMailSubjectEditBox = { SetText = function(_, value) fields.subject = value end }
+    SendMailBodyEditBox = { SetText = function(_, value) fields.body = value end }
+    SendMailMoney = {}
+    MoneyInputFrame_SetCopper = function(frame, copper)
+        fields.moneyFrame = frame
+        fields.copper = copper
+    end
+
+    local ok = ns.Requests:BeginMailFulfillment("req-1")
+
+    assertEqual(ok, true, "bank desk mail prep reports success")
+    assertEqual(fields.clickedSendTab, true, "mail prep switches to send tab")
+    assertEqual(fields.name, "Graham", "mail prep strips same-realm recipient")
+    assertEqual(fields.subject, "Roguelite bank release", "mail prep fills banker subject")
+    assertEqual(fields.copper, 1200, "mail prep fills requested gold")
+    assertEqual(WRL_DB.requests[1].status, "gathering", "mail prep marks request as preparing")
+    assertEqual(WRL_DB.requests[1]._fulfillmentMethod, "mail", "mail prep stores fulfillment method")
+end
+
 local function testRequestInventoryScansUseCContainerFallback()
     local ns = resetHarness()
     NUM_BAG_SLOTS = 0
@@ -169,6 +206,7 @@ testOutgoingRequestKeepsMailFallbackSubject()
 testMailFallbackBodyNamesRequesterAndRewards()
 testBeginMailFallbackPrefillsMailbox()
 testFulfillmentMailUsesBankerFlavorAndRewardDetails()
+testBeginMailFulfillmentPrefillsBankDeskMailAndMarksGathering()
 testRequestInventoryScansUseCContainerFallback()
 
 print("RequestMailFallback.test.lua: ok")

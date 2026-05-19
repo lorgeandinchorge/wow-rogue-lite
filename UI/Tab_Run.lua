@@ -239,8 +239,38 @@ local function isActionableRequest(req)
     return req and (req.status == "pending" or req.status == "gathering")
 end
 
-function Tab:_FirstActionableBankRequest(unassignedOnly)
+local function actionableBankRequests()
+    local rows = {}
     for _, req in ipairs(requestRows()) do
+        if isActionableRequest(req) then
+            rows[#rows + 1] = req
+        end
+    end
+    return rows
+end
+
+function Tab:_ActiveBankRequest()
+    local rows = actionableBankRequests()
+    if #rows == 0 then
+        self.bankRequestIndex = 1
+        return nil
+    end
+    self.bankRequestIndex = math.max(1, math.min(self.bankRequestIndex or 1, #rows))
+    return rows[self.bankRequestIndex]
+end
+
+function Tab:_AdvanceBankRequest()
+    local rows = actionableBankRequests()
+    if #rows == 0 then
+        self.bankRequestIndex = 1
+        return nil
+    end
+    self.bankRequestIndex = ((self.bankRequestIndex or 1) % #rows) + 1
+    return rows[self.bankRequestIndex]
+end
+
+function Tab:_FirstActionableBankRequest(unassignedOnly)
+    for _, req in ipairs(actionableBankRequests()) do
         if isActionableRequest(req) and ((not unassignedOnly) or not req.accountId) then
             return req
         end
@@ -268,6 +298,52 @@ local function readinessSummary(req)
         return ("Ready to prepare mail: %s plus listed supplies. The vault has stopped sighing."):format(ns.Tiers:FormatMoney(gold))
     end
     return ("Missing for next mail: %d item line(s), %s. The ledger has concerns."):format(missingItems, ns.Tiers:FormatMoney(missingGold))
+end
+
+local function appendActiveRequestLines(lines, req)
+    if not req then
+        lines[#lines + 1] = "No pending bank requests. Suspiciously peaceful."
+        lines[#lines + 1] = "Mailbox work: nothing ready for the clerk."
+        return
+    end
+
+    local account = req.accountId and ns.Database and ns.Database.AccountLabel and ns.Database:AccountLabel(req.accountId) or "Unassigned"
+    lines[#lines + 1] = ("Active request: %s [%s]"):format(req.from or "Unknown", account)
+    lines[#lines + 1] = ("Rewards: %s"):format(requestTierLabel(req))
+
+    local ok, ready = pcall(function()
+        return ns.Requests and ns.Requests.FulfillmentReadiness and ns.Requests:FulfillmentReadiness(req) or nil
+    end)
+    if not ok or not ready then
+        lines[#lines + 1] = "Readiness: unavailable. The paperwork is staring back."
+        return
+    end
+
+    local requiredGold = ready.requiredGold or 0
+    local availableGold = ready.availableGold or 0
+    local missingGold = math.max(0, requiredGold - availableGold)
+    local missingItems = ready.missingItems or {}
+    if ready.fulfillable then
+        lines[#lines + 1] = ("Readiness: ready for mail - %s gold, 0 item line(s) missing."):format(ns.Tiers:FormatMoney(requiredGold))
+        lines[#lines + 1] = "Missing: none. The clerk is almost cheerful."
+        return
+    end
+
+    lines[#lines + 1] = ("Readiness: missing %d item line(s), %s gold."):format(#missingItems, ns.Tiers:FormatMoney(missingGold))
+    local shownItems = math.min(2, #missingItems)
+    for i = 1, shownItems do
+        local it = missingItems[i]
+        lines[#lines + 1] = ("Missing item: %s need %d, have %d"):format(
+            it.name or ("item:" .. tostring(it.id or "?")),
+            it.required or 0,
+            it.available or 0)
+    end
+    if #missingItems > shownItems then
+        lines[#lines + 1] = ("Missing item: ... and %d more"):format(#missingItems - shownItems)
+    end
+    if missingGold > 0 then
+        lines[#lines + 1] = ("Missing gold: need %s, have %s"):format(ns.Tiers:FormatMoney(requiredGold), ns.Tiers:FormatMoney(availableGold))
+    end
 end
 
 local function appendContributionBoard(lines, maxAccounts, maxCharacters)
@@ -528,14 +604,13 @@ function Tab:_BuildBankerOverviewLines(key)
         if isActionableRequest(req) and not req.accountId then unassigned = unassigned + 1 end
     end
 
-    local nextReq = self:_FirstActionableBankRequest(false)
+    local nextReq = self:_ActiveBankRequest()
     local right = {
         "|cffc0a060Bank Desk|r",
         ("%d request(s) need attention: %d pending, %d preparing."):format(pending + gathering, pending, gathering),
         ("Fulfilled in the ledger: %d. Unassigned requester(s): %d."):format(fulfilled, unassigned),
-        requestSummaryLine(nextReq),
-        readinessSummary(nextReq),
     }
+    appendActiveRequestLines(right, nextReq)
     appendContributionBoard(right, 4, 3)
     appendRecentLedger(right, 50)
 
@@ -611,43 +686,6 @@ function Tab:Init(parent)
     end)
     self.contributionButton:Hide()
 
-    self.bankMailButton = Theme:Button(p, "Prepare Mail", 118, 22)
-    self.bankMailButton:SetPoint("TOPRIGHT", -20, -18)
-    self.bankMailButton:SetScript("OnClick", function()
-        local req = Tab:_FirstActionableBankRequest(false)
-        if req and ns.Requests and ns.Requests.BeginMailFulfillment then
-            ns.Requests:BeginMailFulfillment(req.id)
-        else
-            ns:Print("No pending bank request is ready for mail.")
-        end
-    end)
-    self.bankMailButton:Hide()
-
-    self.bankDoneButton = Theme:Button(p, "Mark Fulfilled", 122, 22)
-    self.bankDoneButton:SetPoint("TOPRIGHT", self.bankMailButton, "TOPLEFT", -6, 0)
-    self.bankDoneButton:SetScript("OnClick", function()
-        local req = Tab:_FirstActionableBankRequest(false)
-        if req and ns.Requests and ns.Requests.MarkFulfilled then
-            ns.Requests:MarkFulfilled(req.id)
-            Tab:Refresh()
-        else
-            ns:Print("No pending bank request to mark fulfilled.")
-        end
-    end)
-    self.bankDoneButton:Hide()
-
-    self.bankAssignButton = Theme:Button(p, "Assign Account", 126, 22)
-    self.bankAssignButton:SetPoint("TOPRIGHT", self.bankDoneButton, "TOPLEFT", -6, 0)
-    self.bankAssignButton:SetScript("OnClick", function()
-        local req = Tab:_FirstActionableBankRequest(true)
-        if req then
-            Tab:PromptAssignAccount(req)
-        else
-            ns:Print("No unassigned pending requester at the Bank Desk.")
-        end
-    end)
-    self.bankAssignButton:Hide()
-
     Theme:Divider(p, "TOPLEFT", "TOPRIGHT", 0, -54, 0.2)
 
     local left = CreateFrame("Frame", nil, p)
@@ -674,6 +712,75 @@ function Tab:Init(parent)
         end
         self.leftLines[i] = fs
     end
+
+    self.bankActionsBox = CreateFrame("Frame", nil, left)
+    self.bankActionsBox:SetPoint("TOPLEFT", self.leftLines[7], "BOTTOMLEFT", 0, -16)
+    self.bankActionsBox:SetSize(300, 96)
+    Theme:Fill(self.bankActionsBox, Theme.c.bg1, true)
+    self.bankActionsBox.borderLeft = self.bankActionsBox:CreateTexture(nil, "BORDER")
+    self.bankActionsBox.borderLeft:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
+    self.bankActionsBox.borderLeft:SetPoint("TOPLEFT", 0, 0)
+    self.bankActionsBox.borderLeft:SetPoint("BOTTOMLEFT", 0, 0)
+    self.bankActionsBox.borderLeft:SetWidth(1)
+    self.bankActionsBox.borderRight = self.bankActionsBox:CreateTexture(nil, "BORDER")
+    self.bankActionsBox.borderRight:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
+    self.bankActionsBox.borderRight:SetPoint("TOPRIGHT", 0, 0)
+    self.bankActionsBox.borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
+    self.bankActionsBox.borderRight:SetWidth(1)
+    self.bankActionsBox:Hide()
+
+    self.bankActionsTitle = Theme:Text(self.bankActionsBox, 12, Theme.c.goldH)
+    self.bankActionsTitle:SetPoint("TOPLEFT", 12, -10)
+    self.bankActionsTitle:SetText("Bank Actions")
+    if self.bankActionsTitle.SetFont then
+        self.bankActionsTitle:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    end
+
+    self.bankNextButton = Theme:Button(self.bankActionsBox, "Next Request", 132, 20)
+    self.bankNextButton:SetPoint("TOPLEFT", self.bankActionsTitle, "BOTTOMLEFT", 0, -8)
+    self.bankNextButton:SetScript("OnClick", function()
+        Tab:_AdvanceBankRequest()
+        Tab:Refresh()
+    end)
+    self.bankNextButton:Hide()
+
+    self.bankAssignButton = Theme:Button(self.bankActionsBox, "Assign Account", 132, 20)
+    self.bankAssignButton:SetPoint("LEFT", self.bankNextButton, "RIGHT", 8, 0)
+    self.bankAssignButton:SetScript("OnClick", function()
+        local activeReq = Tab:_ActiveBankRequest()
+        local req = activeReq and not activeReq.accountId and activeReq or Tab:_FirstActionableBankRequest(true)
+        if req then
+            Tab:PromptAssignAccount(req)
+        else
+            ns:Print("No unassigned pending requester at the Bank Desk.")
+        end
+    end)
+    self.bankAssignButton:Hide()
+
+    self.bankDoneButton = Theme:Button(self.bankActionsBox, "Mark Fulfilled", 132, 20)
+    self.bankDoneButton:SetPoint("TOPLEFT", self.bankNextButton, "BOTTOMLEFT", 0, -8)
+    self.bankDoneButton:SetScript("OnClick", function()
+        local req = Tab:_ActiveBankRequest()
+        if req and ns.Requests and ns.Requests.MarkFulfilled then
+            ns.Requests:MarkFulfilled(req.id)
+            Tab:Refresh()
+        else
+            ns:Print("No pending bank request to mark fulfilled.")
+        end
+    end)
+    self.bankDoneButton:Hide()
+
+    self.bankMailButton = Theme:Button(self.bankActionsBox, "Prepare Mail", 132, 20)
+    self.bankMailButton:SetPoint("LEFT", self.bankDoneButton, "RIGHT", 8, 0)
+    self.bankMailButton:SetScript("OnClick", function()
+        local req = Tab:_ActiveBankRequest()
+        if req and ns.Requests and ns.Requests.BeginMailFulfillment then
+            ns.Requests:BeginMailFulfillment(req.id)
+        else
+            ns:Print("No pending bank request is ready for mail.")
+        end
+    end)
+    self.bankMailButton:Hide()
 
     local scroll, content = Theme:ScrollArea(right)
     scroll:SetPoint("TOPLEFT", 0, -2)
@@ -717,6 +824,7 @@ function Tab:Refresh()
         if self.bankDeskSection then self.bankDeskSection:Hide() end
         if self.bankContributionSection then self.bankContributionSection:Hide() end
         if self.bankLedgerSection then self.bankLedgerSection:Hide() end
+        if self.bankActionsBox then self.bankActionsBox:Hide() end
         writeLines(self.leftLines, {
             "Character: unavailable",
             "Run data has not initialized yet.",
@@ -732,8 +840,9 @@ function Tab:Refresh()
     local name, realm = withRealm(key)
     if ns.Database:IsBankCharacter(key) then
         if self.contributionButton then self.contributionButton:Hide() end
-        local actionReq = self:_FirstActionableBankRequest(false)
+        local actionReq = self:_ActiveBankRequest()
         local unassignedReq = self:_FirstActionableBankRequest(true)
+        if self.bankActionsBox then self.bankActionsBox:Show() end
         if self.bankMailButton then
             if actionReq then self.bankMailButton:Show() else self.bankMailButton:Hide() end
         end
@@ -742,6 +851,9 @@ function Tab:Refresh()
         end
         if self.bankAssignButton then
             if unassignedReq then self.bankAssignButton:Show() else self.bankAssignButton:Hide() end
+        end
+        if self.bankNextButton then
+            if actionReq then self.bankNextButton:Show() else self.bankNextButton:Hide() end
         end
         self.hint:SetText("Bank Desk dashboard: requests, account contributions, and recent ledger work.")
         self.leftTitle:SetText("Bank Snapshot")
@@ -768,6 +880,8 @@ function Tab:Refresh()
     if self.bankMailButton then self.bankMailButton:Hide() end
     if self.bankDoneButton then self.bankDoneButton:Hide() end
     if self.bankAssignButton then self.bankAssignButton:Hide() end
+    if self.bankNextButton then self.bankNextButton:Hide() end
+    if self.bankActionsBox then self.bankActionsBox:Hide() end
     self.leftTitle:SetText("Character Dashboard")
 
     local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"

@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.3.1"
+ns.version     = "0.3.2"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -132,6 +132,31 @@ SlashCmdList["WRL"] = function(msg)
             if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
                 ns.MainFrame:RefreshCurrentTab()
             end
+        end
+    elseif cmd == "simrequest" or cmd == "simreq" then
+        if not (ns.Requests and ns.Requests.OnIncoming) then
+            ns:Print("Requests module is not ready yet.")
+            return
+        end
+        local requester, rewardText = rest:match("^(%S+)%s*(.-)$")
+        requester = requester and requester ~= "" and requester or "Tester-Realm"
+        rewardText = rewardText and rewardText ~= "" and rewardText or "101"
+        local tierIds = {}
+        for id in rewardText:gmatch("([^,%s]+)") do
+            local n = tonumber(id)
+            if n then tierIds[#tierIds + 1] = n end
+        end
+        if #tierIds == 0 then
+            ns:Print("Usage: /wrl simrequest [Character-Realm] [RewardId,RewardId]")
+            return
+        end
+        local requestId = ("sim-%s-%s"):format(tostring(time and time() or 0), tostring(math.random and math.random(1000, 9999) or 1000))
+        ns.Requests:OnIncoming(requester, tierIds, "Simulated tester request.", "simulated", requestId)
+        ns:Print("Simulated request from %s for rewards %s.", requester, table.concat(tierIds, ","))
+        if ns.MainFrame and ns.MainFrame.ShowTab then
+            ns.MainFrame:ShowTab("Run")
+        elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+            ns.MainFrame:RefreshCurrentTab()
         end
     elseif cmd == "contribute" or cmd == "contribution" then
         if ns.Death and ns.Death.PrepareContributionMail then
@@ -283,6 +308,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl dashboard      - open the Dashboard tab")
         ns:Print("  /wrl request        - open the Rewards tab")
         ns:Print("  /wrl account L C-R  - assign Character-Realm to account label L")
+        ns:Print("  /wrl simrequest C-R IDS - simulate a pending bank request")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")
         ns:Print("  /wrl sellfinal      - sell bags and equipped gear at the current vendor")
         ns:Print("  /wrl settings       - print current settings to chat")

@@ -524,10 +524,10 @@ end
 
 function R:BeginMailFulfillment(reqId)
     local req; for _, r in ipairs(WRL_DB.requests or {}) do if r.id == reqId then req = r; break end end
-    if not req then return end
+    if not req then return false end
     if not MailFrame or not MailFrame:IsShown() then
         ns:Print("Open your mailbox first, then click Fulfill again.")
-        return
+        return false
     end
 
     -- Switch to the Send Mail tab if not already.
@@ -545,7 +545,7 @@ function R:BeginMailFulfillment(reqId)
     end
 
     -- Gold (MoneyInputFrame API — values in copper).
-    if bundle.gold > 0 and MoneyInputFrame_SetCopper and SendMailMoney then
+    if (bundle.gold or 0) > 0 and MoneyInputFrame_SetCopper and SendMailMoney then
         MoneyInputFrame_SetCopper(SendMailMoney, bundle.gold)
     end
 
@@ -565,6 +565,7 @@ function R:BeginMailFulfillment(reqId)
 
     req._fulfillmentMethod = "mail"
     self:SetStatus(reqId, REQ_STATUS.GATHERING)
+    return true
 end
 
 -- ---- fulfillment: trade --------------------------------------------------

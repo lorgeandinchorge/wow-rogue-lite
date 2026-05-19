@@ -49,6 +49,9 @@ local function resetHarness()
     function ns.LegacyUnlocks:AvailableBudget() return 100000 end
     function ns.Run:GetState(rec) return rec and rec.status or "unknown" end
     function ns.Tiers:FormatMoney(copper) return tostring(copper) .. "c" end
+    function ns.Database:AccountLabel(accountId)
+        return WRL_DB.accounts[accountId] and WRL_DB.accounts[accountId].label or "Unassigned"
+    end
     function ns.Database:AccountContributionRows()
         return {
             {
@@ -79,7 +82,17 @@ local function resetHarness()
     function ns.Requests:BankRequestRows()
         return WRL_DB.requests
     end
-    function ns.Requests:FulfillmentReadiness()
+    function ns.Requests:FulfillmentReadiness(req)
+        if req and req.id == "req-1" then
+            return {
+                fulfillable = false,
+                requiredGold = 1200,
+                availableGold = 500,
+                missingItems = {
+                    { name = "Banker's Thread", required = 2, available = 0, missing = 2 },
+                },
+            }
+        end
         return { fulfillable = true, requiredGold = 500, availableGold = 1000, missingItems = {} }
     end
 
@@ -111,10 +124,14 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
 
     assertEqual(right[1], "|cffc0a060Bank Desk|r", "right pane starts with Bank Desk heading")
     assertContains(right[2], "2 request", "bank desk summarizes pending requests")
-    assertContains(right[6], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
-    assertContains(right[7], "Graham", "contribution board is grouped by account")
-    assertContains(right[8], "Graham-Realm", "contribution board keeps character detail")
-    assertContains(right[12], "ledger", "right pane includes ledger heading")
+    assertContains(right[4], "Active request: Graham-Realm [Graham]", "bank desk names the active request and account")
+    assertContains(right[6], "Readiness: missing", "bank desk shows a direct readiness status")
+    assertContains(right[7], "Missing item: Banker's Thread", "bank desk lists the first missing item")
+    assertContains(right[8], "Missing gold: need 1200c, have 500c", "bank desk lists missing gold")
+    assertContains(right[9], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
+    assertContains(right[10], "Graham", "contribution board is grouped by account")
+    assertContains(right[11], "Graham-Realm", "contribution board keeps character detail")
+    assertContains(right[15], "ledger", "right pane includes ledger heading")
 end
 
 local function testContributionActionOnlyShowsForPendingContributionRuns()
@@ -133,10 +150,28 @@ local function testBankDeskActionButtonsAreDashboardOwned()
     local src = f:read("*a"):gsub("\r\n", "\n")
     f:close()
 
-    assertContains(src, 'Theme:Button(p, "Prepare Mail"', "Dashboard should own the bank mail action")
-    assertContains(src, 'Theme:Button(p, "Mark Fulfilled"', "Dashboard should own the bank fulfill action")
-    assertContains(src, 'Theme:Button(p, "Assign Account"', "Dashboard should own account assignment action")
+    assertContains(src, 'Theme:Button(self.bankActionsBox, "Prepare Mail"', "Dashboard should own the bank mail action")
+    assertContains(src, 'Theme:Button(self.bankActionsBox, "Mark Fulfilled"', "Dashboard should own the bank fulfill action")
+    assertContains(src, 'Theme:Button(self.bankActionsBox, "Assign Account"', "Dashboard should own account assignment action")
+    assertContains(src, 'Theme:Button(self.bankActionsBox, "Next Request"', "Dashboard should let the banker cycle active requests")
+    assertContains(src, "self:_ActiveBankRequest()", "bank mail action should use the active Dashboard request")
     assertContains(src, "if actionReq then self.bankMailButton:Show()", "bank mail action only shows with actionable request")
+    assertContains(src, "self.bankActionsBox = CreateFrame(\"Frame\", nil, left)", "bank actions should live under the Bank Snapshot")
+    assertContains(src, "Theme:Fill(self.bankActionsBox, Theme.c.bg1, true)", "bank actions should use a color-only fill without panel texture tiling")
+    assertContains(src, "self.bankActionsBox:SetPoint(\"TOPLEFT\", self.leftLines[7]", "bank action box should sit below snapshot lines")
+    assertContains(src, "self.bankActionsBox.borderLeft", "bank action box should have a left border")
+    assertContains(src, "self.bankActionsBox.borderRight", "bank action box should have a right border")
+    assertContains(src, "Theme:Button(self.bankActionsBox, \"Prepare Mail\"", "bank mail button should be inside the action box")
+end
+
+local function testBankDeskCanCycleActiveRequests()
+    local tab = resetHarness()
+
+    assertEqual(tab:_ActiveBankRequest().id, "req-1", "first actionable request starts active")
+    tab:_AdvanceBankRequest()
+    assertEqual(tab:_ActiveBankRequest().id, "req-2", "next request advances active selection")
+    tab:_AdvanceBankRequest()
+    assertEqual(tab:_ActiveBankRequest().id, "req-1", "next request wraps around")
 end
 
 local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
@@ -168,6 +203,7 @@ end
 testBankerOverviewReplacesRunSnapshotCopy()
 testContributionActionOnlyShowsForPendingContributionRuns()
 testBankDeskActionButtonsAreDashboardOwned()
+testBankDeskCanCycleActiveRequests()
 testBankDeskUsesBorderedSectionsWithStrongHeadings()
 
 print("RunTabBankerOverview.test.lua: ok")

@@ -1,5 +1,15 @@
 # WoW Roguelite Changelog
 
+## v0.3.2
+
+- Upgrade the bank character Dashboard into the active Bank Desk fulfillment surface, with an active request summary, account label, reward IDs, readiness state, missing item details, and missing gold details.
+- Add a Dashboard **Next Request** control so the banker can cycle pending/preparing requests without opening the Rewards tab.
+- Add `/wrl simrequest [Character-Realm] [RewardId,RewardId]` for local Bank Desk testing without needing a second requester online.
+- Make Dashboard **Prepare Mail**, **Mark Fulfilled**, and **Assign Account** operate on the active Bank Desk request.
+- Make reward mail preparation report success/failure to callers while preserving the manual Send boundary.
+- Keep the Rewards tab available as the detailed request browser and backup workflow.
+- Add regression coverage for active request cycling, Bank Desk readiness lines, and mail preparation state changes.
+
 ## v0.3.1
 
 - Rename the visible Current Run tab to Dashboard while preserving the internal Run panel and saved-tab migration.

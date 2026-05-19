@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.1 — Bank Desk foundation. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
+> **Status:** v0.3.2 — Bank Desk fulfillment pass. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted: the addon shows active request readiness, pre-fills mail forms and currency, and keeps final Send manual.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.1 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.2 loaded.` in chat.
 
 ### Quick start
 
@@ -35,11 +35,13 @@ so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addo
 3. Type `/wrl` to open the main window.
 4. Use the **Legacy** tab to spend any available budget, the **Rewards** tab to request unlocked starter kits, and the **Dashboard** tab to track in-progress state.
 
+For Bank Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online.
+
 ### How a run works
 
 **On a run character.** Open `/wrl` → **Legacy** to review lifetime contributions and spend available legacy budget into Storage, Stipend, and Fate. Open `/wrl` → **Rewards**, tick any unlocked legacy rewards you want sent to you, and click **Send Request**. The addon whispers your bank character; if the bank is offline, the mail fallback at any mailbox carries the same payload and the bank picks it up on next login.
 
-**On your bank character.** Open `/wrl` → **Dashboard** to use the Bank Desk: pending requests, account-grouped contributions, recent ledger activity, and fulfillment actions. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
+**On your bank character.** Open `/wrl` → **Dashboard** to use the Bank Desk: active request readiness, missing item/gold details, account-grouped contributions, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
 
 **On death (non-bank characters).** If you have lives left from Fate unlocks, you get a soft popup and carry on. On a final death, the addon snapshots your carried currency plus vendor value. Visit a vendor and click **WRL: Sell All** to confirm and automatically sell vendorable bag contents plus equipped gear. At a mailbox, click **WRL: Contribute** in the mail header to prepare the currency-only contribution mail, reserving 30c for postage; press Send when ready. If you defer or close the prompt, the **Dashboard** tab has a **Prepare Contribution Mail** button and `/wrl contribute` reopens it. The character is then marked **retired** and further play won't be credited.
 
