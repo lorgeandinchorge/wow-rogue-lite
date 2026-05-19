@@ -1,5 +1,14 @@
 # WoW Roguelite Changelog
 
+## v0.3.3
+
+- Move boons and burdens out of the Rewards tab and into Settings under a dedicated **Run Modifiers** section.
+- Simplify the run-side Rewards tab into a guided request flow with an unlocked reward dropdown and **Prepare Mail** action.
+- Keep bank-side Rewards fulfillment available as the detailed request browser while the Dashboard remains the primary Bank Desk surface.
+- Harden reward request and fulfillment mail body prefill across Classic mail-frame timing differences.
+- Expand prepared reward mail body details with requested item lines so banker handoffs are easier to verify.
+- Update smoke-test and public docs so testers know where to request rewards and where to configure run modifiers.
+
 ## v0.3.2
 
 - Upgrade the bank character Dashboard into the active Bank Desk fulfillment surface, with an active request summary, account label, reward IDs, readiness state, missing item details, and missing gold details.

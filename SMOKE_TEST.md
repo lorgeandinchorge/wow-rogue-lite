@@ -90,16 +90,16 @@ If you only have 10 to 15 minutes, please do this section.
   Expected: the run character can view Dashboard, Achievements, Legacy, and Rewards cleanly.
 
 - [ ] Open the Rewards tab.
-  Expected: it clearly explains where rewards will be sent from.
+  Expected: it clearly explains this is where starter reward request mail is prepared.
 
 - [ ] Open the Legacy tab and unlock an affordable Storage, Stipend, or Fate node if budget is available.
   Expected: available budget decreases, the node becomes unlocked, and the UI refreshes cleanly.
 
-- [ ] Select any available boon or burden.
-  Expected: the UI updates and does not error.
+- [ ] Open gear Settings and find **Run Modifiers**.
+  Expected: boons and burdens appear there, not inside the Rewards tab.
 
-- [ ] If rewards are unlocked, try sending a request.
-  Expected: the request sends cleanly and the addon gives clear feedback.
+- [ ] If rewards are unlocked, choose one from the Rewards dropdown and click **Prepare Mail** at a mailbox.
+  Expected: the request mail is prepared cleanly and final Send remains manual.
 
 ### 4. Bank Desk / Rewards Flow
 

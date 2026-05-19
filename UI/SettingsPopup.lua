@@ -6,6 +6,7 @@ local Popup = ns:NewModule("SettingsPopup")
 
 local POPUP_W, POPUP_H = 720, 520
 local ROW_H = 28
+local MOD_ROW_H = 30
 local RULE_ROW_H = 50
 local LOG_LINES = 10
 
@@ -107,6 +108,35 @@ local function buildRuleRow(parent, Theme)
     return r
 end
 
+local function buildModifierRow(parent, Theme)
+    local r = CreateFrame("Button", nil, parent)
+    r:SetHeight(MOD_ROW_H)
+    Theme:Fill(r, Theme.c.bg1, false)
+
+    r.box = r:CreateTexture(nil, "ARTWORK")
+    r.box:SetSize(12, 12)
+    r.box:SetPoint("LEFT", 10, 0)
+
+    r.name = Theme:Text(r, 11, Theme.c.fg)
+    r.name:SetPoint("TOPLEFT", 30, -5)
+    r.name:SetWidth(210)
+    r.name:SetJustifyH("LEFT")
+    r.name:SetWordWrap(false)
+
+    r.desc = Theme:Text(r, 9, Theme.c.fg2)
+    r.desc:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
+    r.desc:SetWidth(210)
+    r.desc:SetJustifyH("LEFT")
+    r.desc:SetWordWrap(false)
+
+    r.state = Theme:Text(r, 10, Theme.c.gold)
+    r.state:SetPoint("RIGHT", -10, 0)
+    r.state:SetWidth(54)
+    r.state:SetJustifyH("RIGHT")
+
+    return r
+end
+
 local function setProfileButtonLook(btn, selected, Theme)
     if not btn then return end
     if selected then
@@ -121,6 +151,76 @@ end
 local function fmtWhen(ts)
     if ts and date then return date("%m-%d %H:%M", ts) end
     return ts and tostring(ts) or "?"
+end
+
+function Popup:ToggleModifier(kind, id)
+    if not id or not ns.Boons then return end
+    local key = ns:UnitKey()
+    if not key or ns.Boons:IsLocked(key) then
+        ns:Print("Run modifiers lock once the run has claimed rewards or retired.")
+        return
+    end
+    local rec = ns.Database and ns.Database:GetCharacter(key)
+    if not rec then return end
+
+    local source = kind == "burden" and (rec.burdens or {}) or (rec.boons or {})
+    local list = {}
+    for selectedId in pairs(source) do
+        if selectedId ~= id then
+            list[#list + 1] = selectedId
+        end
+    end
+    if not source[id] then
+        list[#list + 1] = id
+    end
+
+    if kind == "burden" then
+        ns.Boons:SetBurdens(key, list)
+    else
+        ns.Boons:SetBoons(key, list)
+    end
+    self:Refresh()
+    if ns.MainFrame then ns.MainFrame:RefreshCurrentTab() end
+end
+
+function Popup:RefreshModifierRows()
+    local Theme = ns.Theme
+    local key = ns:UnitKey()
+    local rec = key and ns.Database and ns.Database:GetCharacter(key)
+    local locked = not (ns.Boons and key and rec) or ns.Boons:IsLocked(key)
+
+    if self.modifiersHint then
+        self.modifiersHint:SetText(locked
+            and "These choices apply to the current run and are locked after a reward claim or retirement."
+            or "Choose optional run modifiers before requesting starter rewards.")
+    end
+
+    local function paint(row, def, selected)
+        row._id = def.id
+        row.name:SetText(def.name or def.id)
+        row.desc:SetText(def.description or "")
+        row.box:SetColorTexture(selected and 0.85 or 0.40, selected and 0.75 or 0.40, selected and 0.35 or 0.40, selected and 0.90 or 0.50)
+        row.state:SetText(locked and "LOCKED" or (selected and "ON" or "OFF"))
+        setTextColor(row.name, selected and Theme.c.fg or Theme.c.fg2, 1)
+        setTextColor(row.state, locked and Theme.c.fg2 or Theme.c.gold, 1)
+        row:SetAlpha(locked and 0.55 or 1)
+    end
+
+    local boonDefs = ns.Boons and ns.Boons.BoonDefs and ns.Boons:BoonDefs() or {}
+    for i, def in ipairs(boonDefs) do
+        local row = self.boonRows and self.boonRows[i]
+        if row then
+            paint(row, def, rec and rec.boons and rec.boons[def.id] ~= nil)
+        end
+    end
+
+    local burdenDefs = ns.Boons and ns.Boons.BurdenDefs and ns.Boons:BurdenDefs() or {}
+    for i, def in ipairs(burdenDefs) do
+        local row = self.burdenRows and self.burdenRows[i]
+        if row then
+            paint(row, def, rec and rec.burdens and rec.burdens[def.id] ~= nil)
+        end
+    end
 end
 
 function Popup:Init()
@@ -196,6 +296,51 @@ function Popup:Init()
     self.optBank:SetPoint("TOPLEFT", 0, -y)
     self.optBank:SetPoint("RIGHT", content, "RIGHT", 0, 0)
     y = y + ROW_H + 18
+
+    self.modifiersLabel, y = buildSectionHeader(content, Theme, "Run Modifiers", y)
+    self.modifiersHint = Theme:Text(content, 10, Theme.c.fg2)
+    self.modifiersHint:SetPoint("TOPLEFT", 0, -y)
+    self.modifiersHint:SetWidth(620)
+    self.modifiersHint:SetJustifyH("LEFT")
+    y = y + 24
+
+    self.boonsHeader = Theme:Text(content, 11, Theme.c.gold)
+    self.boonsHeader:SetPoint("TOPLEFT", 0, -y)
+    self.boonsHeader:SetText("Boons")
+    self.burdensHeader = Theme:Text(content, 11, Theme.c.gold)
+    self.burdensHeader:SetPoint("TOPLEFT", 324, -y)
+    self.burdensHeader:SetText("Burdens")
+    y = y + 18
+
+    self.boonRows = {}
+    self.burdenRows = {}
+    local modifierStartY = y
+    local boonDefs = ns.Boons and ns.Boons.BoonDefs and ns.Boons:BoonDefs() or {}
+    local burdenDefs = ns.Boons and ns.Boons.BurdenDefs and ns.Boons:BurdenDefs() or {}
+    local modifierRows = math.max(#boonDefs, #burdenDefs)
+    for i = 1, modifierRows do
+        if boonDefs[i] then
+            local row = buildModifierRow(content, Theme)
+            row:SetPoint("TOPLEFT", 0, -(modifierStartY + (i - 1) * (MOD_ROW_H + 4)))
+            row:SetWidth(308)
+            row._kind = "boon"
+            row:SetScript("OnClick", function()
+                Popup:ToggleModifier(row._kind, row._id)
+            end)
+            self.boonRows[i] = row
+        end
+        if burdenDefs[i] then
+            local row = buildModifierRow(content, Theme)
+            row:SetPoint("TOPLEFT", 324, -(modifierStartY + (i - 1) * (MOD_ROW_H + 4)))
+            row:SetWidth(308)
+            row._kind = "burden"
+            row:SetScript("OnClick", function()
+                Popup:ToggleModifier(row._kind, row._id)
+            end)
+            self.burdenRows[i] = row
+        end
+    end
+    y = y + math.max(1, modifierRows) * (MOD_ROW_H + 4) + 14
 
     self.rulesProfileLabel, y = buildSectionHeader(content, Theme, "Rules & Profiles", y)
     self.currentProfile = Theme:Text(content, 11, Theme.c.gold)
@@ -346,6 +491,8 @@ function Popup:Refresh()
         setProfileButtonLook(btn, prof == pid, Theme)
     end
 
+    self:RefreshModifierRows()
+
     for i, def in ipairs(ns.Rules and ns.Rules:Definitions() or {}) do
         local row = self.ruleRows and self.ruleRows[i]
         if row then
@@ -424,9 +571,18 @@ function Popup:RefreshTheme()
     if self.themeLabel then setTextColor(self.themeLabel, Theme.c.goldH, 1) end
     if self.deathLabel then setTextColor(self.deathLabel, Theme.c.goldH, 1) end
     if self.optionsLabel then setTextColor(self.optionsLabel, Theme.c.goldH, 1) end
+    if self.modifiersLabel then setTextColor(self.modifiersLabel, Theme.c.goldH, 1) end
+    if self.boonsHeader then setTextColor(self.boonsHeader, Theme.c.gold, 1) end
+    if self.burdensHeader then setTextColor(self.burdensHeader, Theme.c.gold, 1) end
     if self.rulesProfileLabel then setTextColor(self.rulesProfileLabel, Theme.c.goldH, 1) end
     if self.rulesHeader then setTextColor(self.rulesHeader, Theme.c.goldH, 1) end
     if self.logLabel then setTextColor(self.logLabel, Theme.c.goldH, 1) end
+    for _, row in ipairs(self.boonRows or {}) do
+        Theme:Fill(row, Theme.c.bg1, false)
+    end
+    for _, row in ipairs(self.burdenRows or {}) do
+        Theme:Fill(row, Theme.c.bg1, false)
+    end
     for _, row in ipairs(self.ruleRows or {}) do
         Theme:Fill(row, Theme.c.bg1, false)
     end

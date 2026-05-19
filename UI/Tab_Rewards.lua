@@ -7,7 +7,6 @@ local ADDON_NAME, ns = ...
 local Tab = ns:NewModule("Tab_Rewards")
 
 local TIER_ROW_H = 68
-local MOD_ROW_H = 24
 local REQ_ROW_H = 148
 local ROW_ICON_SIZE = 18
 local ROW_ICON_MAX = 5
@@ -213,43 +212,23 @@ local function buildOptRow(content, Theme)
     return r
 end
 
-local function buildModifierRow(content, Theme)
-    local r = CreateFrame("Button", nil, content)
-    r:SetHeight(MOD_ROW_H)
-    Theme:Fill(r, Theme.c.bg1, false)
-
-    r.box = r:CreateTexture(nil, "ARTWORK")
-    r.box:SetSize(10, 10)
-    r.box:SetPoint("LEFT", 8, 0)
-
-    r.label = Theme:Text(r, 10, Theme.c.fg)
-    r.label:SetPoint("TOPLEFT", 24, -3)
-    r.label:SetWidth(238)
-    r.label:SetJustifyH("LEFT")
-    r.label:SetWordWrap(false)
-
-    r.sub = Theme:Text(r, 7, Theme.c.fg2)
-    r.sub:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -1)
-    r.sub:SetWidth(250)
-    r.sub:SetJustifyH("LEFT")
-    r.sub:SetWordWrap(false)
-
-    r.state = Theme:Text(r, 9, Theme.c.gold)
-    r.state:SetPoint("RIGHT", -6, 0)
-    r.state:SetJustifyH("RIGHT")
-
-    return r
-end
-
-local function selectionCount(selected, displayTiers, charKey)
-    local picked = 0
+local function firstClaimable(displayTiers, charKey)
     for _, t in ipairs(displayTiers or {}) do
-        local claimed = ns.Database:HasClaimedTier(charKey, t.id)
-        if not claimed and selected[t.id] then
-            picked = picked + 1
+        if not ns.Database:HasClaimedTier(charKey, t.id) then
+            return t
         end
     end
-    return picked
+    return nil
+end
+
+local function selectedRewardLabel(self, displayTiers)
+    local selectedId = self.selectedRewardId
+    for _, t in ipairs(displayTiers or {}) do
+        if t.id == selectedId then
+            return t.name or ("Legacy " .. tostring(t.id))
+        end
+    end
+    return "Choose an unlocked reward"
 end
 
 local function countClaimable(displayTiers, charKey)
@@ -485,7 +464,7 @@ function Tab:Init(parent)
     self.bankLine:SetJustifyH("LEFT")
 
     local summaryRow = CreateFrame("Frame", nil, p)
-    summaryRow:SetPoint("TOPLEFT", 20, -88)
+    summaryRow:SetPoint("TOPLEFT", 20, -82)
     summaryRow:SetSize(720, 86)
     self.summaryRow = summaryRow
 
@@ -498,59 +477,23 @@ function Tab:Init(parent)
     self.selectionCard = createInfoCard(summaryRow, Theme, 226, "Selection")
     self.selectionCard:SetPoint("TOPLEFT", self.progressCard, "TOPRIGHT", 12, 0)
 
-    self.sectionLabel = Theme:Text(p, 12, Theme.c.goldH)
-    self.sectionLabel:SetPoint("TOPLEFT", summaryRow, "BOTTOMLEFT", 0, -12)
-    self.sectionLabel:SetText("Available Legacy Rewards")
+    self.requestLabel = Theme:Text(p, 12, Theme.c.goldH)
+    self.requestLabel:SetPoint("TOPLEFT", summaryRow, "BOTTOMLEFT", 0, -14)
+    self.requestLabel:SetText("Request Reward")
 
-    self.modHeader = Theme:Text(p, 12, Theme.c.goldH)
-    self.modHeader:SetPoint("TOPLEFT", self.sectionLabel, "BOTTOMLEFT", 0, -10)
-    self.modHeader:SetText("Run Modifiers")
+    local dd = CreateFrame("Frame", "WRL_RewardsDropdown", p, "UIDropDownMenuTemplate")
+    dd:SetPoint("TOPLEFT", self.requestLabel, "BOTTOMLEFT", -16, -4)
+    if UIDropDownMenu_SetWidth then UIDropDownMenu_SetWidth(dd, 390) end
+    self.rewardDropdown = dd
 
-    self.modHint = Theme:Text(p, 10, Theme.c.fg2)
-    self.modHint:SetPoint("TOPLEFT", self.modHeader, "BOTTOMLEFT", 0, -3)
-    self.modHint:SetWidth(720)
-    self.modHint:SetJustifyH("LEFT")
-    self.modHint:SetText("Locked once your first legacy reward is claimed.")
+    self.prepareMailBtn = Theme:Button(p, "Prepare Mail", 130, 24)
+    self.prepareMailBtn:SetPoint("LEFT", dd, "RIGHT", -8, 2)
+    self.prepareMailBtn:SetScript("OnClick", function() Tab:BeginMailFallback() end)
 
-    self.modWrap = CreateFrame("Frame", nil, p)
-    self.modWrap:SetPoint("TOPLEFT", self.modHint, "BOTTOMLEFT", 0, -6)
-    self.modWrap:SetSize(720, (MOD_ROW_H + 1) * 5 + 8)
-    Theme:Fill(self.modWrap, Theme.c.bg1, true, "panel")
-
-    self.boonPanel = CreateFrame("Frame", nil, self.modWrap)
-    self.boonPanel:SetPoint("TOPLEFT", 8, -5)
-    self.boonPanel:SetSize(344, self.modWrap:GetHeight() - 10)
-    Theme:Fill(self.boonPanel, Theme.c.bg0, false, "panel")
-
-    self.burdenPanel = CreateFrame("Frame", nil, self.modWrap)
-    self.burdenPanel:SetPoint("TOPRIGHT", -8, -5)
-    self.burdenPanel:SetSize(344, self.modWrap:GetHeight() - 10)
-    Theme:Fill(self.burdenPanel, Theme.c.bg0, false, "panel")
-
-    self.boonLabel = Theme:Text(self.boonPanel, 11, Theme.c.gold)
-    self.boonLabel:SetPoint("TOPLEFT", 8, -4)
-    self.boonLabel:SetText("Boons")
-
-    self.burdenLabel = Theme:Text(self.burdenPanel, 11, Theme.c.gold)
-    self.burdenLabel:SetPoint("TOPLEFT", 8, -4)
-    self.burdenLabel:SetText("Burdens")
-
-    local boonScroll, boonContent = Theme:ScrollArea(self.boonPanel)
-    boonScroll:SetPoint("TOPLEFT", 8, -20)
-    boonScroll:SetPoint("BOTTOMRIGHT", -24, 4)
-    boonContent:SetSize(304, 1)
-    self.boonScroll = boonScroll
-    self.boonContent = boonContent
-
-    local burdenScroll, burdenContent = Theme:ScrollArea(self.burdenPanel)
-    burdenScroll:SetPoint("TOPLEFT", 8, -20)
-    burdenScroll:SetPoint("BOTTOMRIGHT", -24, 4)
-    burdenContent:SetSize(304, 1)
-    self.burdenScroll = burdenScroll
-    self.burdenContent = burdenContent
-
-    self.boonRows = {}
-    self.burdenRows = {}
+    self.requestHelp = Theme:Text(p, 10, Theme.c.fg2)
+    self.requestHelp:SetPoint("LEFT", self.prepareMailBtn, "RIGHT", 12, 0)
+    self.requestHelp:SetWidth(184)
+    self.requestHelp:SetJustifyH("LEFT")
 
     self.empty = Theme:Text(p, 11, Theme.c.fg2)
     self.empty:SetWidth(720)
@@ -568,7 +511,7 @@ function Tab:Init(parent)
     self.bankSetupBody:Hide()
 
     local scroll, content = Theme:ScrollArea(p)
-    scroll:SetPoint("TOPLEFT", self.modWrap, "BOTTOMLEFT", 0, -8)
+    scroll:SetPoint("TOPLEFT", self.requestLabel, "BOTTOMLEFT", 0, -44)
     scroll:SetPoint("BOTTOMRIGHT", -20, 52)
     content:SetSize(720, 1)
     self.scroll = scroll
@@ -583,17 +526,9 @@ function Tab:Init(parent)
     Theme:Fill(footer, Theme.c.bg1, false, "footer")
     self.footer = footer
 
-    self.sendBtn = Theme:Button(footer, "Send Request", 140, 24)
-    self.sendBtn:SetPoint("RIGHT", -16, 0)
-    self.sendBtn:SetScript("OnClick", function() Tab:SendRequest() end)
-
-    self.mailBtn = Theme:Button(footer, "Mail Fallback", 128, 24)
-    self.mailBtn:SetPoint("RIGHT", self.sendBtn, "LEFT", -8, 0)
-    self.mailBtn:SetScript("OnClick", function() Tab:BeginMailFallback() end)
-
     self.footerHint = Theme:Text(footer, 10, Theme.c.fg2)
     self.footerHint:SetPoint("LEFT", 16, 0)
-    self.footerHint:SetWidth(438)
+    self.footerHint:SetWidth(600)
     self.footerHint:SetJustifyH("LEFT")
 
     local bankView = CreateFrame("Frame", nil, p)
@@ -648,10 +583,10 @@ end
 function Tab:ShowBankSetupGuidance()
     if self.bankView then self.bankView:Hide() end
     if self.summaryRow then self.summaryRow:Hide() end
-    if self.sectionLabel then self.sectionLabel:Hide() end
-    if self.modHeader then self.modHeader:Hide() end
-    if self.modHint then self.modHint:Hide() end
-    if self.modWrap then self.modWrap:Hide() end
+    if self.requestLabel then self.requestLabel:Hide() end
+    if self.rewardDropdown then self.rewardDropdown:Hide() end
+    if self.prepareMailBtn then self.prepareMailBtn:Hide() end
+    if self.requestHelp then self.requestHelp:Hide() end
     if self.scroll then self.scroll:Hide() end
     if self.footer then self.footer:Hide() end
     if self.empty then self.empty:Hide() end
@@ -669,10 +604,10 @@ end
 function Tab:ShowRunWorkflow()
     if self.bankView then self.bankView:Hide() end
     if self.summaryRow then self.summaryRow:Show() end
-    if self.sectionLabel then self.sectionLabel:Show() end
-    if self.modHeader then self.modHeader:Show() end
-    if self.modHint then self.modHint:Show() end
-    if self.modWrap then self.modWrap:Show() end
+    if self.requestLabel then self.requestLabel:Show() end
+    if self.rewardDropdown then self.rewardDropdown:Show() end
+    if self.prepareMailBtn then self.prepareMailBtn:Show() end
+    if self.requestHelp then self.requestHelp:Show() end
     if self.footer then self.footer:Show() end
     if self.bankLine then self.bankLine:Show() end
     if self.hint then self.hint:Show() end
@@ -682,10 +617,10 @@ end
 
 function Tab:HideRunWorkflow()
     if self.summaryRow then self.summaryRow:Hide() end
-    if self.sectionLabel then self.sectionLabel:Hide() end
-    if self.modHeader then self.modHeader:Hide() end
-    if self.modHint then self.modHint:Hide() end
-    if self.modWrap then self.modWrap:Hide() end
+    if self.requestLabel then self.requestLabel:Hide() end
+    if self.rewardDropdown then self.rewardDropdown:Hide() end
+    if self.prepareMailBtn then self.prepareMailBtn:Hide() end
+    if self.requestHelp then self.requestHelp:Hide() end
     if self.scroll then self.scroll:Hide() end
     if self.footer then self.footer:Hide() end
     if self.empty then self.empty:Hide() end
@@ -778,23 +713,30 @@ function Tab:Refresh()
 
     local displayTiers = activeLegacyRows()
 
-    for _, t in ipairs(displayTiers) do
-        local claimed = ns.Database:HasClaimedTier(charKey, t.id)
-        if claimed then
-            self.selected[t.id] = nil
-        end
-    end
-
     local claimableCount = countClaimable(displayTiers, charKey)
-    local selectedCount = selectionCount(self.selected, displayTiers, charKey)
-    local modifiersLocked = not (ns.Boons and ns.Boons.IsLocked) or ns.Boons:IsLocked(charKey)
     local rec = ns.Database and ns.Database:GetCharacter(charKey)
     local canRequest = (not rec) or (not ns.Run) or ns.Run:IsPlayable(rec)
+
+    if self.selectedRewardId and ns.Database:HasClaimedTier(charKey, self.selectedRewardId) then
+        self.selectedRewardId = nil
+    end
+    local selectedKnown = false
+    for _, t in ipairs(displayTiers) do
+        if t.id == self.selectedRewardId and not ns.Database:HasClaimedTier(charKey, t.id) then
+            selectedKnown = true
+            break
+        end
+    end
+    if not selectedKnown then
+        local first = firstClaimable(displayTiers, charKey)
+        self.selectedRewardId = first and first.id or nil
+    end
+    local selectedCount = self.selectedRewardId and 1 or 0
 
     if not canRequest then
         self.hint:SetText("This run is retired. Dead or retired characters cannot request new bank rewards.")
     else
-        self.hint:SetText(("Pick the unlocked legacy rewards you want delivered from |cffc0a060%s|r. Buy more unlocks on the Legacy tab."):format(bank))
+        self.hint:SetText(("Request unlocked starter rewards from your bank. Buy more unlocks on the Legacy tab, then prepare mail for |cffc0a060%s|r."):format(bank))
     end
 
     local bankStatus, bankStatusLabel = "missing", "No bank set"
@@ -838,8 +780,8 @@ function Tab:Refresh()
 
     self.selectionCard:SetLines({
         ("Selectable rewards: %d"):format(claimableCount),
-        ("Selected now: %d"):format(selectedCount),
-        (claimableCount > 0 and "Toggle any unlocked reward below to include it."
+        ("Selected now: %s"):format(selectedRewardLabel(self, displayTiers)),
+        (claimableCount > 0 and "Use the dropdown, then prepare a mailbox request."
             or (#displayTiers > 0 and "All unlocked rewards below are already claimed."
             or "No legacy rewards are unlocked yet.")),
     })
@@ -847,154 +789,52 @@ function Tab:Refresh()
     local cardHeight = math.max(self.statusCard:GetHeight(), self.progressCard:GetHeight(), self.selectionCard:GetHeight())
     self.summaryRow:SetHeight(cardHeight)
 
-    local offerMailFallback = bank and ns.BankStatus and ns.BankStatus:ShouldOfferMailFallback(bank)
-    if offerMailFallback then
-        self.footerHint:SetText("Bank is not confirmed online. Send Request queues the addon whisper; Mail Fallback prepares a mailbox letter the bank can import later.")
-    else
-        self.footerHint:SetText("Requests are sent to the configured bank. Mail fulfillment happens on the banker side in this Rewards tab.")
-    end
+    self.footerHint:SetText("Prepare Mail creates a request letter for the banker to import. The final Send button stays manual.")
 
-    local boonDefs = (ns.Boons and ns.Boons.BoonDefs and ns.Boons:BoonDefs()) or {}
-    local burdenDefs = (ns.Boons and ns.Boons.BurdenDefs and ns.Boons:BurdenDefs()) or {}
-
-    for i = #self.boonRows + 1, #boonDefs do
-        local row = buildModifierRow(self.boonContent, Theme)
-        row:SetScript("OnClick", function()
-            if modifiersLocked then return end
-            local id = row._id
-            local list = {}
-            for boonId in pairs((rec and rec.boons) or {}) do
-                if boonId ~= id then
-                    list[#list + 1] = boonId
+    if UIDropDownMenu_Initialize and self.rewardDropdown then
+        UIDropDownMenu_Initialize(self.rewardDropdown, function(_, level)
+            for _, t in ipairs(displayTiers) do
+                local claimed = ns.Database:HasClaimedTier(charKey, t.id)
+                local reward = t
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = (t.name or ("Legacy " .. tostring(t.id))) .. (claimed and " (claimed)" or "")
+                info.value = t.id
+                info.disabled = claimed
+                info.checked = self.selectedRewardId == t.id
+                info.func = function()
+                    self.selectedRewardId = reward.id
+                    self:Refresh()
                 end
+                UIDropDownMenu_AddButton(info, level)
             end
-            if not (rec and rec.boons and rec.boons[id]) then
-                list[#list + 1] = id
-            end
-            if ns.Boons then
-                ns.Boons:SetBoons(charKey, list)
-            end
-            Tab:Refresh()
         end)
-        self.boonRows[i] = row
     end
-    for i = #boonDefs + 1, #self.boonRows do self.boonRows[i]:Hide() end
-
-    local boonY = 0
-    for i, def in ipairs(boonDefs) do
-        local row = self.boonRows[i]
-        local selected = rec and rec.boons and rec.boons[def.id] ~= nil
-        row._id = def.id
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", self.boonContent, "TOPLEFT", 0, -boonY)
-        row:SetPoint("RIGHT", self.boonContent, "RIGHT", 0, 0)
-        row:Show()
-
-        row.box:SetColorTexture(selected and 0.85 or 0.40, selected and 0.75 or 0.40, selected and 0.35 or 0.40, selected and 0.90 or 0.50)
-        row.label:SetText(def.name or def.id)
-        row.sub:SetText(def.description or "")
-        if modifiersLocked then
-            safeTextColor(row.state, Theme.c.fg2, 0.7)
-            row.state:SetText("LOCKED")
-            row:SetAlpha(0.5)
-        elseif selected then
-            safeTextColor(row.state, Theme.c.gold, 1)
-            row.state:SetText("ON")
-            row:SetAlpha(1)
-        else
-            safeTextColor(row.state, Theme.c.fg2, 1)
-            row.state:SetText("OFF")
-            row:SetAlpha(1)
+    if self.rewardDropdown then
+        if UIDropDownMenu_SetText then
+            UIDropDownMenu_SetText(self.rewardDropdown, selectedRewardLabel(self, displayTiers))
+        elseif self.rewardDropdown.label then
+            self.rewardDropdown.label:SetText(selectedRewardLabel(self, displayTiers))
         end
-        boonY = boonY + MOD_ROW_H + 1
     end
-    self.boonContent:SetHeight(math.max(1, boonY))
-
-    for i = #self.burdenRows + 1, #burdenDefs do
-        local row = buildModifierRow(self.burdenContent, Theme)
-        row:SetScript("OnClick", function()
-            if modifiersLocked then return end
-            local id = row._id
-            local list = {}
-            for burdenId in pairs((rec and rec.burdens) or {}) do
-                if burdenId ~= id then
-                    list[#list + 1] = burdenId
-                end
-            end
-            if not (rec and rec.burdens and rec.burdens[id]) then
-                list[#list + 1] = id
-            end
-            if ns.Boons then
-                ns.Boons:SetBurdens(charKey, list)
-            end
-            Tab:Refresh()
-        end)
-        self.burdenRows[i] = row
+    if self.requestHelp then
+        self.requestHelp:SetText(claimableCount > 0 and ("Claimable: " .. claimableCount) or "Unlock rewards on Legacy first.")
     end
-    for i = #burdenDefs + 1, #self.burdenRows do self.burdenRows[i]:Hide() end
-
-    local burdenY = 0
-    for i, def in ipairs(burdenDefs) do
-        local row = self.burdenRows[i]
-        local selected = rec and rec.burdens and rec.burdens[def.id] ~= nil
-        row._id = def.id
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", self.burdenContent, "TOPLEFT", 0, -burdenY)
-        row:SetPoint("RIGHT", self.burdenContent, "RIGHT", 0, 0)
-        row:Show()
-
-        row.box:SetColorTexture(selected and 0.85 or 0.40, selected and 0.75 or 0.40, selected and 0.35 or 0.40, selected and 0.90 or 0.50)
-        row.label:SetText(def.name or def.id)
-        row.sub:SetText(def.description or "")
-        if modifiersLocked then
-            safeTextColor(row.state, Theme.c.fg2, 0.7)
-            row.state:SetText("LOCKED")
-            row:SetAlpha(0.5)
-        elseif selected then
-            safeTextColor(row.state, Theme.c.gold, 1)
-            row.state:SetText("ON")
-            row:SetAlpha(1)
-        else
-            safeTextColor(row.state, Theme.c.fg2, 1)
-            row.state:SetText("OFF")
-            row:SetAlpha(1)
-        end
-        burdenY = burdenY + MOD_ROW_H + 1
-    end
-    self.burdenContent:SetHeight(math.max(1, burdenY))
 
     local footerWouldCollide = (#displayTiers == 0)
     if footerWouldCollide then
-        self.sendBtn:Hide()
-        self.mailBtn:Hide()
+        self.prepareMailBtn:Hide()
         self.footerHint:Hide()
     else
-        self.sendBtn:Show()
+        self.prepareMailBtn:Show()
         self.footerHint:Show()
-        if offerMailFallback then
-            self.mailBtn:Show()
-        else
-            self.mailBtn:Hide()
-        end
     end
 
-    if isBank then
-        self.sendBtn:Disable()
-        self.sendBtn:SetAlpha(0.45)
-    elseif not bank or selectedCount == 0 or not ns.Settings:Get("allowBankRewards", true) then
-        self.sendBtn:Disable()
-        self.sendBtn:SetAlpha(0.45)
+    if isBank or not bank or selectedCount == 0 or not ns.Settings:Get("allowBankRewards", true) or not canRequest then
+        self.prepareMailBtn:Disable()
+        self.prepareMailBtn:SetAlpha(0.45)
     else
-        self.sendBtn:Enable()
-        self.sendBtn:SetAlpha(1)
-    end
-
-    if not footerWouldCollide and offerMailFallback and not isBank and bank and selectedCount > 0 and ns.Settings:Get("allowBankRewards", true) then
-        self.mailBtn:Enable()
-        self.mailBtn:SetAlpha(1)
-    else
-        self.mailBtn:Disable()
-        self.mailBtn:SetAlpha(0.45)
+        self.prepareMailBtn:Enable()
+        self.prepareMailBtn:SetAlpha(1)
     end
 
     if not ns.Settings:Get("allowBankRewards", true) then
@@ -1008,7 +848,7 @@ function Tab:Refresh()
             if not tier then return end
             local claimed = ns.Database:HasClaimedTier(charKey, tier.id)
             if claimed then return end
-            self.selected[tier.id] = not self.selected[tier.id] or nil
+            self.selectedRewardId = tier.id
             Tab:Refresh()
         end)
         self.rows[i] = row
@@ -1019,7 +859,7 @@ function Tab:Refresh()
     for i, t in ipairs(displayTiers) do
         local row = self.rows[i]
         local claimed = ns.Database:HasClaimedTier(charKey, t.id)
-        local selected = self.selected[t.id] == true and not claimed
+        local selected = self.selectedRewardId == t.id and not claimed
         row._tier = t
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -y)
@@ -1056,20 +896,18 @@ end
 function Tab:SelectedRewardIds()
     local charKey = ns:UnitKey()
     local tierIds = {}
-    for tierId, picked in pairs(self.selected or {}) do
-        if picked then
-            local allowed = true
-            if ns.Rules and ns.Rules.CheckTierClaimAvailable then
-                allowed = ns.Rules:CheckTierClaimAvailable(charKey, tierId)
-            elseif ns.Database:HasClaimedTier(charKey, tierId) then
-                allowed = false
-            end
-            if allowed then
-                tierIds[#tierIds + 1] = tierId
-            end
+    local tierId = self.selectedRewardId
+    if tierId then
+        local allowed = true
+        if ns.Rules and ns.Rules.CheckTierClaimAvailable then
+            allowed = ns.Rules:CheckTierClaimAvailable(charKey, tierId)
+        elseif ns.Database:HasClaimedTier(charKey, tierId) then
+            allowed = false
+        end
+        if allowed then
+            tierIds[#tierIds + 1] = tierId
         end
     end
-    table.sort(tierIds)
     return tierIds
 end
 

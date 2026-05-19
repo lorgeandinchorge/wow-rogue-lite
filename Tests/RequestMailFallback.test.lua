@@ -14,6 +14,9 @@ local function resetHarness()
     _G.SendMailNameEditBox = nil
     _G.SendMailSubjectEditBox = nil
     _G.SendMailBodyEditBox = nil
+    _G.SendMailBodyScrollFrame = nil
+    _G.SendMailFrame = nil
+    _G.C_Timer = nil
     _G.NUM_BAG_SLOTS = nil
     _G.GetContainerNumSlots = nil
     _G.GetContainerItemInfo = nil
@@ -110,7 +113,7 @@ local function testFulfillmentMailUsesBankerFlavorAndRewardDetails()
     ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
     ns.Rewards = {
         BuildRewardForTierIds = function()
-            return { gold = 1234, extraLives = 1, items = { { id = 101, qty = 2 } } }
+            return { gold = 1234, extraLives = 1, items = { { id = 101, qty = 2, note = "linen bag" } } }
         end,
     }
 
@@ -127,6 +130,15 @@ local function testFulfillmentMailUsesBankerFlavorAndRewardDetails()
     end
     if not body:find("Gold released: 1234c", 1, true) then
         error("fulfillment mail preserves gold details")
+    end
+    if not body:find("Here are the items you requested", 1, true) then
+        error("fulfillment mail introduces requested items in character")
+    end
+    if not body:find("- 2x item:101 (linen bag)", 1, true) then
+        error("fulfillment mail lists requested item details")
+    end
+    if not body:find("Please try not to make the paperwork look heroic.", 1, true) then
+        error("fulfillment mail includes dry banker snark")
     end
 end
 
@@ -165,6 +177,43 @@ local function testBeginMailFulfillmentPrefillsBankDeskMailAndMarksGathering()
     assertEqual(fields.copper, 1200, "mail prep fills requested gold")
     assertEqual(WRL_DB.requests[1].status, "gathering", "mail prep marks request as preparing")
     assertEqual(WRL_DB.requests[1]._fulfillmentMethod, "mail", "mail prep stores fulfillment method")
+end
+
+local function testBeginMailFulfillmentRetriesBodyAfterSendTabSwitch()
+    local ns = resetHarness()
+    ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
+    ns.Rewards = {
+        BuildRewardForTierIds = function()
+            return { gold = 0, extraLives = 0, items = { { id = 101, qty = 1, note = "pouch" } } }
+        end,
+    }
+    ns.Container = {
+        GetNumSlots = function() return 0 end,
+        GetItemInfo = function() return nil end,
+    }
+    WRL_DB.requests[1] = { id = "req-1", from = "Tester-Realm", tierIds = { 101 }, status = "pending" }
+
+    local delayed = nil
+    local fields = {}
+    MailFrame = { IsShown = function() return true end }
+    MailFrameTab2 = { Click = function() fields.clickedSendTab = true end }
+    SendMailNameEditBox = { SetText = function(_, value) fields.name = value end }
+    SendMailSubjectEditBox = { SetText = function(_, value) fields.subject = value end }
+    SendMailBodyEditBox = nil
+    C_Timer = {
+        After = function(_, callback)
+            delayed = callback
+        end,
+    }
+
+    local ok = ns.Requests:BeginMailFulfillment("req-1")
+    SendMailBodyEditBox = { SetText = function(_, value) fields.body = value end }
+    delayed()
+
+    assertEqual(ok, true, "mail prep still succeeds when body field appears after tab switch")
+    if not fields.body or not fields.body:find("Here are the items you requested", 1, true) then
+        error("mail prep retries body text after send tab switch")
+    end
 end
 
 local function testRequestInventoryScansUseCContainerFallback()
@@ -207,6 +256,7 @@ testMailFallbackBodyNamesRequesterAndRewards()
 testBeginMailFallbackPrefillsMailbox()
 testFulfillmentMailUsesBankerFlavorAndRewardDetails()
 testBeginMailFulfillmentPrefillsBankDeskMailAndMarksGathering()
+testBeginMailFulfillmentRetriesBodyAfterSendTabSwitch()
 testRequestInventoryScansUseCContainerFallback()
 
 print("RequestMailFallback.test.lua: ok")

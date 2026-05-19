@@ -28,13 +28,13 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.0 - Contributions Done, Next Up BANKING
+### Latest Update: v0.3.3 - Rewards And Run Modifiers Cleanup
 
-- Completes the final contribution loop for testers.
-- Makes the vendor **WRL: Sell All** button appear from the vendor window opening, without needing a buy/sell refresh.
-- Adds a mailbox **WRL: Contribute** button in the mail header and hides it with the mailbox.
-- Keeps private confirmation before selling vendorable bag contents and equipped gear, and keeps the final mail Send button manual.
-- Next major focus: BANKING.
+- Rewards is now a focused starter-reward request surface with a dropdown and **Prepare Mail** action.
+- Boons and burdens moved into Settings under **Run Modifiers** so testers can find them with rules/profile setup.
+- Reward request and fulfillment mail body prefill is more reliable across Classic mail-frame timing.
+- Prepared reward mail now lists requested item details for easier banker verification.
+- Smoke-test and public docs now reflect the new Rewards and Run Modifiers flow.
 
 ### Bank And Run Structure
 
@@ -46,11 +46,11 @@ When a run dies permanently, the addon tracks its final contribution and adds it
 
 ### Starter Reward Requests
 
-On a new run, spend budget on the Legacy tab, then open the Rewards tab and request any unlocked legacy rewards. On the bank character, open the Rewards tab to see what is needed and fulfill it by mail or trade.
+On a new run, spend budget on the Legacy tab, then open the Rewards tab, choose an unlocked starter reward, and prepare a request mail for the bank. On the bank character, open the Rewards tab to see what is needed and fulfill it by mail or trade.
 
-### Profiles, Rules, Boons, And Burdens
+### Profiles, Rules, And Run Modifiers
 
-Choose from built-in profiles like Casual Roguelite, Banked Hardcore, Solo Self Found, and Ironman. You can also customize individual rule toggles and add run modifiers through boons and burdens.
+Choose from built-in profiles like Casual Roguelite, Banked Hardcore, Solo Self Found, and Ironman. You can also customize individual rule toggles and set boons and burdens from Settings under Run Modifiers.
 
 ### Export And Audit Tools
 

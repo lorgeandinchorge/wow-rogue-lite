@@ -37,6 +37,18 @@ local function testSettingsOwnsRulesProfilesSurface()
     assertContains(src, "RULE_ROW_H", "Settings should render rule rows with descriptions and severity")
 end
 
+local function testSettingsOwnsRunModifiersSurface()
+    local src = readFile("UI/SettingsPopup.lua")
+
+    assertContains(src, "Run Modifiers", "Settings should include a dedicated run modifier section")
+    assertContains(src, "Boons", "Settings should label beneficial run modifiers")
+    assertContains(src, "Burdens", "Settings should label restrictive run modifiers")
+    assertContains(src, "BoonDefs", "Settings should render boon definitions")
+    assertContains(src, "BurdenDefs", "Settings should render burden definitions")
+    assertContains(src, "SetBoons", "Settings should persist selected boons")
+    assertContains(src, "SetBurdens", "Settings should persist selected burdens")
+end
+
 local function testOldRulesTabNoLongerLoads()
     local toc = readFile("WoWRoguelite.toc")
 
@@ -52,6 +64,7 @@ end
 
 testRulesMoveOutOfMainTabs()
 testSettingsOwnsRulesProfilesSurface()
+testSettingsOwnsRunModifiersSurface()
 testOldRulesTabNoLongerLoads()
 testInterfaceOptionsPointsRulesToSettings()
 

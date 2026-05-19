@@ -105,7 +105,7 @@ function R:BeginMailFallback(bankKey, tierIds, note)
     local recipient = bankKey:match("^([^-]+)") or bankKey
     if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
     if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(self:MailFallbackSubject(tierIds)) end
-    if SendMailBodyEditBox then SendMailBodyEditBox:SetText(self:MailFallbackBody(bankKey, tierIds, note)) end
+    self:PrefillSendMailBody(self:MailFallbackBody(bankKey, tierIds, note))
 
     ns:Print("|cffc0a060Mail fallback prepared.|r Send this letter with no attachments so the bank can import your request.")
     return true
@@ -152,6 +152,17 @@ local function rewardsLabel(tierIds)
     return table.concat(ids, ", ")
 end
 
+local function rewardItemLabel(item)
+    local id = item and item.id or "?"
+    local qty = item and item.qty or 1
+    local note = item and item.note
+    local label = ("%dx item:%s"):format(qty, tostring(id))
+    if note and note ~= "" then
+        label = ("%s (%s)"):format(label, note)
+    end
+    return label
+end
+
 function R:FulfillmentMailSubject(req)
     return "Roguelite bank release"
 end
@@ -171,11 +182,55 @@ function R:FulfillmentMailBody(req, bundle)
         lines[#lines + 1] = ("Fate adjustment: +%d life"):format(bundle.extraLives)
     end
     if #(bundle.items or {}) > 0 then
-        lines[#lines + 1] = ("Attached supplies: %d stack(s) expected"):format(#bundle.items)
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = "Here are the items you requested, released from the vault after the usual amount of sighing:"
+        for _, item in ipairs(bundle.items or {}) do
+            lines[#lines + 1] = "- " .. rewardItemLabel(item)
+        end
     end
     lines[#lines + 1] = ""
+    lines[#lines + 1] = "Please try not to make the paperwork look heroic."
     lines[#lines + 1] = "The ledger is pretending not to judge."
     return table.concat(lines, "\n")
+end
+
+function R:SendMailBodyEditBox()
+    if SendMailBodyEditBox and SendMailBodyEditBox.SetText then return SendMailBodyEditBox end
+    if _G and _G.SendMailBodyEditBox and _G.SendMailBodyEditBox.SetText then return _G.SendMailBodyEditBox end
+    if SendMailBodyScrollFrame and SendMailBodyScrollFrame.EditBox and SendMailBodyScrollFrame.EditBox.SetText then
+        return SendMailBodyScrollFrame.EditBox
+    end
+    if _G and _G.SendMailBodyScrollFrame and _G.SendMailBodyScrollFrame.EditBox and _G.SendMailBodyScrollFrame.EditBox.SetText then
+        return _G.SendMailBodyScrollFrame.EditBox
+    end
+    if SendMailFrame then
+        return (SendMailFrame.BodyEditBox and SendMailFrame.BodyEditBox.SetText and SendMailFrame.BodyEditBox)
+            or (SendMailFrame.bodyEditBox and SendMailFrame.bodyEditBox.SetText and SendMailFrame.bodyEditBox)
+            or (SendMailFrame.Body and SendMailFrame.Body.SetText and SendMailFrame.Body)
+            or nil
+    end
+    if _G and _G.SendMailFrame then
+        local frame = _G.SendMailFrame
+        return (frame.BodyEditBox and frame.BodyEditBox.SetText and frame.BodyEditBox)
+            or (frame.bodyEditBox and frame.bodyEditBox.SetText and frame.bodyEditBox)
+            or (frame.Body and frame.Body.SetText and frame.Body)
+            or nil
+    end
+end
+
+function R:PrefillSendMailBody(body)
+    local function apply()
+        local editBox = self:SendMailBodyEditBox()
+        if not editBox then return false end
+        editBox:SetText(body or "")
+        if editBox.ClearFocus then editBox:ClearFocus() end
+        return true
+    end
+    local ok = apply()
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function() apply() end)
+    end
+    return ok
 end
 
 local function shallowCopyItems(items)
@@ -540,9 +595,7 @@ function R:BeginMailFulfillment(reqId)
     local recipient = req.from:match("^([^-]+)") or req.from
     if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
     if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(self:FulfillmentMailSubject(req)) end
-    if SendMailBodyEditBox then
-        SendMailBodyEditBox:SetText(self:FulfillmentMailBody(req, bundle))
-    end
+    self:PrefillSendMailBody(self:FulfillmentMailBody(req, bundle))
 
     -- Gold (MoneyInputFrame API — values in copper).
     if (bundle.gold or 0) > 0 and MoneyInputFrame_SetCopper and SendMailMoney then

@@ -45,6 +45,18 @@ local function testBankWorkflowHidesRunWorkflow()
         "bank characters should hide run controls before showing bank fulfillment")
 end
 
+local function testRunRewardsUsesGuidedRequestControl()
+    local src = readFile("UI/Tab_Rewards.lua")
+
+    assertContains(src, "WRL_RewardsDropdown", "Rewards should expose a dropdown for unlocked reward requests")
+    assertContains(src, "Request unlocked starter rewards from your bank.",
+        "Rewards should explain the request-only purpose")
+    assertContains(src, 'Theme:Button(p, "Prepare Mail"',
+        "Rewards should create a simple mail-preparation request button")
+    assertNotContains(src, "self.modWrap", "Rewards should not own boons/burdens modifier panels")
+    assertNotContains(src, "Run Modifiers", "Rewards should not label an embedded modifier section")
+end
+
 local function testRequestsNotifyRewardsTab()
     local src = readFile("Core/Requests.lua")
 
@@ -57,6 +69,7 @@ end
 testMainFrameUsesSingleRewardsTab()
 testTocLoadsRewardsPanel()
 testBankWorkflowHidesRunWorkflow()
+testRunRewardsUsesGuidedRequestControl()
 testRequestsNotifyRewardsTab()
 
 print("RewardsTabWiring.test.lua: ok")
