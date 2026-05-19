@@ -1,7 +1,10 @@
 # WoW Roguelite Changelog
 
-## v0.3.0a
+## v0.3.0b
 
+- Add Havok and Rabid as always-available UI themes.
+- Retune Rabid toward a stronger blue base with cooler blue-purple accents.
+- Make GW2 UI theme availability tolerate Classic client addon-enable API timing/signature differences so saved GW2 selections can activate on first login.
 - Fix the GW2 UI theme texture paths so the skin loads upstream `.png` assets instead of falling back to color-only surfaces.
 - Resolve GW2 UI texture roots from the active enabled flavor, including TBC/Mainline/Vanilla/Mists/Wrath installs.
 

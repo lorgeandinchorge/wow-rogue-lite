@@ -26,10 +26,10 @@ Example:
 
 ```powershell
 git add WoWRoguelite.toc WoWRoguelite.lua CHANGELOG.md README.md CURSEFORGE_DESCRIPTION.md RELEASE.md
-git commit -m "Release v0.3.0a"
+git commit -m "Release v0.3.0b"
 git push origin main
-git tag -a v0.3.0a -m "0.3.0a GW2 UI theme texture hotfix"
-git push origin v0.3.0a
+git tag -a v0.3.0b -m "0.3.0b theme hotfix"
+git push origin v0.3.0b
 ```
 
 The workflow packages the addon and uploads it to CurseForge.

@@ -104,6 +104,46 @@ local PALETTES = {
             buttonHover = "Textures\\uistuff\\button_hover.png",
         },
     },
+    havok = {
+        id = "havok",
+        label = "Havok",
+        c = {
+            bg0       = {0.012, 0.016, 0.026, 0.98},
+            bg1       = {0.025, 0.035, 0.055, 1.00},
+            bg2       = {0.040, 0.070, 0.115, 1.00},
+            bg3       = {0.055, 0.125, 0.215, 1.00},
+            headerBg  = {0.020, 0.060, 0.125, 1.00},
+            navBg     = {0.010, 0.018, 0.034, 1.00},
+            rowBg     = {0.030, 0.045, 0.070, 1.00},
+            rowAccent = {0.120, 0.520, 1.000, 0.72},
+            fg        = {0.820, 0.925, 1.000, 1.00},
+            fg2       = {0.520, 0.650, 0.780, 1.00},
+            gold      = {0.120, 0.520, 1.000, 1.00},
+            goldH     = {0.330, 0.760, 1.000, 1.00},
+            red       = {0.780, 0.210, 0.310, 1.00},
+            green     = {0.220, 0.780, 0.680, 1.00},
+        },
+    },
+    rabid = {
+        id = "rabid",
+        label = "Rabid",
+        c = {
+            bg0       = {0.022, 0.045, 0.180, 0.98},
+            bg1       = {0.038, 0.080, 0.245, 1.00},
+            bg2       = {0.060, 0.125, 0.340, 1.00},
+            bg3       = {0.090, 0.175, 0.460, 1.00},
+            headerBg  = {0.070, 0.120, 0.390, 1.00},
+            navBg     = {0.020, 0.048, 0.175, 1.00},
+            rowBg     = {0.045, 0.095, 0.265, 1.00},
+            rowAccent = {0.400, 0.420, 1.000, 0.72},
+            fg        = {0.875, 0.800, 1.000, 1.00},
+            fg2       = {0.680, 0.640, 0.940, 1.00},
+            gold      = {0.400, 0.420, 1.000, 1.00},
+            goldH     = {0.560, 0.650, 1.000, 1.00},
+            red       = {0.850, 0.260, 0.520, 1.00},
+            green     = {0.220, 0.760, 0.900, 1.00},
+        },
+    },
     grant = {
         id = "grant",
         label = "Grant",
@@ -146,7 +186,7 @@ local PALETTES = {
     },
 }
 
-local THEME_ORDER = { "classic", "dark", "gw2", "grant", "isabella" }
+local THEME_ORDER = { "classic", "dark", "gw2", "havok", "rabid", "grant", "isabella" }
 local GW2_UI_ADDON_IDS = {
     "GW2_UI",
     "GW2_UI_Mainline",
@@ -178,21 +218,36 @@ local function getAddonInfo(addonNameOrIndex)
 end
 
 local function getAddonEnableState(addonName)
+    local fallbackState
     if C_AddOns and C_AddOns.GetAddOnEnableState then
-        local ok, state = pcall(C_AddOns.GetAddOnEnableState, addonName, "player")
-        if ok then return state end
-        ok, state = pcall(C_AddOns.GetAddOnEnableState, addonName)
-        if ok then return state end
+        local checks = {
+            { "player", addonName },
+            { addonName, "player" },
+            { addonName },
+        }
+        for _, args in ipairs(checks) do
+            local ok, state = pcall(C_AddOns.GetAddOnEnableState, unpack(args))
+            if ok and state ~= nil then
+                if state > 0 then return state end
+                fallbackState = fallbackState or state
+            end
+        end
     end
 
     if GetAddOnEnableState then
         local ok, state = pcall(GetAddOnEnableState, "player", addonName)
-        if ok then return state end
+        if ok and state ~= nil then
+            if state > 0 then return state end
+            fallbackState = fallbackState or state
+        end
         ok, state = pcall(GetAddOnEnableState, addonName)
-        if ok then return state end
+        if ok and state ~= nil then
+            if state > 0 then return state end
+            fallbackState = fallbackState or state
+        end
     end
 
-    return nil
+    return fallbackState
 end
 
 local function getNumAddOns()

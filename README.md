@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.0a — contributions done; next up is BANKING. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, and GW2 UI texture-backed theme loading are in place. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
+> **Status:** v0.3.0b — contributions done; next up is BANKING. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, and GW2 UI texture-backed theme loading are in place. Mail and trade fulfillment is assisted: the addon pre-fills forms and contribution currency, but Blizzard's addon API won't let it press Send for you.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.0a loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.0b loaded.` in chat.
 
 ### Quick start
 
@@ -84,7 +84,7 @@ Configuration
   /wrl rules            list rules and their enabled state
   /wrl rules log        print recent taint/warn log entries
   /wrl theme            show the active UI theme
-  /wrl theme <id>       set UI theme (classic, dark, gw2, grant, isabella)
+  /wrl theme <id>       set UI theme (classic, dark, gw2, havok, rabid, grant, isabella)
 
 Export
   /wrl export           export current run summary (copyable popup)
@@ -107,6 +107,8 @@ Open `/wrl` and click the gear button to choose the account-wide theme, or use `
 - `classic` — Classic WoW / BetterBags-style palette (default).
 - `dark` — the former dark default palette.
 - `gw2` — GW2 UI-inspired palette; only available when [GW2 UI](https://github.com/Mortalknight/GW2_UI) (including the TBC flavor) is installed and enabled.
+- `havok` — black surfaces with electric blue accents.
+- `rabid` — strong blue surfaces with cooler blue-purple accents.
 - `grant` — jewel purples primary, greens secondary.
 - `isabella` — jewel pinks primary, teals secondary.
 

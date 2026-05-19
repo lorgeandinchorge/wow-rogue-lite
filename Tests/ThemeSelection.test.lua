@@ -2,6 +2,7 @@ local addonEnabled = false
 local addonId = "GW2_UI"
 local addonTitle = "GW2 UI"
 local useCAddOns = false
+local cAddOnsEnableStateOrder = "addonFirst"
 
 local function resetHarness(savedTheme)
     WRL_DB = {
@@ -31,7 +32,8 @@ local function resetHarness(savedTheme)
     if useCAddOns then
         _G.C_AddOns = {
             GetAddOnInfo = _G.GetAddOnInfo,
-            GetAddOnEnableState = function(name)
+            GetAddOnEnableState = function(first, second)
+                local name = cAddOnsEnableStateOrder == "playerFirst" and second or first
                 if name == addonId and addonEnabled then
                     return 2
                 end
@@ -198,6 +200,7 @@ end
 
 local function testGw2DetectedThroughCAddOns()
     useCAddOns = true
+    cAddOnsEnableStateOrder = "addonFirst"
     addonEnabled = true
     addonId = "GW2_UI"
     addonTitle = "|cffffedbaGW2 UI|r"
@@ -209,8 +212,21 @@ local function testGw2DetectedThroughCAddOns()
     assertEqual(ns.Theme:HasGW2UI(), true, "HasGW2UI uses C_AddOns when globals are absent")
 end
 
+local function testGw2DetectedThroughCAddOnsPlayerFirstEnableState()
+    useCAddOns = true
+    cAddOnsEnableStateOrder = "playerFirst"
+    addonEnabled = true
+    addonId = "GW2_UI_TBC"
+    addonTitle = "|cffffedbaGW2 UI|r |cFF888888TBC|r"
+    local ns = resetHarness("gw2")
+
+    assertEqual(ns.Theme:HasGW2UI(), true, "HasGW2UI tolerates player-first C_AddOns enable state")
+    assertEqual(ns.Theme:GetActiveThemeId(), "gw2", "saved gw2 activates on first init when player-first C_AddOns reports enabled")
+end
+
 local function testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
     useCAddOns = false
+    cAddOnsEnableStateOrder = "addonFirst"
     addonEnabled = false
     addonId = "GW2_UI"
     addonTitle = "GW2 UI"
@@ -280,6 +296,44 @@ local function testIsabellaThemeCanBeSelected()
     assertEqual(ns.Theme.c.green[2], 0.714, "isabella secondary success uses jewel teal")
 end
 
+local function testHavokThemeCanBeSelected()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok, reason = ns.Theme:SetTheme("havok")
+
+    assertEqual(ok, true, "havok theme selection succeeds")
+    assertEqual(reason, nil, "successful havok selection has no failure reason")
+    assertEqual(ns.Settings:Get("uiTheme"), "havok", "stored setting changes to havok")
+    assertEqual(ns.Theme:GetActiveThemeId(), "havok", "active theme is havok")
+    assertEqual(ns.Theme:ThemeLabel("havok"), "Havok", "havok theme has display label")
+    assertEqual(ns.Theme.c.bg0[1], 0.012, "havok uses black surface red channel")
+    assertEqual(ns.Theme.c.gold[3], 1.000, "havok accent uses electric blue")
+end
+
+local function testRabidThemeCanBeSelected()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok, reason = ns.Theme:SetTheme("rabid")
+
+    assertEqual(ok, true, "rabid theme selection succeeds")
+    assertEqual(reason, nil, "successful rabid selection has no failure reason")
+    assertEqual(ns.Settings:Get("uiTheme"), "rabid", "stored setting changes to rabid")
+    assertEqual(ns.Theme:GetActiveThemeId(), "rabid", "active theme is rabid")
+    assertEqual(ns.Theme:ThemeLabel("rabid"), "Rabid", "rabid theme has display label")
+    assertEqual(ns.Theme.c.bg0[3], 0.180, "rabid uses a stronger blue base")
+    assertEqual(ns.Theme.c.gold[1], 0.400, "rabid accent keeps a cooler blue-purple red channel")
+    assertEqual(ns.Theme.c.fg[1], 0.875, "rabid primary text shifts toward readable purple")
+    assertEqual(ns.Theme.c.fg2[3], 0.940, "rabid secondary text stays bright enough on blue")
+end
+
 local function testPersonalThemesAppearInThemeListOrder()
     useCAddOns = false
     addonEnabled = false
@@ -289,10 +343,14 @@ local function testPersonalThemesAppearInThemeListOrder()
 
     local list = ns.Theme:ThemeList()
 
-    assertEqual(list[4].id, "grant", "grant appears after gw2 in theme list")
-    assertEqual(list[4].available, true, "grant is always available")
-    assertEqual(list[5].id, "isabella", "isabella appears after grant in theme list")
-    assertEqual(list[5].available, true, "isabella is always available")
+    assertEqual(list[4].id, "havok", "havok appears after gw2 in theme list")
+    assertEqual(list[4].available, true, "havok is always available")
+    assertEqual(list[5].id, "rabid", "rabid appears after havok in theme list")
+    assertEqual(list[5].available, true, "rabid is always available")
+    assertEqual(list[6].id, "grant", "grant appears after rabid in theme list")
+    assertEqual(list[6].available, true, "grant is always available")
+    assertEqual(list[7].id, "isabella", "isabella appears after grant in theme list")
+    assertEqual(list[7].available, true, "isabella is always available")
 end
 
 local function testThemeCommandTextUsesThemeOrder()
@@ -302,8 +360,8 @@ local function testThemeCommandTextUsesThemeOrder()
     addonTitle = "GW2 UI"
     local ns = resetHarness()
 
-    assertEqual(ns.Theme:ThemeUsageText(), "classic | dark | gw2 | grant | isabella", "theme usage text follows theme order")
-    assertEqual(ns.Theme:ThemeSentenceText(), "classic, dark, gw2, grant, or isabella", "theme sentence text follows theme order")
+    assertEqual(ns.Theme:ThemeUsageText(), "classic | dark | gw2 | havok | rabid | grant | isabella", "theme usage text follows theme order")
+    assertEqual(ns.Theme:ThemeSentenceText(), "classic, dark, gw2, havok, rabid, grant, or isabella", "theme sentence text follows theme order")
 end
 
 local function testClassicPaletteUsesBetterBagsStyleDefault()
@@ -414,10 +472,13 @@ testGw2VanillaCanBeSelectedWhenAvailable()
 testGw2MistsCanBeSelectedWhenAvailable()
 testGw2WrathCanBeSelectedWhenAvailable()
 testGw2DetectedThroughCAddOns()
+testGw2DetectedThroughCAddOnsPlayerFirstEnableState()
 testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
 testSetThemeRefreshesVisibleUi()
 testGrantThemeCanBeSelected()
 testIsabellaThemeCanBeSelected()
+testHavokThemeCanBeSelected()
+testRabidThemeCanBeSelected()
 testPersonalThemesAppearInThemeListOrder()
 testThemeCommandTextUsesThemeOrder()
 testClassicPaletteUsesBetterBagsStyleDefault()
