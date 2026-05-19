@@ -36,9 +36,13 @@ local function resetHarness()
         return "Runner-Realm"
     end
 
-    function ns.Database:IsBankCharacter()
-        return false
-    end
+function ns.Database:IsBankCharacter()
+    return false
+end
+
+function ns.Database:AccountIdForCharacter()
+    return nil
+end
 
     assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/Requests.lua"))("WoWRoguelite", ns)
@@ -101,6 +105,31 @@ local function testBeginMailFallbackPrefillsMailbox()
     end
 end
 
+local function testFulfillmentMailUsesBankerFlavorAndRewardDetails()
+    local ns = resetHarness()
+    ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
+    ns.Rewards = {
+        BuildRewardForTierIds = function()
+            return { gold = 1234, extraLives = 1, items = { { id = 101, qty = 2 } } }
+        end,
+    }
+
+    local req = { from = "Runner-Realm", tierIds = { 201, 101 } }
+    local subject = ns.Requests:FulfillmentMailSubject(req)
+    local body = ns.Requests:FulfillmentMailBody(req)
+
+    assertEqual(subject, "Roguelite bank release", "fulfillment mail has banker release subject")
+    if not body:find("Withdrawal approved", 1, true) then
+        error("fulfillment mail opens with banker flavor")
+    end
+    if not body:find("Rewards: 101, 201", 1, true) then
+        error("fulfillment mail preserves sorted reward details")
+    end
+    if not body:find("Gold released: 1234c", 1, true) then
+        error("fulfillment mail preserves gold details")
+    end
+end
+
 local function testRequestInventoryScansUseCContainerFallback()
     local ns = resetHarness()
     NUM_BAG_SLOTS = 0
@@ -139,6 +168,7 @@ testMailFallbackSubjectUsesRewardCsv()
 testOutgoingRequestKeepsMailFallbackSubject()
 testMailFallbackBodyNamesRequesterAndRewards()
 testBeginMailFallbackPrefillsMailbox()
+testFulfillmentMailUsesBankerFlavorAndRewardDetails()
 testRequestInventoryScansUseCContainerFallback()
 
 print("RequestMailFallback.test.lua: ok")

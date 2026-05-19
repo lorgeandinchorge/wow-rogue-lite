@@ -130,6 +130,7 @@ function C:Record(characterKey, amount, source, info)
     local receipt = {
         id                = rollId(),
         characterKey      = characterKey,
+        accountId         = ns.Database.AccountIdForCharacter and ns.Database:AccountIdForCharacter(characterKey) or nil,
         when              = now(),
         amount            = amount,
         source            = source or "",

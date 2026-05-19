@@ -138,11 +138,44 @@ function R:OnIncoming(fromKey, tierIds, note, via, requestId)
     local req = {
         id = requestId or newId(), from = fromKey, tierIds = tierIds or {}, note = note or "",
         when = time(), via = via or "unknown", status = REQ_STATUS.PENDING,
+        accountId = ns.Database.AccountIdForCharacter and ns.Database:AccountIdForCharacter(fromKey) or nil,
     }
     table.insert(WRL_DB.requests, req)
     ns:Print("|cffc0a060New legacy reward request|r from %s (rewards %s). Open /wrl to fulfill.",
         fromKey, table.concat(tierIds or {}, ","))
     if ns.MainFrame and ns.MainFrame.Notify then ns.MainFrame:Notify("Rewards") end
+end
+
+local function rewardsLabel(tierIds)
+    local ids = sortedRewardIds(tierIds)
+    if #ids == 0 then return "none recorded" end
+    return table.concat(ids, ", ")
+end
+
+function R:FulfillmentMailSubject(req)
+    return "Roguelite bank release"
+end
+
+function R:FulfillmentMailBody(req, bundle)
+    bundle = bundle or self:Bundle(req)
+    local lines = {
+        "Withdrawal approved.",
+        "",
+        ("Recipient: %s"):format(req.from or "Unknown"),
+        ("Rewards: %s"):format(rewardsLabel(req.tierIds)),
+    }
+    if (bundle.gold or 0) > 0 and ns.Tiers and ns.Tiers.FormatMoney then
+        lines[#lines + 1] = ("Gold released: %s"):format(ns.Tiers:FormatMoney(bundle.gold))
+    end
+    if (bundle.extraLives or 0) > 0 then
+        lines[#lines + 1] = ("Fate adjustment: +%d life"):format(bundle.extraLives)
+    end
+    if #(bundle.items or {}) > 0 then
+        lines[#lines + 1] = ("Attached supplies: %d stack(s) expected"):format(#bundle.items)
+    end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "The ledger is pretending not to judge."
+    return table.concat(lines, "\n")
 end
 
 local function shallowCopyItems(items)
@@ -506,11 +539,9 @@ function R:BeginMailFulfillment(reqId)
     -- doesn't accept "Name-Realm" in all clients.
     local recipient = req.from:match("^([^-]+)") or req.from
     if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
-    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText("Roguelite legacy rewards") end
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(self:FulfillmentMailSubject(req)) end
     if SendMailBodyEditBox then
-        SendMailBodyEditBox:SetText(
-            ("Legacy rewards for your new run.\nRewards: %s\n\nGood luck.")
-                :format(table.concat(req.tierIds, ", ")))
+        SendMailBodyEditBox:SetText(self:FulfillmentMailBody(req, bundle))
     end
 
     -- Gold (MoneyInputFrame API — values in copper).
@@ -613,6 +644,7 @@ function R:MarkFulfilled(reqId)
         when        = now,
         banker      = bankerKey,
         requester   = req.from,
+        accountId   = req.accountId or (ns.Database.AccountIdForCharacter and ns.Database:AccountIdForCharacter(req.from) or nil),
         requestId   = req.id,
         tierIds     = req.tierIds or {},
         items       = shallowCopyItems(bundle.items),

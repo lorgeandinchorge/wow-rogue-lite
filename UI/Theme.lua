@@ -146,7 +146,7 @@ local PALETTES = {
     },
     grant = {
         id = "grant",
-        label = "Grant",
+        label = "Graham",
         c = {
             bg0       = {0.070, 0.060, 0.100, 0.98},
             bg1       = {0.125, 0.105, 0.170, 1.00},

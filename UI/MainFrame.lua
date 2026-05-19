@@ -7,7 +7,7 @@ local M = ns:NewModule("MainFrame")
 
 local TABS = { "Run", "Achievements", "Legacy", "Rewards" }
 local TAB_LABELS = {
-    Run = "Current Run",
+    Run = "Dashboard",
     Achievements = "Achievements",
     Legacy = "Legacy",
     Rewards = "Rewards",
@@ -149,7 +149,7 @@ function M:Init()
         lastTab = "Legacy"
     elseif lastTab == "Requests" or lastTab == "NewRun" then
         lastTab = "Rewards"
-    elseif lastTab == "Rules" then
+    elseif lastTab == "Rules" or lastTab == "Dashboard" or lastTab == "Current Run" then
         lastTab = "Run"
     end
     self:ShowTab(lastTab)

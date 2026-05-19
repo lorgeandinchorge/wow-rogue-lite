@@ -509,10 +509,10 @@ function D:Init()
         button1  = "Pre-Fill Mail",
         button2  = "Later",
         OnAccept = function() ns.Death:OpenMailToBank() end,
-        -- "Later" leaves the contribution pending so the Current Run button
+        -- "Later" leaves the contribution pending so the Dashboard button
         -- or /wrl contribute can prepare the mail when the player is ready.
         OnCancel = function()
-            ns:Print("Contribution deferred. Open Current Run or use /wrl contribute at a mailbox when ready.")
+            ns:Print("Contribution deferred. Open Dashboard or use /wrl contribute at a mailbox when ready.")
         end,
         timeout = 0, whileDead = 1, hideOnEscape = 1, preferredIndex = 3,
     }

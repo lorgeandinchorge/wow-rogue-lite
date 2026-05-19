@@ -31,6 +31,8 @@ WoW Roguelite turns your account into a run-based progression system:
 /wrl help
 /wrl setbank
 /wrl bank
+/wrl dashboard
+/wrl account LABEL Character-Realm
 /wrl settings
 /wrl profile list
 /wrl rules
@@ -84,7 +86,7 @@ If you only have 10 to 15 minutes, please do this section.
 ### 3. Rewards Flow
 
 - [ ] Open the addon on a non-bank character.
-  Expected: the run character can view Current Run, Achievements, Legacy, and Rewards cleanly.
+  Expected: the run character can view Dashboard, Achievements, Legacy, and Rewards cleanly.
 
 - [ ] Open the Rewards tab.
   Expected: it clearly explains where rewards will be sent from.
@@ -98,10 +100,19 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] If rewards are unlocked, try sending a request.
   Expected: the request sends cleanly and the addon gives clear feedback.
 
-### 4. Bank Rewards Flow
+### 4. Bank Desk / Rewards Flow
+
+- [ ] On the bank character, open the Dashboard tab.
+  Expected: the Bank Desk shows pending requests, account contribution summaries, and recent ledger activity.
+
+- [ ] If a requester is unassigned, use **Assign Account** or `/wrl account LABEL Character-Realm`.
+  Expected: the requester rolls up under that account label on the Contribution Board.
+
+- [ ] With a pending request selected by the Bank Desk, click **Prepare Mail** at a mailbox.
+  Expected: the mail recipient, subject, body, and gold are prepared, with final Send still manual.
 
 - [ ] On the bank character, open the Rewards tab.
-  Expected: incoming requests appear clearly.
+  Expected: incoming requests still appear clearly for detailed review.
 
 - [ ] Check whether the shopping list is understandable.
   Expected: needed items, gold, and actions are easy to follow.

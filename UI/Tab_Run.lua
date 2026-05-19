@@ -228,6 +228,93 @@ local function achievementSummaryLine()
     return ("Achievements: %d earned - open Achievements"):format(earnedCount)
 end
 
+local function requestRows()
+    if ns.Requests and ns.Requests.BankRequestRows then
+        return ns.Requests:BankRequestRows() or {}
+    end
+    return WRL_DB and WRL_DB.requests or {}
+end
+
+local function isActionableRequest(req)
+    return req and (req.status == "pending" or req.status == "gathering")
+end
+
+function Tab:_FirstActionableBankRequest(unassignedOnly)
+    for _, req in ipairs(requestRows()) do
+        if isActionableRequest(req) and ((not unassignedOnly) or not req.accountId) then
+            return req
+        end
+    end
+    return nil
+end
+
+local function requestSummaryLine(req)
+    if not req then return "No pending bank requests. Suspiciously peaceful." end
+    local status = req.status or "pending"
+    local account = req.accountId and ns.Database and ns.Database.AccountLabel and ns.Database:AccountLabel(req.accountId) or "Unassigned"
+    return ("%s from %s [%s] - %s"):format(status, shortName(req.from), account, requestTierLabel(req))
+end
+
+local function readinessSummary(req)
+    if not req or not ns.Requests or not ns.Requests.FulfillmentReadiness then
+        return "Mailbox work: nothing ready for the clerk."
+    end
+    local ok, ready = pcall(function() return ns.Requests:FulfillmentReadiness(req) end)
+    if not ok or not ready then return "Mailbox work: readiness unavailable." end
+    local gold = ready.requiredGold or 0
+    local missingGold = math.max(0, gold - (ready.availableGold or 0))
+    local missingItems = #(ready.missingItems or {})
+    if ready.fulfillable then
+        return ("Ready to prepare mail: %s plus listed supplies. The vault has stopped sighing."):format(ns.Tiers:FormatMoney(gold))
+    end
+    return ("Missing for next mail: %d item line(s), %s. The ledger has concerns."):format(missingItems, ns.Tiers:FormatMoney(missingGold))
+end
+
+local function appendContributionBoard(lines, maxAccounts, maxCharacters)
+    lines[#lines + 1] = "|cffc0a060Contribution Board|r"
+    local rows = ns.Database and ns.Database.AccountContributionRows and ns.Database:AccountContributionRows() or {}
+    if #rows == 0 then
+        lines[#lines + 1] = "No account contributions recorded yet. The vault remains emotionally available."
+        return
+    end
+    for i = 1, math.min(maxAccounts or 4, #rows) do
+        local row = rows[i]
+        lines[#lines + 1] = ("%s - %s (%.1f%% of the paperwork)"):format(
+            row.label or "Unassigned",
+            ns.Tiers:FormatMoney(row.total or 0),
+            row.percent or 0)
+        for j = 1, math.min(maxCharacters or 3, #(row.characters or {})) do
+            local c = row.characters[j]
+            lines[#lines + 1] = (" - %s: %s"):format(c.characterKey or "Unknown", ns.Tiers:FormatMoney(c.total or 0))
+        end
+    end
+end
+
+local function appendRecentLedger(lines, maxRows)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "|cffc0a060Recent ledger|r"
+    local rows = ns.Database and ns.Database.RecentBankLedgerRows and ns.Database:RecentBankLedgerRows(maxRows or 6) or {}
+    if #rows == 0 then
+        lines[#lines + 1] = "No recent ledger activity. The ink is getting ideas."
+        return
+    end
+    for _, row in ipairs(rows) do
+        if row.kind == "fulfillment" then
+            lines[#lines + 1] = (" - %s fulfilled for %s (%s, %s)"):format(
+                fmtWhen(row.when),
+                row.characterKey or "Unknown",
+                row.accountLabel or "Unassigned",
+                row.method or "manual")
+        else
+            lines[#lines + 1] = (" - %s contribution from %s (%s): %s"):format(
+                fmtWhen(row.when),
+                row.characterKey or "Unknown",
+                row.accountLabel or "Unassigned",
+                ns.Tiers:FormatMoney(row.amount or 0))
+        end
+    end
+end
+
 local function writeLines(target, lines)
     for i = 1, #target do
         local fs = target[i]
@@ -239,6 +326,178 @@ local function writeLines(target, lines)
             fs:Hide()
         end
     end
+end
+
+local function hideLines(lines)
+    for _, fs in ipairs(lines or {}) do
+        fs:Hide()
+    end
+end
+
+local function splitBankSections(lines)
+    local desk = {}
+    local contributions = {}
+    local ledger = {}
+    local target = desk
+    for i, line in ipairs(lines or {}) do
+        if i == 1 then
+            -- The framed section title owns this heading.
+        elseif line == "|cffc0a060Contribution Board|r" then
+            target = contributions
+        elseif line == "" then
+            target = ledger
+        elseif line == "|cffc0a060Recent ledger|r" then
+            target = ledger
+        else
+            target[#target + 1] = line
+        end
+    end
+    return desk, contributions, ledger
+end
+
+local setLedgerSection
+
+local function buildBankSection(content, Theme, titleText)
+    local section = CreateFrame("Frame", nil, content)
+    section:SetWidth(420)
+    Theme:Fill(section, Theme.c.bg1, true, "panel")
+    section.borderLeft = section:CreateTexture(nil, "BORDER")
+    section.borderLeft:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
+    section.borderLeft:SetPoint("TOPLEFT", 0, 0)
+    section.borderLeft:SetPoint("BOTTOMLEFT", 0, 0)
+    section.borderLeft:SetWidth(1)
+    section.borderRight = section:CreateTexture(nil, "BORDER")
+    section.borderRight:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
+    section.borderRight:SetPoint("TOPRIGHT", 0, 0)
+    section.borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
+    section.borderRight:SetWidth(1)
+
+    local title = Theme:Text(section, 12, Theme.c.goldH)
+    section.title = title
+    title:SetPoint("TOPLEFT", 12, -10)
+    title:SetText(titleText or "")
+    if title.SetFont then
+        title:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    end
+
+    section.lines = {}
+    for i = 1, 16 do
+        local fs = Theme:Text(section, 10, Theme.c.fg2)
+        fs:SetWidth(396)
+        fs:SetJustifyH("LEFT")
+        fs:SetSpacing(2)
+        section.lines[i] = fs
+    end
+
+    return section
+end
+
+local function buildLedgerSection(content, Theme)
+    local ledger = buildBankSection(content, Theme, "Recent Ledger")
+    ledger:SetHeight(176)
+    for _, fs in ipairs(ledger.lines or {}) do fs:Hide() end
+
+    ledger.searchBox = CreateFrame("EditBox", nil, ledger, "InputBoxTemplate")
+    ledger.searchBox:SetSize(180, 18)
+    ledger.searchBox:SetPoint("TOPLEFT", ledger.title, "BOTTOMLEFT", 0, -8)
+    ledger.searchBox:SetAutoFocus(false)
+    ledger.searchBox:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "")
+    ledger.searchBox:SetTextInsets(4, 4, 0, 0)
+    ledger.searchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    ledger.searchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    ledger.searchBox:SetScript("OnTextChanged", function()
+        if setLedgerSection then
+            setLedgerSection(ledger, ledger._allLines or {})
+        end
+    end)
+
+    local searchHint = Theme:Text(ledger, 9, Theme.c.fg2)
+    ledger.searchHint = searchHint
+    searchHint:SetPoint("LEFT", ledger.searchBox, "RIGHT", 6, 0)
+    searchHint:SetText("Search")
+
+    local ledgerScroll, ledgerContent = Theme:ScrollArea(ledger)
+    ledgerScroll:SetPoint("TOPLEFT", ledger.searchBox, "BOTTOMLEFT", 0, -8)
+    ledgerScroll:SetPoint("BOTTOMRIGHT", ledger, "BOTTOMRIGHT", -24, 10)
+    ledgerContent:SetSize(372, 1)
+    ledger.scroll = ledgerScroll
+    ledger.content = ledgerContent
+    ledger.ledgerLines = {}
+    for i = 1, 50 do
+        local fs = Theme:Text(ledgerContent, 10, Theme.c.fg2)
+        fs:SetWidth(372)
+        fs:SetJustifyH("LEFT")
+        fs:SetSpacing(2)
+        if i == 1 then
+            fs:SetPoint("TOPLEFT", 0, -2)
+        else
+            fs:SetPoint("TOPLEFT", ledger.ledgerLines[i - 1], "BOTTOMLEFT", 0, -4)
+        end
+        ledger.ledgerLines[i] = fs
+    end
+
+    return ledger
+end
+
+local function setBankSection(section, lines)
+    if not section then return 0 end
+    local prev = section.title
+    local height = 30
+    for i, fs in ipairs(section.lines or {}) do
+        local text = lines and lines[i]
+        fs:ClearAllPoints()
+        if text and text ~= "" then
+            fs:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -5)
+            fs:SetText(text)
+            fs:Show()
+            prev = fs
+            height = height + 16
+        else
+            fs:Hide()
+        end
+    end
+    section:SetHeight(math.max(72, height + 10))
+    section:Show()
+    return section:GetHeight()
+end
+
+setLedgerSection = function(section, lines)
+    if not section then return 0 end
+    section._allLines = lines or {}
+    local query = ""
+    if section.searchBox and section.searchBox.GetText then
+        query = (section.searchBox:GetText() or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    end
+
+    local filtered = {}
+    for _, line in ipairs(lines or {}) do
+        local plain = tostring(line or "")
+        if query == "" or plain:lower():find(query, 1, true) then
+            filtered[#filtered + 1] = plain
+        end
+    end
+    if #filtered == 0 then
+        filtered[1] = query ~= "" and "No ledger entries match that search." or "No recent ledger activity. The ink is getting ideas."
+    end
+
+    for i, fs in ipairs(section.ledgerLines or {}) do
+        local text = filtered[i]
+        if text and text ~= "" then
+            fs:SetText(text)
+            fs:Show()
+        else
+            fs:Hide()
+        end
+    end
+    if section.content then
+        section.content:SetHeight(math.max(1, (#filtered * 18) + 10))
+    end
+    if section.scroll then
+        section.scroll:SetVerticalScroll(0)
+    end
+    section:SetHeight(176)
+    section:Show()
+    return section:GetHeight()
 end
 
 function Tab:_BuildBankerOverviewLines(key)
@@ -261,21 +520,66 @@ function Tab:_BuildBankerOverviewLines(key)
         achievementSummaryLine(),
     }
 
+    local pending, gathering, fulfilled, unassigned = 0, 0, 0, 0
+    for _, req in ipairs(requestRows()) do
+        if req.status == "pending" then pending = pending + 1 end
+        if req.status == "gathering" then gathering = gathering + 1 end
+        if req.status == "fulfilled" then fulfilled = fulfilled + 1 end
+        if isActionableRequest(req) and not req.accountId then unassigned = unassigned + 1 end
+    end
+
+    local nextReq = self:_FirstActionableBankRequest(false)
     local right = {
-        "|cffc0a060Character status|r",
-        "This character is marked as the legacy bank.",
-        "Bank characters do not run roguelite lives.",
-        "Deaths on this character do not retire account progress.",
-        "",
-        "|cffc0a060Estimated contribution|r",
-        ("Estimated contribution: %s"):format(fmtMoney(0)),
-        "",
-        "|cffc0a060Run audit|r",
-        "Recent contribution receipts: none",
-        "Recent taint/warning entries: none",
+        "|cffc0a060Bank Desk|r",
+        ("%d request(s) need attention: %d pending, %d preparing."):format(pending + gathering, pending, gathering),
+        ("Fulfilled in the ledger: %d. Unassigned requester(s): %d."):format(fulfilled, unassigned),
+        requestSummaryLine(nextReq),
+        readinessSummary(nextReq),
     }
+    appendContributionBoard(right, 4, 3)
+    appendRecentLedger(right, 50)
 
     return left, right
+end
+
+function Tab:PromptAssignAccount(req)
+    if not req or not req.from then return end
+    if not StaticPopupDialogs or not StaticPopup_Show then
+        ns:Print("Assign account with |cffffff00/wrl account LABEL %s|r.", req.from)
+        return
+    end
+    StaticPopupDialogs["WRL_ACCOUNT_LABEL"] = StaticPopupDialogs["WRL_ACCOUNT_LABEL"] or {
+        text = "Assign %s to account label:",
+        button1 = "Assign",
+        button2 = "Cancel",
+        hasEditBox = 1,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        OnAccept = function(popup, characterKey)
+            local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+            local label = editBox and editBox:GetText() or ""
+            if label and label ~= "" and ns.Database and ns.Database.AssignCharacterToAccountLabel then
+                local account = ns.Database:AssignCharacterToAccountLabel(characterKey, label)
+                for _, r in ipairs(WRL_DB.requests or {}) do
+                    if r.from == characterKey then r.accountId = account and account.id or r.accountId end
+                end
+                ns:Print("Assigned %s to account %s.", characterKey, account and account.label or label)
+                if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then ns.MainFrame:RefreshCurrentTab() end
+            end
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local popup = editBox:GetParent()
+            local characterKey = popup.data
+            StaticPopupDialogs["WRL_ACCOUNT_LABEL"].OnAccept(popup, characterKey)
+            popup:Hide()
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            editBox:GetParent():Hide()
+        end,
+    }
+    local popup = StaticPopup_Show("WRL_ACCOUNT_LABEL", req.from)
+    if popup then popup.data = req.from end
 end
 
 function Tab:_ShouldShowContributionAction(rec)
@@ -291,7 +595,7 @@ function Tab:Init(parent)
     self.panel = p
     ns.MainFrame:RegisterPanel("Run", p)
 
-    local title = Theme:Header(p, "Current Run", 16)
+    local title = Theme:Header(p, "Dashboard", 16)
     title:SetPoint("TOPLEFT", 20, -18)
 
     self.hint = Theme:Text(p, 11, Theme.c.fg2)
@@ -307,12 +611,49 @@ function Tab:Init(parent)
     end)
     self.contributionButton:Hide()
 
+    self.bankMailButton = Theme:Button(p, "Prepare Mail", 118, 22)
+    self.bankMailButton:SetPoint("TOPRIGHT", -20, -18)
+    self.bankMailButton:SetScript("OnClick", function()
+        local req = Tab:_FirstActionableBankRequest(false)
+        if req and ns.Requests and ns.Requests.BeginMailFulfillment then
+            ns.Requests:BeginMailFulfillment(req.id)
+        else
+            ns:Print("No pending bank request is ready for mail.")
+        end
+    end)
+    self.bankMailButton:Hide()
+
+    self.bankDoneButton = Theme:Button(p, "Mark Fulfilled", 122, 22)
+    self.bankDoneButton:SetPoint("TOPRIGHT", self.bankMailButton, "TOPLEFT", -6, 0)
+    self.bankDoneButton:SetScript("OnClick", function()
+        local req = Tab:_FirstActionableBankRequest(false)
+        if req and ns.Requests and ns.Requests.MarkFulfilled then
+            ns.Requests:MarkFulfilled(req.id)
+            Tab:Refresh()
+        else
+            ns:Print("No pending bank request to mark fulfilled.")
+        end
+    end)
+    self.bankDoneButton:Hide()
+
+    self.bankAssignButton = Theme:Button(p, "Assign Account", 126, 22)
+    self.bankAssignButton:SetPoint("TOPRIGHT", self.bankDoneButton, "TOPLEFT", -6, 0)
+    self.bankAssignButton:SetScript("OnClick", function()
+        local req = Tab:_FirstActionableBankRequest(true)
+        if req then
+            Tab:PromptAssignAccount(req)
+        else
+            ns:Print("No unassigned pending requester at the Bank Desk.")
+        end
+    end)
+    self.bankAssignButton:Hide()
+
     Theme:Divider(p, "TOPLEFT", "TOPRIGHT", 0, -54, 0.2)
 
     local left = CreateFrame("Frame", nil, p)
     left:SetPoint("TOPLEFT", 20, -64)
     left:SetPoint("BOTTOMLEFT", 20, 18)
-    left:SetWidth(352)
+    left:SetWidth(304)
 
     local right = CreateFrame("Frame", nil, p)
     right:SetPoint("TOPLEFT", left, "TOPRIGHT", 16, 0)
@@ -324,7 +665,7 @@ function Tab:Init(parent)
     self.leftLines = {}
     for i = 1, 18 do
         local fs = Theme:Text(left, 11, Theme.c.fg)
-        fs:SetWidth(348)
+        fs:SetWidth(300)
         fs:SetJustifyH("LEFT")
         if i == 1 then
             fs:SetPoint("TOPLEFT", self.leftTitle, "BOTTOMLEFT", 0, -8)
@@ -337,15 +678,22 @@ function Tab:Init(parent)
     local scroll, content = Theme:ScrollArea(right)
     scroll:SetPoint("TOPLEFT", 0, -2)
     scroll:SetPoint("BOTTOMRIGHT", 0, 0)
-    content:SetSize(372, 1)
+    content:SetSize(420, 1)
     self.scroll = scroll
     self.content = content
+    self.bankDeskSection = buildBankSection(content, Theme, "Bank Desk")
+    self.bankDeskSection:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -2)
+    self.bankDeskSection:Hide()
+    self.bankContributionSection = buildBankSection(content, Theme, "Contribution Board")
+    self.bankContributionSection:Hide()
+    self.bankLedgerSection = buildLedgerSection(content, Theme)
+    self.bankLedgerSection:Hide()
 
     self.rightLines = {}
     local prev = nil
     for i = 1, 60 do
         local fs = Theme:Text(content, 10, Theme.c.fg2)
-        fs:SetWidth(360)
+        fs:SetWidth(408)
         fs:SetJustifyH("LEFT")
         if i == 1 then
             fs:SetPoint("TOPLEFT", 0, -2)
@@ -366,6 +714,9 @@ function Tab:Refresh()
     local key = ns:UnitKey()
     local rec = key and ns.Database and ns.Database.GetCharacter and ns.Database:GetCharacter(key) or nil
     if not key or not rec then
+        if self.bankDeskSection then self.bankDeskSection:Hide() end
+        if self.bankContributionSection then self.bankContributionSection:Hide() end
+        if self.bankLedgerSection then self.bankLedgerSection:Hide() end
         writeLines(self.leftLines, {
             "Character: unavailable",
             "Run data has not initialized yet.",
@@ -381,17 +732,42 @@ function Tab:Refresh()
     local name, realm = withRealm(key)
     if ns.Database:IsBankCharacter(key) then
         if self.contributionButton then self.contributionButton:Hide() end
-        self.hint:SetText("Character-focused dashboard for the logged-in bank character.")
-        self.leftTitle:SetText("Character Dashboard")
+        local actionReq = self:_FirstActionableBankRequest(false)
+        local unassignedReq = self:_FirstActionableBankRequest(true)
+        if self.bankMailButton then
+            if actionReq then self.bankMailButton:Show() else self.bankMailButton:Hide() end
+        end
+        if self.bankDoneButton then
+            if actionReq then self.bankDoneButton:Show() else self.bankDoneButton:Hide() end
+        end
+        if self.bankAssignButton then
+            if unassignedReq then self.bankAssignButton:Show() else self.bankAssignButton:Hide() end
+        end
+        self.hint:SetText("Bank Desk dashboard: requests, account contributions, and recent ledger work.")
+        self.leftTitle:SetText("Bank Snapshot")
         local left, right = self:_BuildBankerOverviewLines(key)
         writeLines(self.leftLines, left)
-        writeLines(self.rightLines, right)
-        self.content:SetHeight(math.max(1, (#right * 16) + 20))
+        hideLines(self.rightLines)
+        local deskLines, contributionLines, ledgerLines = splitBankSections(right)
+        local deskH = setBankSection(self.bankDeskSection, deskLines)
+        self.bankContributionSection:ClearAllPoints()
+        self.bankContributionSection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        local contributionH = setBankSection(self.bankContributionSection, contributionLines)
+        self.bankLedgerSection:ClearAllPoints()
+        self.bankLedgerSection:SetPoint("TOPLEFT", self.bankContributionSection, "BOTTOMLEFT", 0, -10)
+        local ledgerH = setLedgerSection(self.bankLedgerSection, ledgerLines)
+        self.content:SetHeight(math.max(1, deskH + contributionH + ledgerH + 46))
         self.scroll:SetVerticalScroll(0)
         return
     end
 
     self.hint:SetText("Character-focused dashboard for the logged-in runner.")
+    if self.bankDeskSection then self.bankDeskSection:Hide() end
+    if self.bankContributionSection then self.bankContributionSection:Hide() end
+    if self.bankLedgerSection then self.bankLedgerSection:Hide() end
+    if self.bankMailButton then self.bankMailButton:Hide() end
+    if self.bankDoneButton then self.bankDoneButton:Hide() end
+    if self.bankAssignButton then self.bankAssignButton:Hide() end
     self.leftTitle:SetText("Character Dashboard")
 
     local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"

@@ -260,7 +260,7 @@ local function testSetThemeRefreshesVisibleUi()
     assertEqual(refreshed, true, "theme selection refreshes visible UI")
 end
 
-local function testGrantThemeCanBeSelected()
+local function testGrahamThemeCanBeSelected()
     useCAddOns = false
     addonEnabled = false
     addonId = "GW2_UI"
@@ -269,13 +269,13 @@ local function testGrantThemeCanBeSelected()
 
     local ok, reason = ns.Theme:SetTheme("grant")
 
-    assertEqual(ok, true, "grant theme selection succeeds")
-    assertEqual(reason, nil, "successful grant selection has no failure reason")
+    assertEqual(ok, true, "graham theme selection succeeds")
+    assertEqual(reason, nil, "successful graham selection has no failure reason")
     assertEqual(ns.Settings:Get("uiTheme"), "grant", "stored setting changes to grant")
     assertEqual(ns.Theme:GetActiveThemeId(), "grant", "active theme is grant")
-    assertEqual(ns.Theme:ThemeLabel("grant"), "Grant", "grant theme has display label")
-    assertEqual(ns.Theme.c.gold[1], 0.486, "grant primary accent uses jewel purple")
-    assertEqual(ns.Theme.c.green[2], 0.659, "grant secondary success uses jewel green")
+    assertEqual(ns.Theme:ThemeLabel("grant"), "Graham", "grant theme has Graham display label")
+    assertEqual(ns.Theme.c.gold[1], 0.486, "graham primary accent uses jewel purple")
+    assertEqual(ns.Theme.c.green[2], 0.659, "graham secondary success uses jewel green")
 end
 
 local function testIsabellaThemeCanBeSelected()
@@ -475,7 +475,7 @@ testGw2DetectedThroughCAddOns()
 testGw2DetectedThroughCAddOnsPlayerFirstEnableState()
 testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
 testSetThemeRefreshesVisibleUi()
-testGrantThemeCanBeSelected()
+testGrahamThemeCanBeSelected()
 testIsabellaThemeCanBeSelected()
 testHavokThemeCanBeSelected()
 testRabidThemeCanBeSelected()

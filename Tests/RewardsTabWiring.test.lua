@@ -22,6 +22,7 @@ local function testMainFrameUsesSingleRewardsTab()
 
     assertContains(src, 'local TABS = { "Run", "Achievements", "Legacy", "Rewards" }',
         "main tab order should combine New Run and Requests into Rewards")
+    assertContains(src, 'Run = "Dashboard"', "Run tab should be visibly labeled Dashboard")
     assertContains(src, 'Rewards = "Rewards"', "Rewards tab should have a visible label")
     assertContains(src, "ns.Tab_Rewards:Init(body)", "MainFrame should initialize the Rewards panel")
     assertNotContains(src, 'Requests = "Requests"', "Requests should not remain a top-level tab")

@@ -1,5 +1,15 @@
 # WoW Roguelite Changelog
 
+## v0.3.1
+
+- Rename the visible Current Run tab to Dashboard while preserving the internal Run panel and saved-tab migration.
+- Add the first Bank Desk dashboard for bank characters, with pending request attention, account-grouped contribution board, recent ledger lines, and fulfillment action buttons.
+- Add account grouping storage and helpers for manual tester/player labels, character-to-account links, and account-level contribution rollups.
+- Store account metadata on new contribution receipts, reward requests, and fulfillment receipts while keeping character-level detail intact.
+- Add dry banker flavor to prepared reward mail while preserving Blizzard's manual Send boundary.
+- Add `/wrl account LABEL Character-Realm` for assigning tester characters to account labels.
+- Add regression coverage for account migration/linking, account rollups, Dashboard labeling, and Bank Desk summaries.
+
 ## v0.3.0b
 
 - Add Havok and Rabid as always-available UI themes.
@@ -91,7 +101,7 @@
 
 ## v0.2.1
 
-- Add Grant and Isabella personal UI themes.
+- Add Graham and Isabella personal UI themes.
 - Generate slash-command theme help from the theme registry so future theme IDs stay in sync.
 - Document that the project was built with AI assistance under human direction, review, and testing.
 

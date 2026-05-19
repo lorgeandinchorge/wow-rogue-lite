@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.3.0b"
+ns.version     = "0.3.1"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -114,6 +114,25 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("Bank character: %s", key or "not set (use /wrl setbank Name-Realm)")
     elseif cmd == "request" then
         ns.MainFrame:ShowTab("Rewards")
+    elseif cmd == "dashboard" or cmd == "dash" then
+        ns.MainFrame:ShowTab("Run")
+    elseif cmd == "account" then
+        local label, characterKey = rest:match("^(%S+)%s+(.+)$")
+        if not label or label == "" then
+            ns:Print("Usage: /wrl account LABEL Character-Realm")
+        elseif not (ns.Database and ns.Database.AssignCharacterToAccountLabel) then
+            ns:Print("Account grouping is not ready yet.")
+        else
+            characterKey = characterKey and characterKey:gsub("^%s+", ""):gsub("%s+$", "") or ns:UnitKey()
+            local account = ns.Database:AssignCharacterToAccountLabel(characterKey, label)
+            for _, req in ipairs((WRL_DB and WRL_DB.requests) or {}) do
+                if req.from == characterKey then req.accountId = account and account.id or req.accountId end
+            end
+            ns:Print("Assigned %s to account %s.", characterKey, account and account.label or label)
+            if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+                ns.MainFrame:RefreshCurrentTab()
+            end
+        end
     elseif cmd == "contribute" or cmd == "contribution" then
         if ns.Death and ns.Death.PrepareContributionMail then
             ns.Death:PrepareContributionMail()
@@ -261,7 +280,9 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl setbank        - mark current char as the bank")
         ns:Print("  /wrl setbank NAME   - set an external bank character")
         ns:Print("  /wrl bank           - show current bank char")
+        ns:Print("  /wrl dashboard      - open the Dashboard tab")
         ns:Print("  /wrl request        - open the Rewards tab")
+        ns:Print("  /wrl account L C-R  - assign Character-Realm to account label L")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")
         ns:Print("  /wrl sellfinal      - sell bags and equipped gear at the current vendor")
         ns:Print("  /wrl settings       - print current settings to chat")

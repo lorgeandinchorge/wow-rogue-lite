@@ -35,9 +35,9 @@ end
 local function testCurrentRunOnlyPointsToAchievementsTab()
     local src = readFile("UI/Tab_Run.lua")
 
-    assertContains(src, "open Achievements", "Current Run should keep a compact Achievements pointer")
-    assertNotContains(src, "VisibleDefinitions", "Current Run should not browse achievement definitions")
-    assertNotContains(src, "GetAchievements()", "Current Run should not browse the achievement ledger directly")
+    assertContains(src, "open Achievements", "Dashboard should keep a compact Achievements pointer")
+    assertNotContains(src, "VisibleDefinitions", "Dashboard should not browse achievement definitions")
+    assertNotContains(src, "GetAchievements()", "Dashboard should not browse the achievement ledger directly")
 end
 
 testMainFrameRegistersAchievementsTab()

@@ -9,7 +9,7 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Database")
 
-local SCHEMA_VERSION = 11
+local SCHEMA_VERSION = 12
 
 local function normalizeCharacterKey(key)
     if not key or key == "" then return nil end
@@ -54,6 +54,8 @@ local function defaults()
         achievements         = {}, -- [achievementId] = { when, characterKey }; owned by Core/Achievements.lua
         legacyUnlocks        = {}, -- [storage|stipend|fate] = purchased rank count
         legacySpent          = 0,  -- copper spent from lifetime contribution budget
+        accounts             = {}, -- [accountId] = { id, label, createdAt }
+        accountLinks         = {}, -- [Character-Realm] = accountId
     }
 end
 
@@ -159,10 +161,17 @@ function D:Init()
         if WRL_DB.schema < 11 then
             WRL_DB.contributionMail = WRL_DB.contributionMail or {}
         end
+        if WRL_DB.schema < 12 then
+            WRL_DB.accounts = WRL_DB.accounts or {}
+            WRL_DB.accountLinks = WRL_DB.accountLinks or {}
+        end
         WRL_DB.schema = SCHEMA_VERSION
     end
 
     WRL_DB.achievements = WRL_DB.achievements or {}
+    WRL_DB.accounts = WRL_DB.accounts or {}
+    WRL_DB.accountLinks = WRL_DB.accountLinks or {}
+    self:EnsureDefaultAccount()
     WRL_DB.contributionMail = WRL_DB.contributionMail or {}
     WRL_DB.contributionMail.outbox = WRL_DB.contributionMail.outbox or {}
     WRL_DB.contributionMail.inbox = WRL_DB.contributionMail.inbox or {}
@@ -193,6 +202,9 @@ function D:Init()
         if rec.visitedInstances == nil then rec.visitedInstances = {} end
         if rec.boons            == nil then rec.boons            = {} end
         if rec.burdens          == nil then rec.burdens          = {} end
+        if not WRL_DB.accountLinks[rec.key or storageKey] then
+            WRL_DB.accountLinks[rec.key or storageKey] = "acct-local"
+        end
     end
 
     self:EnsureCharacter(ns:UnitKey())
@@ -204,6 +216,9 @@ end
 -- unique key ("Name-Realm#createdAt") and a fresh record takes the primary slot.
 function D:EnsureCharacter(key)
     if not key then return end
+    WRL_DB.accounts = WRL_DB.accounts or {}
+    WRL_DB.accountLinks = WRL_DB.accountLinks or {}
+    self:EnsureDefaultAccount()
     local rec = WRL_DB.characters[key]
     local _, currentClass = UnitClass("player")
     currentClass = currentClass or ""
@@ -257,6 +272,9 @@ function D:EnsureCharacter(key)
         if rec.visitedInstances == nil then rec.visitedInstances = {} end
         if rec.boons            == nil then rec.boons            = {} end
         if rec.burdens          == nil then rec.burdens          = {} end
+    end
+    if rec.key and not WRL_DB.accountLinks[rec.key] then
+        WRL_DB.accountLinks[rec.key] = "acct-local"
     end
     return rec
 end
@@ -360,6 +378,175 @@ end
 -- Convenience accessors -----------------------------------------------------
 
 function D:TotalContributed() return WRL_DB.totalContributed or 0 end
+
+-- Account grouping ---------------------------------------------------------
+-- These helpers deliberately use manual, stable account labels.  WoW does not
+-- expose a reliable cross-player Battle.net account identity for addon data.
+
+local function accountSlug(label)
+    label = tostring(label or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    label = label:gsub("[^%w]+", "-"):gsub("^%-+", ""):gsub("%-+$", "")
+    if label == "" then label = "account" end
+    return label
+end
+
+function D:EnsureDefaultAccount()
+    WRL_DB.accounts = WRL_DB.accounts or {}
+    WRL_DB.accountLinks = WRL_DB.accountLinks or {}
+    if not WRL_DB.accounts["acct-local"] then
+        WRL_DB.accounts["acct-local"] = {
+            id = "acct-local",
+            label = "Local Account",
+            createdAt = time and time() or 0,
+        }
+    end
+    return WRL_DB.accounts["acct-local"]
+end
+
+function D:CreateAccount(label)
+    self:EnsureDefaultAccount()
+    label = tostring(label or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if label == "" then label = "Account" end
+
+    for _, account in pairs(WRL_DB.accounts or {}) do
+        if account.label == label then return account end
+    end
+
+    local base = "acct-" .. accountSlug(label)
+    local id = base
+    local i = 2
+    while WRL_DB.accounts[id] do
+        id = base .. "-" .. tostring(i)
+        i = i + 1
+    end
+
+    local account = { id = id, label = label, createdAt = time and time() or 0 }
+    WRL_DB.accounts[id] = account
+    return account
+end
+
+function D:LinkCharacterToAccount(characterKey, accountId)
+    if not characterKey or characterKey == "" then return nil end
+    self:EnsureDefaultAccount()
+    if not accountId or not WRL_DB.accounts[accountId] then
+        accountId = "acct-local"
+    end
+    WRL_DB.accountLinks[characterKey] = accountId
+    return WRL_DB.accounts[accountId]
+end
+
+function D:AccountIdForCharacter(characterKey)
+    self:EnsureDefaultAccount()
+    if not characterKey or characterKey == "" then return nil end
+    return WRL_DB.accountLinks and WRL_DB.accountLinks[characterKey] or nil
+end
+
+function D:AccountForCharacter(characterKey)
+    local accountId = self:AccountIdForCharacter(characterKey)
+    if not accountId then return nil end
+    return WRL_DB.accounts and WRL_DB.accounts[accountId] or nil
+end
+
+function D:AccountLabel(accountId)
+    local account = accountId and WRL_DB.accounts and WRL_DB.accounts[accountId]
+    return account and account.label or "Unassigned"
+end
+
+function D:AccountLabelForCharacter(characterKey)
+    local account = self:AccountForCharacter(characterKey)
+    return account and account.label or "Unassigned"
+end
+
+function D:AssignCharacterToAccountLabel(characterKey, label)
+    if not characterKey or characterKey == "" then return nil end
+    local account = self:CreateAccount(label)
+    self:LinkCharacterToAccount(characterKey, account.id)
+    return account
+end
+
+function D:AccountContributionRows()
+    self:EnsureDefaultAccount()
+    local grouped = {}
+    local total = 0
+
+    for _, receipt in ipairs(WRL_DB.contributionReceipts or {}) do
+        local amount = math.max(0, math.floor(receipt.amount or receipt.copper or 0))
+        if amount > 0 then
+            total = total + amount
+            local accountId = receipt.accountId or self:AccountIdForCharacter(receipt.characterKey) or "unassigned"
+            local row = grouped[accountId]
+            if not row then
+                row = {
+                    accountId = accountId,
+                    label = accountId == "unassigned" and "Unassigned" or self:AccountLabel(accountId),
+                    total = 0,
+                    charactersByKey = {},
+                    characters = {},
+                }
+                grouped[accountId] = row
+            end
+            row.total = row.total + amount
+            local characterKey = receipt.characterKey or "Unknown"
+            local character = row.charactersByKey[characterKey]
+            if not character then
+                character = { characterKey = characterKey, total = 0 }
+                row.charactersByKey[characterKey] = character
+                row.characters[#row.characters + 1] = character
+            end
+            character.total = character.total + amount
+        end
+    end
+
+    local rows = {}
+    for _, row in pairs(grouped) do
+        row.percent = total > 0 and ((row.total / total) * 100) or 0
+        row.charactersByKey = nil
+        table.sort(row.characters, function(a, b)
+            if (a.total or 0) == (b.total or 0) then
+                return tostring(a.characterKey) < tostring(b.characterKey)
+            end
+            return (a.total or 0) > (b.total or 0)
+        end)
+        rows[#rows + 1] = row
+    end
+    table.sort(rows, function(a, b)
+        if (a.total or 0) == (b.total or 0) then
+            return tostring(a.label) < tostring(b.label)
+        end
+        return (a.total or 0) > (b.total or 0)
+    end)
+    return rows
+end
+
+function D:RecentBankLedgerRows(maxRows)
+    maxRows = maxRows or 8
+    local rows = {}
+    for _, r in ipairs(WRL_DB.contributionReceipts or {}) do
+        rows[#rows + 1] = {
+            kind = "contribution",
+            when = r.when or 0,
+            characterKey = r.characterKey,
+            accountId = r.accountId or self:AccountIdForCharacter(r.characterKey),
+            accountLabel = self:AccountLabel(r.accountId or self:AccountIdForCharacter(r.characterKey)),
+            amount = r.amount or 0,
+            source = r.source,
+        }
+    end
+    for _, f in ipairs(WRL_DB.fulfillmentReceipts or {}) do
+        rows[#rows + 1] = {
+            kind = "fulfillment",
+            when = f.when or 0,
+            characterKey = f.requester,
+            accountId = f.accountId or self:AccountIdForCharacter(f.requester),
+            accountLabel = self:AccountLabel(f.accountId or self:AccountIdForCharacter(f.requester)),
+            amount = f.gold or 0,
+            method = f.method,
+        }
+    end
+    table.sort(rows, function(a, b) return (a.when or 0) > (b.when or 0) end)
+    while #rows > maxRows do table.remove(rows) end
+    return rows
+end
 
 -- Returns every character record (current + archived) as a flat list.
 -- Sorting is left to the caller so the UI can apply its own priority
