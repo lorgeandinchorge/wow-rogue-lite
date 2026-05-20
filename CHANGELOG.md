@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.3.4
+
+- Add full item-availability lines to Bank Desk request readiness so bankers can see ready and missing stacks together.
+- Add gold availability lines to Bank Desk and fulfillment mail prep instead of only reporting missing totals.
+- Add an item checklist to prepared reward mail bodies so manual attachments are easier to verify before pressing Send.
+- Increase Bank Desk section heading/body text sizes for cleaner scanning in the dashboard.
+- Add regression coverage for Bank Desk readiness lines and prepared fulfillment mail checklist output.
+
 ## v0.3.3
 
 - Move boons and burdens out of the Rewards tab and into Settings under a dedicated **Run Modifiers** section.

@@ -22,11 +22,19 @@ local function resetHarness()
     _G.GetContainerItemInfo = nil
     _G.C_Container = nil
 
+    local prints = {}
     local ns = {
         Database = {},
         Debug = function() end,
-        Print = function() end,
+        Print = function(_, msg, ...)
+            if select("#", ...) > 0 then
+                prints[#prints + 1] = string.format(msg, ...)
+            else
+                prints[#prints + 1] = msg
+            end
+        end,
         On = function() end,
+        _prints = prints,
     }
 
     function ns:NewModule(name)
@@ -216,6 +224,69 @@ local function testBeginMailFulfillmentRetriesBodyAfterSendTabSwitch()
     end
 end
 
+local function testFulfillmentMailAndChatUseAvailableMissingChecklist()
+    local ns = resetHarness()
+    ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
+    ns.Rewards = {
+        BuildRewardForTierIds = function()
+            return {
+                gold = 1200,
+                extraLives = 0,
+                items = {
+                    { id = 101, qty = 2, note = "thread" },
+                    { id = 202, qty = 3, note = "potion" },
+                },
+            }
+        end,
+    }
+    ns.Container = {
+        GetNumSlots = function() return 2 end,
+        GetItemInfo = function(_, bag, slot)
+            if bag == 0 and slot == 1 then return { itemID = 101, count = 1 } end
+            if bag == 0 and slot == 2 then return { itemID = 202, count = 3 } end
+            return nil
+        end,
+    }
+    _G.GetMoney = function() return 500 end
+    WRL_DB.requests[1] = { id = "req-1", from = "Graham-Realm", tierIds = { 101 }, status = "pending" }
+
+    local fields = {}
+    MailFrame = { IsShown = function() return true end }
+    MailFrameTab2 = { Click = function() fields.clickedSendTab = true end }
+    SendMailNameEditBox = { SetText = function(_, value) fields.name = value end }
+    SendMailSubjectEditBox = { SetText = function(_, value) fields.subject = value end }
+    SendMailBodyEditBox = { SetText = function(_, value) fields.body = value end }
+    SendMailMoney = {}
+    MoneyInputFrame_SetCopper = function(_, copper) fields.copper = copper end
+
+    local ok = ns.Requests:BeginMailFulfillment("req-1")
+
+    assertEqual(ok, true, "mail prep succeeds")
+    if not fields.body or not fields.body:find("Item checklist", 1, true) then
+        error("fulfillment mail body includes an item checklist")
+    end
+    if not fields.body:find("item:101 (thread): available 1 / requested 2 / missing 1", 1, true) then
+        error("fulfillment mail body lists missing item availability")
+    end
+    if not fields.body:find("item:202 (potion): available 3 / requested 3 / ready", 1, true) then
+        error("fulfillment mail body lists ready item availability")
+    end
+
+    local joined = table.concat(ns._prints, "\n")
+    if not joined:find("Checklist for Graham%-Realm", 1, false) then
+        error("chat feedback starts a request checklist")
+    end
+    if not joined:find("item:101 %(thread%): available 1 / requested 2 / missing 1") then
+        error("chat feedback includes missing item counts")
+    end
+    if not joined:find("item:202 %(potion%): available 3 / requested 3 / ready") then
+        error("chat feedback includes ready item counts")
+    end
+    if not joined:find("Gold: available 500c / requested 1200c / missing 700c") then
+        error("chat feedback includes gold availability counts")
+    end
+end
+
 local function testRequestInventoryScansUseCContainerFallback()
     local ns = resetHarness()
     NUM_BAG_SLOTS = 0
@@ -257,6 +328,7 @@ testBeginMailFallbackPrefillsMailbox()
 testFulfillmentMailUsesBankerFlavorAndRewardDetails()
 testBeginMailFulfillmentPrefillsBankDeskMailAndMarksGathering()
 testBeginMailFulfillmentRetriesBodyAfterSendTabSwitch()
+testFulfillmentMailAndChatUseAvailableMissingChecklist()
 testRequestInventoryScansUseCContainerFallback()
 
 print("RequestMailFallback.test.lua: ok")

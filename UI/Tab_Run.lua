@@ -300,6 +300,28 @@ local function readinessSummary(req)
     return ("Missing for next mail: %d item line(s), %s. The ledger has concerns."):format(missingItems, ns.Tiers:FormatMoney(missingGold))
 end
 
+local function bankDeskItemLine(item)
+    local name = item and item.name or ("item:" .. tostring(item and item.id or "?"))
+    local required = item and item.required or 0
+    local available = item and item.available or 0
+    local missing = item and item.missing or 0
+    if missing > 0 then
+        return ("Item: %s - available %d / requested %d / missing %d"):format(name, available, required, missing)
+    end
+    return ("Item: %s - available %d / requested %d / ready"):format(name, available, required)
+end
+
+local function bankDeskGoldLine(ready)
+    local requiredGold = ready and ready.requiredGold or 0
+    local availableGold = ready and ready.availableGold or 0
+    local missingGold = math.max(0, requiredGold - availableGold)
+    local state = missingGold > 0 and ("missing " .. ns.Tiers:FormatMoney(missingGold)) or "ready"
+    return ("Gold: available %s / requested %s / %s"):format(
+        ns.Tiers:FormatMoney(availableGold),
+        ns.Tiers:FormatMoney(requiredGold),
+        state)
+end
+
 local function appendActiveRequestLines(lines, req)
     if not req then
         lines[#lines + 1] = "No pending bank requests. Suspiciously peaceful."
@@ -325,25 +347,21 @@ local function appendActiveRequestLines(lines, req)
     local missingItems = ready.missingItems or {}
     if ready.fulfillable then
         lines[#lines + 1] = ("Readiness: ready for mail - %s gold, 0 item line(s) missing."):format(ns.Tiers:FormatMoney(requiredGold))
-        lines[#lines + 1] = "Missing: none. The clerk is almost cheerful."
-        return
+    else
+        lines[#lines + 1] = ("Readiness: missing %d item line(s), %s gold."):format(#missingItems, ns.Tiers:FormatMoney(missingGold))
     end
 
-    lines[#lines + 1] = ("Readiness: missing %d item line(s), %s gold."):format(#missingItems, ns.Tiers:FormatMoney(missingGold))
-    local shownItems = math.min(2, #missingItems)
+    local items = ready.items or {}
+    local shownItems = math.min(4, #items)
     for i = 1, shownItems do
-        local it = missingItems[i]
-        lines[#lines + 1] = ("Missing item: %s need %d, have %d"):format(
-            it.name or ("item:" .. tostring(it.id or "?")),
-            it.required or 0,
-            it.available or 0)
+        lines[#lines + 1] = bankDeskItemLine(items[i])
     end
-    if #missingItems > shownItems then
-        lines[#lines + 1] = ("Missing item: ... and %d more"):format(#missingItems - shownItems)
+    if #items == 0 then
+        lines[#lines + 1] = "Item: no item stacks requested."
+    elseif #items > shownItems then
+        lines[#lines + 1] = ("Item: ... and %d more item line(s)"):format(#items - shownItems)
     end
-    if missingGold > 0 then
-        lines[#lines + 1] = ("Missing gold: need %s, have %s"):format(ns.Tiers:FormatMoney(requiredGold), ns.Tiers:FormatMoney(availableGold))
-    end
+    lines[#lines + 1] = bankDeskGoldLine(ready)
 end
 
 local function appendContributionBoard(lines, maxAccounts, maxCharacters)
@@ -448,17 +466,17 @@ local function buildBankSection(content, Theme, titleText)
     section.borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
     section.borderRight:SetWidth(1)
 
-    local title = Theme:Text(section, 12, Theme.c.goldH)
+    local title = Theme:Text(section, 13, Theme.c.goldH)
     section.title = title
     title:SetPoint("TOPLEFT", 12, -10)
     title:SetText(titleText or "")
     if title.SetFont then
-        title:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+        title:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     end
 
     section.lines = {}
     for i = 1, 16 do
-        local fs = Theme:Text(section, 10, Theme.c.fg2)
+        local fs = Theme:Text(section, 11, Theme.c.fg2)
         fs:SetWidth(396)
         fs:SetJustifyH("LEFT")
         fs:SetSpacing(2)
@@ -527,7 +545,7 @@ local function setBankSection(section, lines)
             fs:SetText(text)
             fs:Show()
             prev = fs
-            height = height + 16
+            height = height + 18
         else
             fs:Hide()
         end

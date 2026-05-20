@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.3 - Rewards and Run Modifiers cleanup. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted: the addon shows active request readiness, pre-fills mail forms and currency, and keeps final Send manual.
+> **Status:** v0.3.4 - Bank inventory/request readiness polish. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted: the addon shows active request readiness with ready/missing item lines, pre-fills mail forms and currency, and keeps final Send manual.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.3 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.4 loaded.` in chat.
 
 ### Quick start
 

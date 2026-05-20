@@ -91,9 +91,21 @@ local function resetHarness()
                 missingItems = {
                     { name = "Banker's Thread", required = 2, available = 0, missing = 2 },
                 },
+                items = {
+                    { name = "Banker's Thread", required = 2, available = 0, missing = 2 },
+                    { name = "Clerk's Potion", required = 3, available = 3, missing = 0 },
+                },
             }
         end
-        return { fulfillable = true, requiredGold = 500, availableGold = 1000, missingItems = {} }
+        return {
+            fulfillable = true,
+            requiredGold = 500,
+            availableGold = 1000,
+            missingItems = {},
+            items = {
+                { name = "Runner's Bag", required = 2, available = 2, missing = 0 },
+            },
+        }
     end
 
     assert(loadfile("UI/Tab_Run.lua"))("WoWRoguelite", ns)
@@ -126,12 +138,13 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(right[2], "2 request", "bank desk summarizes pending requests")
     assertContains(right[4], "Active request: Graham-Realm [Graham]", "bank desk names the active request and account")
     assertContains(right[6], "Readiness: missing", "bank desk shows a direct readiness status")
-    assertContains(right[7], "Missing item: Banker's Thread", "bank desk lists the first missing item")
-    assertContains(right[8], "Missing gold: need 1200c, have 500c", "bank desk lists missing gold")
-    assertContains(right[9], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
-    assertContains(right[10], "Graham", "contribution board is grouped by account")
-    assertContains(right[11], "Graham-Realm", "contribution board keeps character detail")
-    assertContains(right[15], "ledger", "right pane includes ledger heading")
+    assertContains(right[7], "Item: Banker's Thread - available 0 / requested 2 / missing 2", "bank desk lists missing item counts")
+    assertContains(right[8], "Item: Clerk's Potion - available 3 / requested 3 / ready", "bank desk lists ready item counts")
+    assertContains(right[9], "Gold: available 500c / requested 1200c / missing 700c", "bank desk lists gold counts")
+    assertContains(right[10], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
+    assertContains(right[11], "Graham", "contribution board is grouped by account")
+    assertContains(right[12], "Graham-Realm", "contribution board keeps character detail")
+    assertContains(right[16], "ledger", "right pane includes ledger heading")
 end
 
 local function testContributionActionOnlyShowsForPendingContributionRuns()
@@ -184,6 +197,8 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "section.borderLeft", "Bank Desk sections should have a full light left border")
     assertContains(src, "section.borderRight", "Bank Desk sections should have a full light right border")
     assertContains(src, "title:SetFont(STANDARD_TEXT_FONT", "Bank Desk section headings should be stronger than body text")
+    assertContains(src, "Theme:Text(section, 13, Theme.c.goldH)", "Bank Desk section headings should be larger for scanning")
+    assertContains(src, "Theme:Text(section, 11, Theme.c.fg2)", "Bank Desk section body text should be larger for readability")
     assertContains(src, "self.bankDeskSection", "Bank Desk should have its own right-side section")
     assertContains(src, "self.bankContributionSection", "Contribution Board should have its own right-side section")
     assertContains(src, "self.bankLedgerSection", "Recent ledger should have its own right-side section")

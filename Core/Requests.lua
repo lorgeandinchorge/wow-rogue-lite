@@ -163,12 +163,24 @@ local function rewardItemLabel(item)
     return label
 end
 
+local function readinessItemText(item)
+    local name = item and item.name or ("item:" .. tostring(item and item.id or "?"))
+    local required = item and item.required or 0
+    local available = item and item.available or 0
+    local missing = item and item.missing or 0
+    if missing > 0 then
+        return ("%s: available %d / requested %d / missing %d"):format(name, available, required, missing)
+    end
+    return ("%s: available %d / requested %d / ready"):format(name, available, required)
+end
+
 function R:FulfillmentMailSubject(req)
     return "Roguelite bank release"
 end
 
-function R:FulfillmentMailBody(req, bundle)
+function R:FulfillmentMailBody(req, bundle, readiness)
     bundle = bundle or self:Bundle(req)
+    readiness = readiness or self:FulfillmentReadiness(req)
     local lines = {
         "Withdrawal approved.",
         "",
@@ -186,6 +198,13 @@ function R:FulfillmentMailBody(req, bundle)
         lines[#lines + 1] = "Here are the items you requested, released from the vault after the usual amount of sighing:"
         for _, item in ipairs(bundle.items or {}) do
             lines[#lines + 1] = "- " .. rewardItemLabel(item)
+        end
+    end
+    if #(readiness.items or {}) > 0 then
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = "Item checklist:"
+        for _, item in ipairs(readiness.items or {}) do
+            lines[#lines + 1] = "- " .. readinessItemText(item)
         end
     end
     lines[#lines + 1] = ""
@@ -524,6 +543,37 @@ function R:FulfillmentReadiness(req)
     }
 end
 
+function R:ReadinessItemLines(readiness, opts)
+    opts = opts or {}
+    local lines = {}
+    local items = readiness and readiness.items or {}
+    local prefix = opts.prefix or ""
+    local maxLines = opts.maxLines or #items
+    for i, it in ipairs(items) do
+        if i > maxLines then
+            lines[#lines + 1] = ("%s... and %d more item line(s)"):format(prefix, #items - maxLines)
+            break
+        end
+        lines[#lines + 1] = prefix .. readinessItemText(it)
+    end
+    if #lines == 0 and not opts.skipEmpty then
+        lines[#lines + 1] = prefix .. "No item stacks requested."
+    end
+    return lines
+end
+
+function R:ReadinessGoldLine(readiness, prefix)
+    local requiredGold = readiness and readiness.requiredGold or 0
+    local availableGold = readiness and readiness.availableGold or 0
+    local missingGold = math.max(0, requiredGold - availableGold)
+    local state = missingGold > 0 and ("missing " .. ns.Tiers:FormatMoney(missingGold)) or "ready"
+    return ("%sGold: available %s / requested %s / %s"):format(
+        prefix or "",
+        ns.Tiers:FormatMoney(availableGold),
+        ns.Tiers:FormatMoney(requiredGold),
+        state)
+end
+
 function R:PrintMissingForRequest(req, readiness)
     readiness = readiness or self:FulfillmentReadiness(req)
     local missingItems = readiness.missingItems or {}
@@ -531,20 +581,15 @@ function R:PrintMissingForRequest(req, readiness)
     local availableGold = readiness.availableGold or 0
 
     if #missingItems == 0 and availableGold >= requiredGold then
-        ns:Print("|cff7ab27aAll requested items are available for %s.|r", req.from or "request")
-        return
+        ns:Print("|cff7ab27aChecklist for %s: all requested supplies are available.|r", req.from or "request")
+    else
+        ns:Print("|cffb85c5cChecklist for %s: missing requirements remain.|r", req.from or "request")
     end
 
-    ns:Print("|cffb85c5cMissing requirements for %s:|r", req.from or "request")
-    for _, it in ipairs(missingItems) do
-        ns:Print("  - %s: need %d, have %d, missing %d", it.name, it.required, it.available, it.missing)
+    for _, line in ipairs(self:ReadinessItemLines(readiness, { prefix = "  - " })) do
+        ns:Print(line)
     end
-    if availableGold < requiredGold then
-        ns:Print("  - Gold: need %s, have %s, missing %s",
-            ns.Tiers:FormatMoney(requiredGold),
-            ns.Tiers:FormatMoney(availableGold),
-            ns.Tiers:FormatMoney(requiredGold - availableGold))
-    end
+    ns:Print(self:ReadinessGoldLine(readiness, "  - "))
 end
 
 -- ---- mail inbox parsing --------------------------------------------------
@@ -595,7 +640,7 @@ function R:BeginMailFulfillment(reqId)
     local recipient = req.from:match("^([^-]+)") or req.from
     if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
     if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(self:FulfillmentMailSubject(req)) end
-    self:PrefillSendMailBody(self:FulfillmentMailBody(req, bundle))
+    self:PrefillSendMailBody(self:FulfillmentMailBody(req, bundle, readiness))
 
     -- Gold (MoneyInputFrame API — values in copper).
     if (bundle.gold or 0) > 0 and MoneyInputFrame_SetCopper and SendMailMoney then
@@ -603,11 +648,8 @@ function R:BeginMailFulfillment(reqId)
     end
 
     -- Ask the user to drag attachments. We flash a chat message list.
-    ns:Print("|cffc0a060Fulfilling %s|r — drag these into the mail attachments:", req.from)
+    ns:Print("|cffc0a060Fulfilling %s|r — drag available items into the mail attachments:", req.from)
     self:PrintMissingForRequest(req, readiness)
-    for _, it in ipairs(bundle.items) do
-        ns:Print("  - %dx item:%d (%s)", it.qty, it.id, it.note or "")
-    end
     if bundle.gold > 0 then
         ns:Print("  - %s (pre-filled in money field)", ns.Tiers:FormatMoney(bundle.gold))
     end

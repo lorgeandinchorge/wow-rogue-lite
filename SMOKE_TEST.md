@@ -116,7 +116,7 @@ If you only have 10 to 15 minutes, please do this section.
   Expected: the requester is assigned to that account label and future request/ledger lines use the label.
 
 - [ ] With a pending request selected by the Bank Desk, click **Prepare Mail** at a mailbox.
-  Expected: the mail recipient, subject, body, and gold are prepared; missing item/gold details remain clear, with final Send still manual.
+  Expected: the mail recipient, subject, body, and gold are prepared; ready and missing item/gold checklist details remain clear, with final Send still manual.
 
 - [ ] On the bank character, open the Rewards tab.
   Expected: incoming requests still appear clearly for detailed review.
