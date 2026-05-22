@@ -36,6 +36,7 @@ local function resetHarness()
         Run = {},
         Tiers = {},
         Requests = {},
+        BankResale = {},
     }
 
     function ns:NewModule(name)
@@ -45,6 +46,7 @@ local function resetHarness()
     end
 
     function ns:UnitKey() return "Bank-Realm" end
+    function ns:Print() end
     function ns.Database:IsBankCharacter() return true end
     function ns.LegacyUnlocks:AvailableBudget() return 100000 end
     function ns.Run:GetState(rec) return rec and rec.status or "unknown" end
@@ -79,6 +81,33 @@ local function resetHarness()
             { kind = "fulfillment", characterKey = "Graham-Realm", accountLabel = "Graham", amount = 500, method = "mail", when = 102 },
         }
     end
+    function ns.BankResale:InventoryRows()
+        return {
+            { itemId = 769, name = "Chunk of Boar Meat", count = 5, priceEach = 25, totalCopper = 125 },
+            { itemId = 723, name = "Goretusk Liver", count = 1, priceEach = 50, totalCopper = 50 },
+        }
+    end
+    function ns.BankResale:RecordSale(itemId, qty, buyer)
+        self.recordedSale = { itemId = itemId, qty = qty, buyer = buyer, totalCopper = (qty or 0) * 25 }
+        return self.recordedSale
+    end
+    function ns.BankResale:PrepareCODMail(itemId, qty, buyer)
+        self.preparedCOD = { itemId = itemId, qty = qty, buyer = buyer }
+        self.pendingCOD = self.preparedCOD
+        return self.preparedCOD
+    end
+    function ns.BankResale:ClearSimulatedStock()
+        self.clearedSimStock = true
+        self.pendingCOD = nil
+        return true
+    end
+    function ns.BankResale:RemoveSimulatedStock(itemId)
+        self.removedSimStock = itemId
+        return true
+    end
+    function ns.BankResale:SimulatedBuyer()
+        return self.simulatedBuyer
+    end
     function ns.Requests:BankRequestRows()
         return WRL_DB.requests
     end
@@ -91,12 +120,25 @@ local function resetHarness()
                 missingItems = {
                     { name = "Banker's Thread", required = 2, available = 0, missing = 2 },
                 },
+                items = {
+                    { name = "Banker's Thread", required = 2, available = 0, missing = 2 },
+                    { name = "Clerk's Potion", required = 3, available = 3, missing = 0 },
+                },
             }
         end
-        return { fulfillable = true, requiredGold = 500, availableGold = 1000, missingItems = {} }
+        return {
+            fulfillable = true,
+            requiredGold = 500,
+            availableGold = 1000,
+            missingItems = {},
+            items = {
+                { name = "Runner's Bag", required = 2, available = 2, missing = 0 },
+            },
+        }
     end
 
     assert(loadfile("UI/Tab_Run.lua"))("WoWRoguelite", ns)
+    ns.Tab_Run._testNS = ns
     return ns.Tab_Run
 end
 
@@ -123,14 +165,24 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(left[6], "Lives remaining: n/a", "banker overview avoids runner life accounting")
 
     assertEqual(right[1], "|cffc0a060Bank Desk|r", "right pane starts with Bank Desk heading")
-    assertContains(right[2], "2 request", "bank desk summarizes pending requests")
-    assertContains(right[4], "Active request: Graham-Realm [Graham]", "bank desk names the active request and account")
-    assertContains(right[6], "Readiness: missing", "bank desk shows a direct readiness status")
-    assertContains(right[7], "Missing item: Banker's Thread", "bank desk lists the first missing item")
-    assertContains(right[8], "Missing gold: need 1200c, have 500c", "bank desk lists missing gold")
-    assertContains(right[9], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
-    assertContains(right[10], "Graham", "contribution board is grouped by account")
-    assertContains(right[11], "Graham-Realm", "contribution board keeps character detail")
+    assertContains(right[2], "Who", "bank desk table includes requester header")
+    assertContains(right[2], "Account", "bank desk table includes account header")
+    assertContains(right[2], "Ready", "bank desk table includes readiness header")
+    assertContains(right[3], "Graham-Realm", "bank desk table lists active requester")
+    assertContains(right[3], "Graham", "bank desk table lists account")
+    assertContains(right[3], "missing", "bank desk table lists readiness state")
+    assertContains(right[4], "Havok-Realm", "bank desk table lists the next requester")
+    assertContains(right[5], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
+    assertContains(right[6], "#", "contribution board uses leaderboard heading")
+    assertContains(right[7], "Graham", "contribution board is grouped by account")
+    assertContains(right[8], "Local Account", "contribution board lists another ranked account")
+    assertContains(right[10], "|cffc0a060Resale Desk|r", "right pane includes resale desk")
+    assertContains(right[11], "Item", "resale desk table includes item header")
+    assertContains(right[11], "Who", "resale desk table includes requester header")
+    assertContains(right[11], "Req", "resale desk table includes requested quantity header")
+    assertContains(right[12], "Chunk of Boar Meat", "resale desk lists catalog inventory")
+    assertContains(right[12], "Graham-Realm", "resale desk lists who requested the resale item")
+    assertContains(right[13], "Goretusk Liver", "resale desk lists additional catalog inventory")
     assertContains(right[15], "ledger", "right pane includes ledger heading")
 end
 
@@ -150,18 +202,139 @@ local function testBankDeskActionButtonsAreDashboardOwned()
     local src = f:read("*a"):gsub("\r\n", "\n")
     f:close()
 
-    assertContains(src, 'Theme:Button(self.bankActionsBox, "Prepare Mail"', "Dashboard should own the bank mail action")
-    assertContains(src, 'Theme:Button(self.bankActionsBox, "Mark Fulfilled"', "Dashboard should own the bank fulfill action")
-    assertContains(src, 'Theme:Button(self.bankActionsBox, "Assign Account"', "Dashboard should own account assignment action")
-    assertContains(src, 'Theme:Button(self.bankActionsBox, "Next Request"', "Dashboard should let the banker cycle active requests")
-    assertContains(src, "self:_ActiveBankRequest()", "bank mail action should use the active Dashboard request")
-    assertContains(src, "if actionReq then self.bankMailButton:Show()", "bank mail action only shows with actionable request")
-    assertContains(src, "self.bankActionsBox = CreateFrame(\"Frame\", nil, left)", "bank actions should live under the Bank Snapshot")
-    assertContains(src, "Theme:Fill(self.bankActionsBox, Theme.c.bg1, true)", "bank actions should use a color-only fill without panel texture tiling")
-    assertContains(src, "self.bankActionsBox:SetPoint(\"TOPLEFT\", self.leftLines[7]", "bank action box should sit below snapshot lines")
-    assertContains(src, "self.bankActionsBox.borderLeft", "bank action box should have a left border")
-    assertContains(src, "self.bankActionsBox.borderRight", "bank action box should have a right border")
-    assertContains(src, "Theme:Button(self.bankActionsBox, \"Prepare Mail\"", "bank mail button should be inside the action box")
+    assertContains(src, "ensureBankDeskButtons", "Bank Desk should own row-level action buttons")
+    assertContains(src, "setBankDeskSection(self.bankDeskSection", "Bank Desk should render through selectable row controls")
+    assertContains(src, "button.mailButton = createInlineIconButton(section, \"mail\", \"Interface\\\\Icons\\\\INV_Letter_15\")", "Bank Desk rows should include an inline mail icon action")
+    assertContains(src, "button.doneButton = createInlineIconButton(section, \"done\", \"Interface\\\\RaidFrame\\\\ReadyCheck-Ready\")", "Bank Desk rows should include an inline fulfill checkmark action")
+    assertContains(src, "button.accountButton = createInlineIconButton(section, \"A\", nil, 22)", "Bank Desk rows should include an inline account assignment action")
+    assertContains(src, "button.mailButton = createInlineIconButton(section, \"mail\", \"Interface\\\\Icons\\\\INV_Letter_15\")", "Resale Desk rows should include an inline mail icon action")
+    assertContains(src, "button.soldButton = createInlineIconButton(section, \"sold\", \"Interface\\\\RaidFrame\\\\ReadyCheck-Ready\")", "Resale Desk rows should include an inline checkmark sold action")
+    assertContains(src, "button.cancelButton = createInlineIconButton(section, \"cancel\", \"Interface\\\\RaidFrame\\\\ReadyCheck-NotReady\")", "Resale Desk rows should include an inline red X cancel action")
+    assertContains(src, "action.icon:SetTexture(texturePath)", "mail action should use an icon texture instead of a text glyph")
+    assertContains(src, "owner:PromptResaleCOD(row)", "Resale row mail action should prepare COD for that row")
+    assertContains(src, "owner:_RecordResaleRow(row)", "Resale row sold action should record that row")
+    assertContains(src, "owner:_CancelResaleRow(row)", "Resale row cancel action should cancel pending resale work")
+    assertContains(src, "ns.Requests:BeginMailFulfillment(req.id)", "bank desk mail action should prepare mail for the row request")
+    assertContains(src, "ns.Requests:MarkFulfilled(req.id)", "bank desk fulfill action should mark the row request fulfilled")
+    assertContains(src, "owner:PromptAssignAccount(req)", "bank desk account action should assign the row requester")
+    assertContains(src, "self.bankContributionSection:SetPoint(\"TOPLEFT\", self.bankSnapshotSection, \"TOPRIGHT\", 10, 0)", "contribution board should sit next to bank snapshot")
+end
+
+local function testBankDeskCanSelectResaleRowsByClickTarget()
+    local tab = resetHarness()
+
+    assertEqual(tab:_ActiveResaleRow().itemId, 769, "first resale row starts active")
+    tab:_SelectResaleRow(2)
+    assertEqual(tab:_ActiveResaleRow().itemId, 723, "clicked resale row becomes active")
+    tab:_SelectResaleRow(99)
+    assertEqual(tab:_ActiveResaleRow().itemId, 723, "invalid resale click keeps current active row")
+end
+
+local function testSelectedResaleOrderDefaultsToRequesterAndFullRow()
+    local tab = resetHarness()
+
+    local order = tab:_SelectResaleRow(1)
+
+    assertEqual(order.itemId, 769, "selected resale order keeps the item")
+    assertEqual(order.qty, 5, "selected resale order defaults to the full row quantity")
+    assertEqual(order.buyer, "Graham-Realm", "selected resale order defaults to the active requester")
+
+    tab:PromptResaleCOD(order)
+    assertEqual(tab._lastResalePrompted, nil, "known requester should avoid prompting for buyer")
+    assertEqual(tab._lastResaleCOD.itemId, 769, "mail action prepares the selected resale item")
+    assertEqual(tab._lastResaleCOD.qty, 5, "mail action prepares the full selected order")
+    assertEqual(tab._lastResaleCOD.buyer, "Graham-Realm", "mail action uses the known requester")
+
+    tab:_RecordResaleRow(order)
+    assertEqual(tab._lastResaleCOD, tab._testNS.BankResale.pendingCOD, "test keeps COD draft visible before record clears module state")
+    assertEqual(tab._testNS.BankResale.recordedSale.itemId, 769, "sold action records the selected item")
+    assertEqual(tab._testNS.BankResale.recordedSale.qty, 5, "sold action records the full selected order")
+    assertEqual(tab._testNS.BankResale.recordedSale.buyer, "Graham-Realm", "sold action records the known requester")
+
+    order = tab:_SelectResaleRow(1)
+    tab:PromptResaleCOD(order)
+    tab:_CancelResaleRow(order)
+    assertEqual(tab.pendingResaleOrder, nil, "cancel clears selected resale order")
+    assertEqual(tab._testNS.BankResale.pendingCOD, nil, "cancel clears pending COD draft")
+end
+
+local function testCancelResaleRowRemovesSimulatedStockLine()
+    local tab = resetHarness()
+    local row = tab:_ResaleRows()[1]
+    row.simulated = true
+
+    tab:_CancelResaleRow(row)
+
+    assertEqual(tab._testNS.BankResale.removedSimStock, 769, "cancel removes the simulated stock line")
+end
+
+local function testSelectedResaleOrderUsesRequestedQuantityWhenRequestMatchesItem()
+    local tab = resetHarness()
+    tab._testNS.Requests.FulfillmentReadiness = function(_, req)
+        return {
+            items = {
+                { id = 769, name = "Chunk of Boar Meat", required = 3, available = 5, missing = 0 },
+            },
+            missingItems = {},
+            requiredGold = 0,
+            availableGold = 0,
+            fulfillable = true,
+        }
+    end
+
+    local order = tab:_SelectResaleRow(1)
+    tab:PromptResaleCOD(order)
+
+    assertEqual(order.buyer, "Graham-Realm", "matching resale order uses active requester name")
+    assertEqual(order.qty, 3, "matching resale order uses requested quantity instead of owned count")
+    assertEqual(tab._lastResaleCOD.buyer, "Graham-Realm", "COD draft receives active requester name")
+    assertEqual(tab._lastResaleCOD.qty, 3, "COD draft receives requested item quantity")
+end
+
+local function testResaleCODRehydratesStaleSelectionWithRequester()
+    local tab = resetHarness()
+    WRL_DB.requests[1].from = "Tester-Realm"
+    tab.pendingResaleOrder = {
+        itemId = 769,
+        name = "Chunk of Boar Meat",
+        itemName = "Chunk of Boar Meat",
+        qty = 1,
+        priceEach = 25,
+        totalCopper = 25,
+    }
+
+    tab:PromptResaleCOD(tab:_ResaleRows()[1])
+
+    assertEqual(tab._lastResalePrompted, nil, "stale resale selection should not prompt once requester is known")
+    assertEqual(tab._lastResaleCOD.buyer, "Tester-Realm", "stale resale selection reuses the current requester")
+    assertEqual(tab._lastResaleCOD.qty, 5, "stale resale selection refreshes to the current requested quantity")
+end
+
+local function testResaleCODUsesSimulatedBuyerWithoutBankRequest()
+    local tab = resetHarness()
+    for _, req in ipairs(WRL_DB.requests) do
+        req.status = "fulfilled"
+    end
+    tab._testNS.BankResale.simulatedBuyer = "Tester-Realm"
+
+    local order = tab:_SelectResaleRow(1)
+    tab:PromptResaleCOD(order)
+
+    assertEqual(tab._lastResalePrompted, nil, "simulated resale buyer should avoid the manual buyer prompt")
+    assertEqual(tab._lastResaleCOD.buyer, "Tester-Realm", "resale sim uses its private buyer without creating a bank request")
+end
+
+local function testResaleDeskClearAllClearsSimulatedRowsAndSelection()
+    local tab = resetHarness()
+    local order = tab:_SelectResaleRow(1)
+    tab:PromptResaleCOD(order)
+
+    tab:_ClearResaleDesk()
+
+    assertEqual(tab._testNS.BankResale.clearedSimStock, true, "clear all calls simulated stock cleanup")
+    assertEqual(tab.pendingResaleOrder, nil, "clear all removes selected resale order")
+    assertEqual(tab._testNS.BankResale.pendingCOD, nil, "clear all removes pending COD draft")
+    assertEqual(tab.bankResaleIndex, 1, "clear all resets resale selection")
 end
 
 local function testBankDeskCanCycleActiveRequests()
@@ -178,17 +351,42 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     local f = assert(io.open("UI/Tab_Run.lua", "rb"))
     local src = f:read("*a"):gsub("\r\n", "\n")
     f:close()
+    local tocFile = assert(io.open("WoWRoguelite.toc", "rb"))
+    local toc = tocFile:read("*a"):gsub("\r\n", "\n")
+    tocFile:close()
 
+    assertContains(toc, "Core/BankResale.lua", "TOC should load the BankResale module")
     assertContains(src, "CreateFrame(\"Frame\", nil, content)", "Bank Desk sections should be framed in the scroll content")
     assertContains(src, "Theme:Fill(section, Theme.c.bg1, true, \"panel\")", "Bank Desk sections should use light panel borders")
     assertContains(src, "section.borderLeft", "Bank Desk sections should have a full light left border")
     assertContains(src, "section.borderRight", "Bank Desk sections should have a full light right border")
     assertContains(src, "title:SetFont(STANDARD_TEXT_FONT", "Bank Desk section headings should be stronger than body text")
+    assertContains(src, "Theme:Text(section, 13, Theme.c.goldH)", "Bank Desk section headings should be larger for scanning")
+    assertContains(src, "Theme:Text(section, 11, Theme.c.fg2)", "Bank Desk section body text should be larger for readability")
     assertContains(src, "self.bankDeskSection", "Bank Desk should have its own right-side section")
     assertContains(src, "self.bankContributionSection", "Contribution Board should have its own right-side section")
+    assertContains(src, "self.bankResaleSection", "Resale Desk should have its own right-side section")
     assertContains(src, "self.bankLedgerSection", "Recent ledger should have its own right-side section")
     assertContains(src, "buildBankSection(content, Theme, \"Contribution Board\")", "Contribution Board should have a strong section heading")
     assertContains(src, "setBankSection(self.bankContributionSection", "Contribution Board should be rendered as its own bordered box")
+    assertContains(src, "buildBankSection(content, Theme, \"Resale Desk\")", "Resale Desk should have a strong section heading")
+    assertContains(src, "setResaleSection(self.bankResaleSection", "Resale Desk should render through selectable row controls")
+    assertContains(src, "resaleTableHeader", "Resale Desk should render as a compact table")
+    assertContains(src, "\"Who\"", "Resale Desk table should expose requester names")
+    assertContains(src, "Req", "Resale Desk table should expose requested quantity")
+    assertContains(src, "Own", "Resale Desk table should expose owned quantity")
+    assertContains(src, "section.clearResaleButton", "Resale Desk should include a top-right clear all button")
+    assertContains(src, "button.text:SetText(\"x\")", "Resale Desk clear all should use a distinct white x instead of the red cancel icon")
+    assertContains(src, "owner:_ClearResaleDesk()", "Resale Desk clear all button should clear test resale rows")
+    assertContains(src, "section.resaleButtons", "Resale Desk should create clickable row targets")
+    assertContains(src, "button.selection:SetColorTexture", "selected resale rows should have a full-line highlight texture")
+    assertContains(src, "button:SetSize(650, 18)", "selected resale row highlight should leave room for requester names and inline action buttons")
+    assertContains(src, "button:SetPoint(\"TOPLEFT\", fs, \"TOPLEFT\", -4, 3)", "selected resale row highlight should align to the visible text line")
+    assertContains(src, "button.mailButton:SetPoint(\"LEFT\", button, \"RIGHT\", 10, 0)", "resale row actions should align vertically to the selected row")
+    assertContains(src, "button.selection:Show()", "active resale row should show its full-line highlight")
+    assertContains(src, "local keepScroll = self.scroll and self.scroll.GetVerticalScroll", "banker refresh should preserve scroll position")
+    assertContains(src, "self.scroll:SetVerticalScroll(keepScroll)", "banker refresh should restore scroll after row selection")
+    assertContains(src, "Tab:_SelectResaleRow", "Resale row targets should select the active resale row")
     assertContains(src, "buildLedgerSection(content, Theme)", "Recent Ledger should use its own specialized section")
     assertContains(src, "CreateFrame(\"EditBox\"", "Recent Ledger should include search input")
     assertContains(src, "ledger.searchBox:SetScript(\"OnTextChanged\"", "Recent Ledger search should refresh results")
@@ -197,12 +395,23 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "setLedgerSection(self.bankLedgerSection", "Recent Ledger should render through its scrollable section")
     assertContains(src, "appendRecentLedger(right, 50)", "Recent Ledger should search across more than the default visible rows")
     assertContains(src, "left:SetWidth(304)", "left snapshot should shrink to give the Bank Desk more room")
-    assertContains(src, "content:SetSize(420", "right content should be wider for Bank Desk readability")
+    assertContains(src, "local BANK_DASHBOARD_WIDTH = 820", "bank Dashboard should use a wide single-column content width")
+    assertContains(src, "self.leftPane:Hide()", "bank Dashboard should hide the left pane for a single-column layout")
+    assertContains(src, "self.rightPane:SetPoint(\"TOPLEFT\", self.panel, \"TOPLEFT\", 20, -64)", "bank Dashboard should stretch the scroll column across the panel")
+    assertContains(src, "self.bankSnapshotSection = buildBankSection(content, Theme, \"Bank Snapshot\")", "bank snapshot should render in the single scroll column")
+    assertContains(src, "self.content:SetSize(BANK_DASHBOARD_WIDTH, 1)", "bank scroll content should use the wide dashboard width")
 end
 
 testBankerOverviewReplacesRunSnapshotCopy()
 testContributionActionOnlyShowsForPendingContributionRuns()
 testBankDeskActionButtonsAreDashboardOwned()
+testBankDeskCanSelectResaleRowsByClickTarget()
+testSelectedResaleOrderDefaultsToRequesterAndFullRow()
+testCancelResaleRowRemovesSimulatedStockLine()
+testSelectedResaleOrderUsesRequestedQuantityWhenRequestMatchesItem()
+testResaleCODRehydratesStaleSelectionWithRequester()
+testResaleCODUsesSimulatedBuyerWithoutBankRequest()
+testResaleDeskClearAllClearsSimulatedRowsAndSelection()
 testBankDeskCanCycleActiveRequests()
 testBankDeskUsesBorderedSectionsWithStrongHeadings()
 

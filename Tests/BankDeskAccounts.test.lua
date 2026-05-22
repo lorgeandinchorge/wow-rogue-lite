@@ -106,6 +106,32 @@ local function testContributionsRecordAndSummarizeByAccount()
     assertEqual(rows[1].characters[1].characterKey, "Graham-Realm", "summary preserves character breakdown")
 end
 
+local function testAssigningAccountMovesExistingContributionReceipts()
+    local ns = resetHarness()
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    ns.Database:LinkCharacterToAccount("Graham-Realm", "acct-local")
+
+    ns.Contributions:Record("Graham-Realm", 200, "manual", { confidence = "manual" })
+    local account = ns.Database:AssignCharacterToAccountLabel("Graham-Realm", "Graham")
+    local rows = ns.Database:AccountContributionRows()
+
+    assertEqual(WRL_DB.contributionReceipts[1].accountId, account.id, "assignment backfills existing contribution receipts")
+    assertEqual(rows[1].accountId, account.id, "summary uses the assigned account for existing receipts")
+    assertEqual(rows[1].label, "Graham", "summary label follows the saved account assignment")
+end
+
+local function testRecentLedgerUsesUpdatedAccountAssignment()
+    local ns = resetHarness()
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    ns.Database:LinkCharacterToAccount("Graham-Realm", "acct-local")
+
+    ns.Contributions:Record("Graham-Realm", 200, "manual", { confidence = "manual" })
+    ns.Database:AssignCharacterToAccountLabel("Graham-Realm", "Graham")
+    local rows = ns.Database:RecentBankLedgerRows(1)
+
+    assertEqual(rows[1].accountLabel, "Graham", "recent ledger label follows the saved account assignment")
+end
+
 local function testRequestsStoreAssignedOrUnassignedAccount()
     local ns = resetHarness()
     local account = ns.Database:CreateAccount("Tester")
@@ -121,6 +147,8 @@ end
 testMigrationCreatesDefaultAccountAndLinksLocalCharacters()
 testManualAccountLabelsCanBeCreatedAndLinked()
 testContributionsRecordAndSummarizeByAccount()
+testAssigningAccountMovesExistingContributionReceipts()
+testRecentLedgerUsesUpdatedAccountAssignment()
 testRequestsStoreAssignedOrUnassignedAccount()
 
 print("BankDeskAccounts.test.lua: ok")

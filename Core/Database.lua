@@ -9,7 +9,7 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Database")
 
-local SCHEMA_VERSION = 12
+local SCHEMA_VERSION = 13
 
 local function normalizeCharacterKey(key)
     if not key or key == "" then return nil end
@@ -56,6 +56,8 @@ local function defaults()
         legacySpent          = 0,  -- copper spent from lifetime contribution budget
         accounts             = {}, -- [accountId] = { id, label, createdAt }
         accountLinks         = {}, -- [Character-Realm] = accountId
+        resaleReceipts       = {}, -- account-wide resale sale ledger; owned by Core/BankResale.lua
+        resaleSimStock       = {}, -- temporary simulated resale stock for local testing
     }
 end
 
@@ -165,10 +167,16 @@ function D:Init()
             WRL_DB.accounts = WRL_DB.accounts or {}
             WRL_DB.accountLinks = WRL_DB.accountLinks or {}
         end
+        if WRL_DB.schema < 13 then
+            WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
+            WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
+        end
         WRL_DB.schema = SCHEMA_VERSION
     end
 
     WRL_DB.achievements = WRL_DB.achievements or {}
+    WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
+    WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
     WRL_DB.accounts = WRL_DB.accounts or {}
     WRL_DB.accountLinks = WRL_DB.accountLinks or {}
     self:EnsureDefaultAccount()
@@ -461,6 +469,16 @@ function D:AssignCharacterToAccountLabel(characterKey, label)
     if not characterKey or characterKey == "" then return nil end
     local account = self:CreateAccount(label)
     self:LinkCharacterToAccount(characterKey, account.id)
+    for _, receipt in ipairs(WRL_DB.contributionReceipts or {}) do
+        if receipt.characterKey == characterKey then
+            receipt.accountId = account.id
+        end
+    end
+    for _, receipt in ipairs(WRL_DB.fulfillmentReceipts or {}) do
+        if receipt.requester == characterKey then
+            receipt.accountId = account.id
+        end
+    end
     return account
 end
 
@@ -473,7 +491,7 @@ function D:AccountContributionRows()
         local amount = math.max(0, math.floor(receipt.amount or receipt.copper or 0))
         if amount > 0 then
             total = total + amount
-            local accountId = receipt.accountId or self:AccountIdForCharacter(receipt.characterKey) or "unassigned"
+            local accountId = self:AccountIdForCharacter(receipt.characterKey) or receipt.accountId or "unassigned"
             local row = grouped[accountId]
             if not row then
                 row = {
@@ -522,25 +540,39 @@ function D:RecentBankLedgerRows(maxRows)
     maxRows = maxRows or 8
     local rows = {}
     for _, r in ipairs(WRL_DB.contributionReceipts or {}) do
+        local accountId = self:AccountIdForCharacter(r.characterKey) or r.accountId
         rows[#rows + 1] = {
             kind = "contribution",
             when = r.when or 0,
             characterKey = r.characterKey,
-            accountId = r.accountId or self:AccountIdForCharacter(r.characterKey),
-            accountLabel = self:AccountLabel(r.accountId or self:AccountIdForCharacter(r.characterKey)),
+            accountId = accountId,
+            accountLabel = self:AccountLabel(accountId),
             amount = r.amount or 0,
             source = r.source,
         }
     end
     for _, f in ipairs(WRL_DB.fulfillmentReceipts or {}) do
+        local accountId = self:AccountIdForCharacter(f.requester) or f.accountId
         rows[#rows + 1] = {
             kind = "fulfillment",
             when = f.when or 0,
             characterKey = f.requester,
-            accountId = f.accountId or self:AccountIdForCharacter(f.requester),
-            accountLabel = self:AccountLabel(f.accountId or self:AccountIdForCharacter(f.requester)),
+            accountId = accountId,
+            accountLabel = self:AccountLabel(accountId),
             amount = f.gold or 0,
             method = f.method,
+        }
+    end
+    for _, s in ipairs(WRL_DB.resaleReceipts or {}) do
+        rows[#rows + 1] = {
+            kind = "resale",
+            when = s.when or 0,
+            characterKey = s.buyer,
+            accountId = self:AccountIdForCharacter(s.buyer),
+            accountLabel = s.buyer and self:AccountLabel(self:AccountIdForCharacter(s.buyer)) or "Unassigned",
+            amount = s.totalCopper or 0,
+            itemName = s.itemName,
+            qty = s.qty,
         }
     end
     table.sort(rows, function(a, b) return (a.when or 0) > (b.when or 0) end)

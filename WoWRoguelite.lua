@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.3.3"
+ns.version     = "0.3.5"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -76,6 +76,7 @@ ns:On("PLAYER_LOGIN", function()
     ns.LegacyUnlocks:Init()
     ns.Vendor:Init()
     ns.Merchant:Init()
+    ns.BankResale:Init()
     ns.Contributions:Init() -- must follow Database + Vendor; used by Death
     ns.Achievements:Init()  -- must follow Contributions/Run/Rules/Tiers for criteria checks
     ns.Comm:Init()
@@ -158,11 +159,133 @@ SlashCmdList["WRL"] = function(msg)
         elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
             ns.MainFrame:RefreshCurrentTab()
         end
+    elseif cmd == "simresale" or cmd == "simresell" then
+        if not (ns.BankResale and ns.BankResale.SimulateStock) then
+            ns:Print("Bank resale desk is not ready yet.")
+            return
+        end
+        local simText = rest ~= "" and rest or "769:4,723:2"
+        if simText:lower() == "clear" then
+            ns.BankResale:ClearSimulatedStock()
+            ns:Print("Simulated resale stock cleared.")
+            if ns.MainFrame and ns.MainFrame.ShowTab then
+                ns.MainFrame:ShowTab("Run")
+            end
+            return
+        end
+
+        local entries = {}
+        for token in simText:gmatch("([^,%s]+)") do
+            local itemText, qtyText = token:match("^(%d+)[:xX](%d+)$")
+            local itemId = tonumber(itemText or token)
+            local qty = tonumber(qtyText) or 1
+            if itemId and qty > 0 then
+                entries[#entries + 1] = { itemId = itemId, qty = qty }
+            end
+        end
+        if #entries == 0 then
+            ns:Print("Usage: /wrl simresale [ITEM_ID:QTY,ITEM_ID:QTY] or /wrl simresale clear")
+            return
+        end
+        local ok, reason = ns.BankResale:SimulateStock(entries, "Tester-Realm")
+        if not ok then
+            if reason == "not_catalog" then
+                ns:Print("Simulated resale stock must use items in the resale catalog.")
+            else
+                ns:Print("Could not create simulated resale stock.")
+            end
+            return
+        end
+        ns:Print("Simulated resale stock created with %d item line(s).", #entries)
+        if ns.MainFrame and ns.MainFrame.ShowTab then
+            ns.MainFrame:ShowTab("Run")
+        elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+            ns.MainFrame:RefreshCurrentTab()
+        end
     elseif cmd == "contribute" or cmd == "contribution" then
         if ns.Death and ns.Death.PrepareContributionMail then
             ns.Death:PrepareContributionMail()
         else
             ns:Print("Contribution flow is not ready yet.")
+        end
+    elseif cmd == "resale" then
+        if not (ns.BankResale and ns.BankResale.InventoryRows) then
+            ns:Print("Bank resale desk is not ready yet.")
+            return
+        end
+        local sub, subRest = rest:match("^(%S+)%s*(.-)$")
+        sub = (sub or ""):lower()
+        subRest = subRest or ""
+        if sub == "sold" or sub == "cod" then
+            local itemText, qtyText, buyer = subRest:match("^(%S+)%s+(%S+)%s*(.-)$")
+            local itemId = tonumber(itemText)
+            local qty = tonumber(qtyText)
+            if not itemId then
+                ns:Print(sub == "cod" and "Usage: /wrl resale cod ITEM_ID QTY BUYER" or "Usage: /wrl resale sold ITEM_ID QTY [BUYER]")
+                return
+            end
+            if not qty or qty <= 0 then
+                ns:Print("Resale sale quantity must be greater than zero.")
+                return
+            end
+            if sub == "cod" and (not buyer or buyer == "") then
+                ns:Print("Resale COD mail requires a buyer.")
+                return
+            end
+            local receipt, reason
+            if sub == "cod" then
+                receipt, reason = ns.BankResale:PrepareCODMail(itemId, qty, buyer)
+            else
+                receipt, reason = ns.BankResale:RecordSale(itemId, qty, buyer)
+            end
+            if not receipt then
+                if reason == "not_catalog" then
+                    ns:Print("Item %s is not in the resale catalog.", tostring(itemId))
+                elseif reason == "bad_qty" then
+                    ns:Print("Resale sale quantity must be greater than zero.")
+                elseif reason == "missing_buyer" then
+                    ns:Print("Resale COD mail requires a buyer.")
+                elseif reason == "mailbox_closed" then
+                    ns:Print("Open your mailbox first, then prepare resale COD mail again.")
+                elseif reason == "cod_unavailable" then
+                    ns:Print("COD mail fields are not available on this client.")
+                else
+                    ns:Print(sub == "cod" and "Could not prepare resale COD mail." or "Could not record resale sale.")
+                end
+                return
+            end
+            if sub == "cod" then
+                ns:Print("Prepared resale COD mail: %dx %s to %s for %s.",
+                    receipt.qty or 0,
+                    receipt.itemName or ("item:" .. tostring(receipt.itemId)),
+                    receipt.buyer or "Unknown",
+                    ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(receipt.totalCopper or 0) or tostring(receipt.totalCopper or 0))
+            else
+                ns:Print("Recorded resale: %dx %s for %s.",
+                    receipt.qty or 0,
+                    receipt.itemName or ("item:" .. tostring(receipt.itemId)),
+                    ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(receipt.totalCopper or 0) or tostring(receipt.totalCopper or 0))
+            end
+        elseif sub ~= "" then
+            ns:Print("Usage: /wrl resale | /wrl resale cod ITEM_ID QTY BUYER | /wrl resale sold ITEM_ID QTY [BUYER]")
+            return
+        else
+            local rows = ns.BankResale:InventoryRows()
+            if #rows == 0 then
+                ns:Print("Resale Desk: no catalog goods found in bank inventory.")
+            else
+                ns:Print("Resale Desk:")
+                for _, row in ipairs(rows) do
+                    ns:Print("  %s x%d - %s each (%s total)",
+                        row.name or ("item:" .. tostring(row.itemId)),
+                        row.count or 0,
+                        ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(row.priceEach or 0) or tostring(row.priceEach or 0),
+                        ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(row.totalCopper or 0) or tostring(row.totalCopper or 0))
+                end
+            end
+            if ns.MainFrame and ns.MainFrame.ShowTab then
+                ns.MainFrame:ShowTab("Run")
+            end
         end
     elseif cmd == "settings" then
         -- Print current account-wide settings to chat for debug inspection.
@@ -309,7 +432,11 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl request        - open the Rewards tab")
         ns:Print("  /wrl account L C-R  - assign Character-Realm to account label L")
         ns:Print("  /wrl simrequest C-R IDS - simulate a pending bank request")
+        ns:Print("  /wrl simresale IDS  - simulate resale stock, e.g. 769:4,723:2")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")
+        ns:Print("  /wrl resale         - show the bank resale desk inventory")
+        ns:Print("  /wrl resale cod ID QTY BUYER - prepare COD mail for resale")
+        ns:Print("  /wrl resale sold ID QTY [BUYER] - record a manual resale")
         ns:Print("  /wrl sellfinal      - sell bags and equipped gear at the current vendor")
         ns:Print("  /wrl settings       - print current settings to chat")
         ns:Print("  /wrl profile        - show active profile")

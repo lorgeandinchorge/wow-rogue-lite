@@ -1,5 +1,14 @@
 # WoW Roguelite Changelog
 
+## v0.3.5
+
+- Add the Bank Dashboard **Resale Desk** for curated quest-useful goods such as Chunk of Boar Meat and Goretusk Liver.
+- Price resale goods with a simple vendor-price-doubled rule and catalog fallback minimums.
+- Add manual resale receipt recording through Dashboard actions and `/wrl resale sold ITEM_ID QTY [BUYER]`.
+- Add `/wrl simresale` for local Resale Desk testing without stocking real bag or bank items first.
+- Keep resale fully manual: the addon lists, prices, and records, but never trades, mails, auctions, or vendors items.
+- Add regression coverage for catalog lookup, pricing, inventory aggregation, receipts, Dashboard wiring, and slash commands.
+
 ## v0.3.3
 
 - Move boons and burdens out of the Rewards tab and into Settings under a dedicated **Run Modifiers** section.

@@ -1,6 +1,10 @@
 local prepared  = 0
 local prompted  = 0
 local simulated = nil
+local resaleSale = nil
+local resaleCOD = nil
+local resaleRowsPrinted = 0
+local simulatedResale = nil
 
 _G.DEFAULT_CHAT_FRAME = { AddMessage = function() end }
 _G.SlashCmdList = {}
@@ -26,6 +30,7 @@ local ns = {
     Achievements = {},
     Comm = {},
     Requests = {},
+    BankResale = {},
     Death = {},
     Export = {},
     Theme = {},
@@ -50,6 +55,43 @@ function ns.Requests:OnIncoming(fromKey, tierIds, note, via, requestId)
         via = via,
         requestId = requestId,
     }
+end
+
+function ns.BankResale:InventoryRows()
+    return {
+        { itemId = 769, name = "Chunk of Boar Meat", count = 4, priceEach = 25, totalCopper = 100 },
+    }
+end
+
+function ns.BankResale:RecordSale(itemId, qty, buyer)
+    if itemId == 99999 then return nil, "not_catalog" end
+    if qty <= 0 then return nil, "bad_qty" end
+    resaleSale = { itemId = itemId, qty = qty, buyer = buyer }
+    return resaleSale
+end
+
+function ns.BankResale:PrepareCODMail(itemId, qty, buyer)
+    if itemId == 99999 then return nil, "not_catalog" end
+    if qty <= 0 then return nil, "bad_qty" end
+    if not buyer or buyer == "" then return nil, "missing_buyer" end
+    resaleCOD = { itemId = itemId, qty = qty, buyer = buyer }
+    return resaleCOD
+end
+
+function ns.BankResale:SimulateStock(entries, buyer)
+    simulatedResale = entries
+    self.simulatedBuyer = buyer
+    return true
+end
+
+function ns.BankResale:ClearSimulatedStock()
+    simulatedResale = {}
+    self.simulatedBuyer = nil
+    return true
+end
+
+function ns.MainFrame:ShowTab(tab)
+    self.lastTab = tab
 end
 
 assert(loadfile("WoWRoguelite.lua"))("WoWRoguelite", ns)
@@ -96,9 +138,83 @@ if not simulated or simulated.fromKey ~= "Tester-Realm" or simulated.tierIds[1] 
     error("expected /wrl simrequest default to Tester-Realm reward 101", 2)
 end
 
--- When Merchant module is absent the command should print rather than crash.
+-- /wrl simresale seeds resale stock and opens Dashboard.
+simulatedResale = nil
+simulated = nil
+SlashCmdList.WRL("simresale 769:4,723:2")
+if ns.MainFrame.lastTab ~= "Run" then
+    error("expected /wrl simresale to open Dashboard", 2)
+end
+if not simulatedResale or simulatedResale[1].itemId ~= 769 or simulatedResale[1].qty ~= 4 or simulatedResale[2].itemId ~= 723 then
+    error("expected /wrl simresale to seed requested item quantities", 2)
+end
+if simulated then
+    error("expected /wrl simresale not to create a regular simulated bank request", 2)
+end
+if ns.BankResale.simulatedBuyer ~= "Tester-Realm" then
+    error("expected /wrl simresale to seed a Tester-Realm resale buyer", 2)
+end
+
+-- /wrl simresale with no args uses a predictable default.
+simulatedResale = nil
+SlashCmdList.WRL("simresale")
+if not simulatedResale or simulatedResale[1].itemId ~= 769 or simulatedResale[1].qty ~= 4 then
+    error("expected /wrl simresale default to Chunk of Boar Meat stock", 2)
+end
+
+-- /wrl simresale clear removes simulated stock.
+SlashCmdList.WRL("simresale clear")
+if not simulatedResale or #simulatedResale ~= 0 then
+    error("expected /wrl simresale clear to clear simulated stock", 2)
+end
+
+-- /wrl resale prints rows and opens Dashboard.
 local printedMessages = {}
 local origPrint = ns.Print
+ns.Print = function(self, msg, ...)
+    if select("#", ...) > 0 then msg = msg:format(...) end
+    printedMessages[#printedMessages + 1] = tostring(msg)
+    if tostring(msg):find("Chunk of Boar Meat", 1, true) then resaleRowsPrinted = resaleRowsPrinted + 1 end
+end
+SlashCmdList.WRL("resale")
+if ns.MainFrame.lastTab ~= "Run" then
+    error("expected /wrl resale to open Dashboard", 2)
+end
+if resaleRowsPrinted ~= 1 then
+    error("expected /wrl resale to print current resale rows", 2)
+end
+
+-- /wrl resale sold records a manual sale.
+resaleSale = nil
+SlashCmdList.WRL("resale sold 769 2 Tester-Realm")
+if not resaleSale or resaleSale.itemId ~= 769 or resaleSale.qty ~= 2 or resaleSale.buyer ~= "Tester-Realm" then
+    error("expected /wrl resale sold to record item, qty, and buyer", 2)
+end
+
+-- /wrl resale cod prepares COD mail.
+resaleCOD = nil
+SlashCmdList.WRL("resale cod 769 2 Tester-Realm")
+if not resaleCOD or resaleCOD.itemId ~= 769 or resaleCOD.qty ~= 2 or resaleCOD.buyer ~= "Tester-Realm" then
+    error("expected /wrl resale cod to prepare item, qty, and buyer", 2)
+end
+
+-- Invalid resale sale commands print clear errors.
+printedMessages = {}
+SlashCmdList.WRL("resale sold 769 0 Tester-Realm")
+SlashCmdList.WRL("resale sold 99999 1 Tester-Realm")
+SlashCmdList.WRL("resale cod 769 1")
+local foundBadQty, foundNotCatalog, foundMissingBuyer = false, false, false
+for _, m in ipairs(printedMessages) do
+    if m:find("quantity", 1, true) then foundBadQty = true end
+    if m:find("resale catalog", 1, true) then foundNotCatalog = true end
+    if m:find("buyer", 1, true) then foundMissingBuyer = true end
+end
+if not foundBadQty then error("expected zero resale quantity to print quantity error", 2) end
+if not foundNotCatalog then error("expected non-catalog resale item to print catalog error", 2) end
+if not foundMissingBuyer then error("expected missing resale COD buyer to print buyer error", 2) end
+ns.Print = origPrint
+
+-- When Merchant module is absent the command should print rather than crash.
 ns.Print = function(self, msg, ...)
     if select("#", ...) > 0 then msg = msg:format(...) end
     printedMessages[#printedMessages + 1] = tostring(msg)

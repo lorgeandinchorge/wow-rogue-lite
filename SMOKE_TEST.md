@@ -34,6 +34,10 @@ WoW Roguelite turns your account into a run-based progression system:
 /wrl dashboard
 /wrl account LABEL Character-Realm
 /wrl simrequest Character-Realm 101,201
+/wrl simresale
+/wrl simresale clear
+/wrl resale
+/wrl resale sold 769 1 Tester-Realm
 /wrl settings
 /wrl profile list
 /wrl rules
@@ -104,7 +108,7 @@ If you only have 10 to 15 minutes, please do this section.
 ### 4. Bank Desk / Rewards Flow
 
 - [ ] On the bank character, open the Dashboard tab.
-  Expected: the Bank Desk shows an active request, readiness details, account contribution summaries, and recent ledger activity.
+  Expected: the Bank Desk shows an active request, readiness details, account contribution summaries, Resale Desk goods, and recent ledger activity.
 
 - [ ] If you do not have a live request, run `/wrl simrequest Tester-Realm 101`.
   Expected: the Bank Desk receives a simulated pending request for testing.
@@ -114,6 +118,15 @@ If you only have 10 to 15 minutes, please do this section.
 
 - [ ] If a requester is unassigned, use **Assign Account** or `/wrl account LABEL Character-Realm`.
   Expected: the requester is assigned to that account label and future request/ledger lines use the label.
+
+- [ ] Run `/wrl simresale`, then `/wrl resale`.
+  Expected: the Resale Desk prints simulated catalog goods, including count and fallback price.
+
+- [ ] Use **Next Resale Item** and **Record 1 Sold**, or run `/wrl resale sold 769 1 Tester-Realm` if you have Chunk of Boar Meat.
+  Expected: the addon records a manual resale receipt and recent ledger activity updates; it does not move, mail, trade, auction, or vendor items.
+
+- [ ] Run `/wrl simresale clear`.
+  Expected: simulated resale stock is removed from the Resale Desk.
 
 - [ ] With a pending request selected by the Bank Desk, click **Prepare Mail** at a mailbox.
   Expected: the mail recipient, subject, body, and gold are prepared; missing item/gold details remain clear, with final Send still manual.

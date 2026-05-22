@@ -3,6 +3,9 @@
 
 local ADDON_NAME, ns = ...
 local Tab = ns:NewModule("Tab_Run")
+local BANK_DASHBOARD_WIDTH = 820
+local BANK_TOP_SECTION_WIDTH = 405
+local CHARACTER_RIGHT_WIDTH = 420
 
 local function shortName(full)
     return (full and full:match("^([^-]+)")) or full or "Unknown"
@@ -269,6 +272,169 @@ function Tab:_AdvanceBankRequest()
     return rows[self.bankRequestIndex]
 end
 
+function Tab:_BankDeskRows()
+    return actionableBankRequests()
+end
+
+function Tab:_SelectBankRequest(index)
+    local rows = self:_BankDeskRows()
+    index = math.floor(tonumber(index) or 0)
+    if index < 1 or index > #rows then
+        return self:_ActiveBankRequest()
+    end
+    self.bankRequestIndex = index
+    return rows[index]
+end
+
+function Tab:_ResaleRows()
+    return ns.BankResale and ns.BankResale.InventoryRows and ns.BankResale:InventoryRows() or {}
+end
+
+function Tab:_ActiveResaleRow(rows)
+    rows = rows or self:_ResaleRows()
+    if #rows == 0 then
+        self.bankResaleIndex = 1
+        return nil
+    end
+    self.bankResaleIndex = math.max(1, math.min(self.bankResaleIndex or 1, #rows))
+    return rows[self.bankResaleIndex]
+end
+
+function Tab:_AdvanceResaleRow()
+    local rows = self:_ResaleRows()
+    if #rows == 0 then
+        self.bankResaleIndex = 1
+        return nil
+    end
+    self.bankResaleIndex = ((self.bankResaleIndex or 1) % #rows) + 1
+    return rows[self.bankResaleIndex]
+end
+
+function Tab:_SelectResaleRow(index)
+    local rows = self:_ResaleRows()
+    index = math.floor(tonumber(index) or 0)
+    if index < 1 or index > #rows then
+        return self:_ActiveResaleRow(rows)
+    end
+    self.bankResaleIndex = index
+    local row = rows[index]
+    self.pendingResaleOrder = self:_BuildResaleOrder(row)
+    return self.pendingResaleOrder
+end
+
+function Tab:_DefaultResaleBuyer()
+    local draft = ns.BankResale and ns.BankResale.pendingCOD
+    if draft and draft.buyer then return draft.buyer end
+    if self.pendingResaleOrder and self.pendingResaleOrder.buyer then return self.pendingResaleOrder.buyer end
+    local req = self:_ActiveBankRequest()
+    if req and req.from then return req.from end
+    if ns.BankResale and ns.BankResale.SimulatedBuyer then
+        local buyer = ns.BankResale:SimulatedBuyer()
+        if buyer and buyer ~= "" then return buyer end
+    end
+    return nil
+end
+
+function Tab:_RequestItemForResaleRow(row)
+    if not row then return nil, nil end
+    local req = self:_ActiveBankRequest()
+    if not req or not ns.Requests or not ns.Requests.FulfillmentReadiness then return req, nil end
+    local ok, ready = pcall(function()
+        return ns.Requests:FulfillmentReadiness(req)
+    end)
+    if not ok or not ready then return req, nil end
+    for _, item in ipairs(ready.items or {}) do
+        local itemId = tonumber(item.id or item.itemId)
+        if itemId and itemId == tonumber(row.itemId) then
+            return req, item
+        end
+    end
+    return req, nil
+end
+
+function Tab:_BuildResaleOrder(row)
+    if not row then return nil end
+    local req, requestItem = self:_RequestItemForResaleRow(row)
+    local requestedQty = requestItem and tonumber(requestItem.required or requestItem.qty)
+    local qty = math.max(1, math.floor(requestedQty or tonumber(row.count) or tonumber(row.qty) or 1))
+    return {
+        itemId = row.itemId,
+        itemName = row.name,
+        name = row.name,
+        qty = qty,
+        buyer = (req and req.from) or self:_DefaultResaleBuyer(),
+        priceEach = row.priceEach,
+        totalCopper = (row.priceEach or 0) * qty,
+    }
+end
+
+function Tab:_ResaleOrderForRow(row)
+    if not row then return nil end
+    local fresh = self:_BuildResaleOrder(row)
+    local pending = self.pendingResaleOrder
+    if pending and pending.itemId == row.itemId then
+        pending.buyer = (fresh and fresh.buyer) or pending.buyer
+        pending.qty = (fresh and fresh.qty) or pending.qty
+        pending.name = pending.name or (fresh and fresh.name)
+        pending.itemName = pending.itemName or (fresh and fresh.itemName)
+        pending.priceEach = pending.priceEach or (fresh and fresh.priceEach) or row.priceEach
+        pending.totalCopper = (pending.priceEach or 0) * math.max(1, math.floor(tonumber(pending.qty) or 1))
+        return pending
+    end
+    return fresh
+end
+
+function Tab:_RecordResaleRow(row)
+    local draft = ns.BankResale and ns.BankResale.pendingCOD
+    local sale = draft or self:_ResaleOrderForRow(row)
+    if sale and ns.BankResale and ns.BankResale.RecordSale then
+        local receipt = ns.BankResale:RecordSale(sale.itemId, math.max(1, math.floor(tonumber(sale.qty) or 1)), sale.buyer)
+        if receipt then
+            ns:Print("Recorded resale: %dx %s for %s.",
+                receipt.qty or sale.qty or 1,
+                receipt.itemName or sale.name or ("item:" .. tostring(sale.itemId)),
+                ns.Tiers:FormatMoney(receipt.totalCopper or sale.totalCopper or 0))
+        end
+        self.pendingResaleOrder = nil
+        self:Refresh()
+    else
+        ns:Print("No resale catalog item is available to record.")
+    end
+end
+
+function Tab:_CancelResaleRow(row)
+    local pending = ns.BankResale and ns.BankResale.pendingCOD
+    if row and row.simulated and ns.BankResale and ns.BankResale.RemoveSimulatedStock then
+        ns.BankResale:RemoveSimulatedStock(row.itemId)
+        if ns.BankResale then ns.BankResale.pendingCOD = nil end
+        self.pendingResaleOrder = nil
+        ns:Print("Removed simulated resale stock line.")
+    elseif pending and (not row or pending.itemId == row.itemId) then
+        ns.BankResale.pendingCOD = nil
+        self.pendingResaleOrder = nil
+        ns:Print("Canceled pending resale COD mail.")
+    elseif self.pendingResaleOrder and (not row or self.pendingResaleOrder.itemId == row.itemId) then
+        self.pendingResaleOrder = nil
+        ns:Print("Canceled selected resale order.")
+    else
+        ns:Print("No pending resale COD mail to cancel.")
+    end
+    self:Refresh()
+end
+
+function Tab:_ClearResaleDesk()
+    if ns.BankResale then
+        ns.BankResale.pendingCOD = nil
+        if ns.BankResale.ClearSimulatedStock then
+            ns.BankResale:ClearSimulatedStock()
+        end
+    end
+    self.pendingResaleOrder = nil
+    self.bankResaleIndex = 1
+    ns:Print("Cleared simulated resale desk stock.")
+    self:Refresh()
+end
+
 function Tab:_FirstActionableBankRequest(unassignedOnly)
     for _, req in ipairs(actionableBankRequests()) do
         if isActionableRequest(req) and ((not unassignedOnly) or not req.accountId) then
@@ -300,6 +466,28 @@ local function readinessSummary(req)
     return ("Missing for next mail: %d item line(s), %s. The ledger has concerns."):format(missingItems, ns.Tiers:FormatMoney(missingGold))
 end
 
+local function bankDeskItemLine(item)
+    local name = item and item.name or ("item:" .. tostring(item and item.id or "?"))
+    local required = item and item.required or 0
+    local available = item and item.available or 0
+    local missing = item and item.missing or 0
+    if missing > 0 then
+        return ("Item: %s - available %d / requested %d / missing %d"):format(name, available, required, missing)
+    end
+    return ("Item: %s - available %d / requested %d / ready"):format(name, available, required)
+end
+
+local function bankDeskGoldLine(ready)
+    local requiredGold = ready and ready.requiredGold or 0
+    local availableGold = ready and ready.availableGold or 0
+    local missingGold = math.max(0, requiredGold - availableGold)
+    local state = missingGold > 0 and ("missing " .. ns.Tiers:FormatMoney(missingGold)) or "ready"
+    return ("Gold: available %s / requested %s / %s"):format(
+        ns.Tiers:FormatMoney(availableGold),
+        ns.Tiers:FormatMoney(requiredGold),
+        state)
+end
+
 local function appendActiveRequestLines(lines, req)
     if not req then
         lines[#lines + 1] = "No pending bank requests. Suspiciously peaceful."
@@ -325,24 +513,66 @@ local function appendActiveRequestLines(lines, req)
     local missingItems = ready.missingItems or {}
     if ready.fulfillable then
         lines[#lines + 1] = ("Readiness: ready for mail - %s gold, 0 item line(s) missing."):format(ns.Tiers:FormatMoney(requiredGold))
-        lines[#lines + 1] = "Missing: none. The clerk is almost cheerful."
+    else
+        lines[#lines + 1] = ("Readiness: missing %d item line(s), %s gold."):format(#missingItems, ns.Tiers:FormatMoney(missingGold))
+    end
+
+    local items = ready.items or {}
+    local shownItems = math.min(4, #items)
+    for i = 1, shownItems do
+        lines[#lines + 1] = bankDeskItemLine(items[i])
+    end
+    if #items == 0 then
+        lines[#lines + 1] = "Item: no item stacks requested."
+    elseif #items > shownItems then
+        lines[#lines + 1] = ("Item: ... and %d more item line(s)"):format(#items - shownItems)
+    end
+    lines[#lines + 1] = bankDeskGoldLine(ready)
+end
+
+local function requestReadyLabel(req)
+    if not req or not ns.Requests or not ns.Requests.FulfillmentReadiness then
+        return "unknown", "?", "?"
+    end
+    local ok, ready = pcall(function()
+        return ns.Requests:FulfillmentReadiness(req)
+    end)
+    if not ok or not ready then return "unknown", "?", "?" end
+    local missingGold = math.max(0, (ready.requiredGold or 0) - (ready.availableGold or 0))
+    local missingItems = #(ready.missingItems or {})
+    local state = ready.fulfillable and "ready" or "missing"
+    return state, ns.Tiers:FormatMoney(missingGold), tostring(missingItems)
+end
+
+local function appendBankDeskTable(lines, maxRows, owner)
+    lines[#lines + 1] = string.format("%-18s %-14s %-16s %-8s %10s %5s", "Who", "Account", "Rewards", "Ready", "Gold", "Items")
+    local rows = owner and owner._BankDeskRows and owner:_BankDeskRows() or actionableBankRequests()
+    if #rows == 0 then
+        lines[#lines + 1] = "No pending bank requests. Suspiciously peaceful."
+        lines[#lines + 1] = "Mailbox work: nothing ready for the clerk."
         return
     end
 
-    lines[#lines + 1] = ("Readiness: missing %d item line(s), %s gold."):format(#missingItems, ns.Tiers:FormatMoney(missingGold))
-    local shownItems = math.min(2, #missingItems)
-    for i = 1, shownItems do
-        local it = missingItems[i]
-        lines[#lines + 1] = ("Missing item: %s need %d, have %d"):format(
-            it.name or ("item:" .. tostring(it.id or "?")),
-            it.required or 0,
-            it.available or 0)
+    local limit = math.min(maxRows or 8, #rows)
+    for i = 1, limit do
+        local req = rows[i]
+        local who = req.from or "Unknown"
+        local account = req.accountId and ns.Database and ns.Database.AccountLabel and ns.Database:AccountLabel(req.accountId) or "Unassigned"
+        local rewards = requestTierLabel(req)
+        local ready, gold, items = requestReadyLabel(req)
+        if #who > 18 then who = who:sub(1, 15) .. "..." end
+        if #account > 14 then account = account:sub(1, 11) .. "..." end
+        if #rewards > 16 then rewards = rewards:sub(1, 13) .. "..." end
+        lines[#lines + 1] = string.format("%-18s %-14s %-16s %-8s %10s %5s",
+            who,
+            account,
+            rewards,
+            ready,
+            gold,
+            items)
     end
-    if #missingItems > shownItems then
-        lines[#lines + 1] = ("Missing item: ... and %d more"):format(#missingItems - shownItems)
-    end
-    if missingGold > 0 then
-        lines[#lines + 1] = ("Missing gold: need %s, have %s"):format(ns.Tiers:FormatMoney(requiredGold), ns.Tiers:FormatMoney(availableGold))
+    if #rows > limit then
+        lines[#lines + 1] = ("... and %d more request(s)"):format(#rows - limit)
     end
 end
 
@@ -353,16 +583,47 @@ local function appendContributionBoard(lines, maxAccounts, maxCharacters)
         lines[#lines + 1] = "No account contributions recorded yet. The vault remains emotionally available."
         return
     end
-    for i = 1, math.min(maxAccounts or 4, #rows) do
+    lines[#lines + 1] = string.format("%-4s %-18s %10s %7s", "#", "Account", "Total", "Share")
+    for i = 1, math.min(maxAccounts or 5, #rows) do
         local row = rows[i]
-        lines[#lines + 1] = ("%s - %s (%.1f%% of the paperwork)"):format(
-            row.label or "Unassigned",
+        local label = row.label or "Unassigned"
+        if #label > 18 then label = label:sub(1, 15) .. "..." end
+        lines[#lines + 1] = string.format("%-4s %-18s %10s %6.1f%%",
+            tostring(i) .. ".",
+            label,
             ns.Tiers:FormatMoney(row.total or 0),
             row.percent or 0)
-        for j = 1, math.min(maxCharacters or 3, #(row.characters or {})) do
-            local c = row.characters[j]
-            lines[#lines + 1] = (" - %s: %s"):format(c.characterKey or "Unknown", ns.Tiers:FormatMoney(c.total or 0))
-        end
+    end
+end
+
+local function appendResaleDesk(lines, maxRows, owner)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "|cffc0a060Resale Desk|r"
+    local rows = ns.BankResale and ns.BankResale.InventoryRows and ns.BankResale:InventoryRows() or {}
+    if #rows == 0 then
+        lines[#lines + 1] = "No resale catalog goods found. The shelves are judging everyone equally."
+        return
+    end
+    local resaleTableHeader = string.format("%-20s %-18s %3s %3s %8s %8s", "Item", "Who", "Req", "Own", "Each", "Total")
+    lines[#lines + 1] = resaleTableHeader
+    local limit = math.min(maxRows or 5, #rows)
+    for i = 1, limit do
+        local row = rows[i]
+        local order = owner and owner._BuildResaleOrder and owner:_BuildResaleOrder(row) or nil
+        local name = row.name or ("item:" .. tostring(row.itemId or "?"))
+        local buyer = (order and order.buyer) or "Unknown"
+        if #name > 20 then name = name:sub(1, 17) .. "..." end
+        if #buyer > 18 then buyer = buyer:sub(1, 15) .. "..." end
+        lines[#lines + 1] = string.format("%-20s %-18s %3s %3d %8s %8s",
+            name,
+            buyer,
+            tostring(order and order.qty or row.count or 0),
+            row.count or 0,
+            ns.Tiers:FormatMoney(row.priceEach or 0),
+            ns.Tiers:FormatMoney((order and order.totalCopper) or row.totalCopper or 0))
+    end
+    if #rows > limit then
+        lines[#lines + 1] = ("... and %d more resale item(s)"):format(#rows - limit)
     end
 end
 
@@ -381,6 +642,13 @@ local function appendRecentLedger(lines, maxRows)
                 row.characterKey or "Unknown",
                 row.accountLabel or "Unassigned",
                 row.method or "manual")
+        elseif row.kind == "resale" then
+            lines[#lines + 1] = (" - %s resale to %s: %dx %s for %s"):format(
+                fmtWhen(row.when),
+                row.characterKey or "Unknown",
+                row.qty or 0,
+                row.itemName or "catalog item",
+                ns.Tiers:FormatMoney(row.amount or 0))
         else
             lines[#lines + 1] = (" - %s contribution from %s (%s): %s"):format(
                 fmtWhen(row.when),
@@ -413,6 +681,7 @@ end
 local function splitBankSections(lines)
     local desk = {}
     local contributions = {}
+    local resale = {}
     local ledger = {}
     local target = desk
     for i, line in ipairs(lines or {}) do
@@ -420,22 +689,28 @@ local function splitBankSections(lines)
             -- The framed section title owns this heading.
         elseif line == "|cffc0a060Contribution Board|r" then
             target = contributions
+        elseif line == "|cffc0a060Resale Desk|r" then
+            target = resale
         elseif line == "" then
-            target = ledger
+            if target == contributions then
+                target = resale
+            else
+                target = ledger
+            end
         elseif line == "|cffc0a060Recent ledger|r" then
             target = ledger
         else
             target[#target + 1] = line
         end
     end
-    return desk, contributions, ledger
+    return desk, contributions, resale, ledger
 end
 
 local setLedgerSection
 
 local function buildBankSection(content, Theme, titleText)
     local section = CreateFrame("Frame", nil, content)
-    section:SetWidth(420)
+    section:SetWidth(BANK_DASHBOARD_WIDTH)
     Theme:Fill(section, Theme.c.bg1, true, "panel")
     section.borderLeft = section:CreateTexture(nil, "BORDER")
     section.borderLeft:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
@@ -448,24 +723,32 @@ local function buildBankSection(content, Theme, titleText)
     section.borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
     section.borderRight:SetWidth(1)
 
-    local title = Theme:Text(section, 12, Theme.c.goldH)
+    local title = Theme:Text(section, 13, Theme.c.goldH)
     section.title = title
     title:SetPoint("TOPLEFT", 12, -10)
     title:SetText(titleText or "")
     if title.SetFont then
-        title:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+        title:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     end
 
     section.lines = {}
     for i = 1, 16 do
-        local fs = Theme:Text(section, 10, Theme.c.fg2)
-        fs:SetWidth(396)
+        local fs = Theme:Text(section, 11, Theme.c.fg2)
+        fs:SetWidth(BANK_DASHBOARD_WIDTH - 24)
         fs:SetJustifyH("LEFT")
         fs:SetSpacing(2)
         section.lines[i] = fs
     end
 
     return section
+end
+
+local function setBankSectionWidth(section, width)
+    if not section or not width then return end
+    section:SetWidth(width)
+    for _, fs in ipairs(section.lines or {}) do
+        fs:SetWidth(width - 24)
+    end
 end
 
 local function buildLedgerSection(content, Theme)
@@ -495,13 +778,13 @@ local function buildLedgerSection(content, Theme)
     local ledgerScroll, ledgerContent = Theme:ScrollArea(ledger)
     ledgerScroll:SetPoint("TOPLEFT", ledger.searchBox, "BOTTOMLEFT", 0, -8)
     ledgerScroll:SetPoint("BOTTOMRIGHT", ledger, "BOTTOMRIGHT", -24, 10)
-    ledgerContent:SetSize(372, 1)
+    ledgerContent:SetSize(BANK_DASHBOARD_WIDTH - 48, 1)
     ledger.scroll = ledgerScroll
     ledger.content = ledgerContent
     ledger.ledgerLines = {}
     for i = 1, 50 do
         local fs = Theme:Text(ledgerContent, 10, Theme.c.fg2)
-        fs:SetWidth(372)
+        fs:SetWidth(BANK_DASHBOARD_WIDTH - 48)
         fs:SetJustifyH("LEFT")
         fs:SetSpacing(2)
         if i == 1 then
@@ -527,7 +810,7 @@ local function setBankSection(section, lines)
             fs:SetText(text)
             fs:Show()
             prev = fs
-            height = height + 16
+            height = height + 18
         else
             fs:Hide()
         end
@@ -535,6 +818,201 @@ local function setBankSection(section, lines)
     section:SetHeight(math.max(72, height + 10))
     section:Show()
     return section:GetHeight()
+end
+
+local function createInlineIconButton(section, label, texturePath, width)
+    local action = CreateFrame("Button", nil, section)
+    action:SetSize(width or 18, 18)
+    action.bg = action:CreateTexture(nil, "BACKGROUND")
+    action.bg:SetAllPoints(action)
+    action.bg:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.12)
+    if texturePath then
+        action.icon = action:CreateTexture(nil, "ARTWORK")
+        action.icon:SetSize(12, 12)
+        action.icon:SetPoint("CENTER", action, "CENTER", 0, 0)
+        action.icon:SetTexture(texturePath)
+    else
+        action.text = ns.Theme:Text(action, 9, ns.Theme.c.fg)
+        action.text:SetPoint("CENTER", action, "CENTER", 0, 0)
+        action.text:SetText(label)
+    end
+    return action
+end
+
+local function ensureBankDeskButtons(section)
+    section.bankDeskButtons = section.bankDeskButtons or {}
+    for i = #section.bankDeskButtons + 1, 16 do
+        local button = CreateFrame("Button", nil, section)
+        button:SetSize(650, 18)
+        button.selection = button:CreateTexture(nil, "BACKGROUND")
+        button.selection:SetAllPoints(button)
+        button.selection:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.18)
+        button.selection:Hide()
+        button.mailButton = createInlineIconButton(section, "mail", "Interface\\Icons\\INV_Letter_15")
+        button.doneButton = createInlineIconButton(section, "done", "Interface\\RaidFrame\\ReadyCheck-Ready")
+        button.accountButton = createInlineIconButton(section, "A", nil, 22)
+        section.bankDeskButtons[i] = button
+    end
+end
+
+local function setBankDeskSection(section, lines, rows, owner)
+    local height = setBankSection(section, lines)
+    if not section then return height end
+    ensureBankDeskButtons(section)
+    rows = rows or {}
+    local shownRows = math.min(#rows, math.max(0, #(section.lines or {}) - 1))
+    for i, button in ipairs(section.bankDeskButtons or {}) do
+        local fs = section.lines and section.lines[i + 1]
+        if i <= shownRows and fs then
+            local rowIndex = i
+            local req = rows[i]
+            local selected = (owner.bankRequestIndex or 1) == i
+            fs:SetText(lines[i + 1] or "")
+            fs:SetWidth(650)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", fs, "TOPLEFT", -4, 3)
+            if button.selection then
+                if selected then button.selection:Show() else button.selection:Hide() end
+            end
+            button:SetScript("OnClick", function()
+                owner:_SelectBankRequest(rowIndex)
+                owner:Refresh()
+            end)
+            button:Show()
+
+            button.mailButton:ClearAllPoints()
+            button.mailButton:SetPoint("LEFT", button, "RIGHT", 10, 0)
+            button.mailButton:SetScript("OnClick", function()
+                owner:_SelectBankRequest(rowIndex)
+                if req and ns.Requests and ns.Requests.BeginMailFulfillment then
+                    ns.Requests:BeginMailFulfillment(req.id)
+                else
+                    ns:Print("No pending bank request is ready for mail.")
+                end
+            end)
+            button.mailButton:Show()
+
+            button.doneButton:ClearAllPoints()
+            button.doneButton:SetPoint("LEFT", button.mailButton, "RIGHT", 4, 0)
+            button.doneButton:SetScript("OnClick", function()
+                owner:_SelectBankRequest(rowIndex)
+                if req and ns.Requests and ns.Requests.MarkFulfilled then
+                    ns.Requests:MarkFulfilled(req.id)
+                    owner:Refresh()
+                else
+                    ns:Print("No pending bank request to mark fulfilled.")
+                end
+            end)
+            button.doneButton:Show()
+
+            button.accountButton:ClearAllPoints()
+            button.accountButton:SetPoint("LEFT", button.doneButton, "RIGHT", 4, 0)
+            button.accountButton:SetScript("OnClick", function()
+                owner:_SelectBankRequest(rowIndex)
+                if req and not req.accountId then
+                    owner:PromptAssignAccount(req)
+                else
+                    ns:Print("Requester is already assigned to an account.")
+                end
+            end)
+            if req and not req.accountId then button.accountButton:Show() else button.accountButton:Hide() end
+        else
+            if button.selection then button.selection:Hide() end
+            button:Hide()
+            if button.mailButton then button.mailButton:Hide() end
+            if button.doneButton then button.doneButton:Hide() end
+            if button.accountButton then button.accountButton:Hide() end
+        end
+    end
+    return height
+end
+
+local function ensureResaleButtons(section)
+    section.resaleButtons = section.resaleButtons or {}
+    for i = #section.resaleButtons + 1, 16 do
+        local button = CreateFrame("Button", nil, section)
+        button:SetSize(650, 18)
+        button.selection = button:CreateTexture(nil, "BACKGROUND")
+        button.selection:SetAllPoints(button)
+        button.selection:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.18)
+        button.selection:Hide()
+        button.mailButton = createInlineIconButton(section, "mail", "Interface\\Icons\\INV_Letter_15")
+        button.soldButton = createInlineIconButton(section, "sold", "Interface\\RaidFrame\\ReadyCheck-Ready")
+        button.cancelButton = createInlineIconButton(section, "cancel", "Interface\\RaidFrame\\ReadyCheck-NotReady")
+        section.resaleButtons[i] = button
+    end
+end
+
+local function setResaleSection(section, lines, rows, owner)
+    local height = setBankSection(section, lines)
+    if not section then return height end
+    ensureResaleButtons(section)
+    if not section.clearResaleButton then
+        local button = CreateFrame("Button", nil, section)
+        button:SetSize(18, 18)
+        button:SetPoint("TOPRIGHT", section, "TOPRIGHT", -10, -8)
+        button.bg = button:CreateTexture(nil, "BACKGROUND")
+        button.bg:SetAllPoints(button)
+        button.bg:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.12)
+        button.text = ns.Theme:Text(button, 11, ns.Theme.c.fg)
+        button.text:SetPoint("CENTER", button, "CENTER", 0, 0)
+        button.text:SetText("x")
+        button:SetScript("OnClick", function()
+            owner:_ClearResaleDesk()
+        end)
+        section.clearResaleButton = button
+    end
+    section.clearResaleButton:Show()
+    rows = rows or {}
+    local shownRows = math.min(#rows, math.max(0, #(section.lines or {}) - 1))
+    for i, button in ipairs(section.resaleButtons or {}) do
+        local fs = section.lines and section.lines[i + 1]
+        if i <= shownRows and fs then
+            local rowIndex = i
+            local row = rows[i]
+            local selected = (owner.bankResaleIndex or 1) == i
+            fs:SetText(lines[i + 1] or "")
+            fs:SetWidth(650)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", fs, "TOPLEFT", -4, 3)
+            if button.selection then
+                if selected then button.selection:Show() else button.selection:Hide() end
+            end
+            button:SetScript("OnClick", function()
+                owner:_SelectResaleRow(rowIndex)
+                owner:Refresh()
+            end)
+            button:Show()
+            button.mailButton:ClearAllPoints()
+            button.mailButton:SetPoint("LEFT", button, "RIGHT", 10, 0)
+            button.mailButton:SetScript("OnClick", function()
+                owner:_SelectResaleRow(rowIndex)
+                owner:PromptResaleCOD(row)
+            end)
+            button.mailButton:Show()
+            button.soldButton:ClearAllPoints()
+            button.soldButton:SetPoint("LEFT", button.mailButton, "RIGHT", 4, 0)
+            button.soldButton:SetScript("OnClick", function()
+                owner:_SelectResaleRow(rowIndex)
+                owner:_RecordResaleRow(row)
+            end)
+            button.soldButton:Show()
+            button.cancelButton:ClearAllPoints()
+            button.cancelButton:SetPoint("LEFT", button.soldButton, "RIGHT", 4, 0)
+            button.cancelButton:SetScript("OnClick", function()
+                owner:_SelectResaleRow(rowIndex)
+                owner:_CancelResaleRow(row)
+            end)
+            button.cancelButton:Show()
+        else
+            if button.selection then button.selection:Hide() end
+            button:Hide()
+            if button.mailButton then button.mailButton:Hide() end
+            if button.soldButton then button.soldButton:Hide() end
+            if button.cancelButton then button.cancelButton:Hide() end
+        end
+    end
+    return height
 end
 
 setLedgerSection = function(section, lines)
@@ -607,11 +1085,10 @@ function Tab:_BuildBankerOverviewLines(key)
     local nextReq = self:_ActiveBankRequest()
     local right = {
         "|cffc0a060Bank Desk|r",
-        ("%d request(s) need attention: %d pending, %d preparing."):format(pending + gathering, pending, gathering),
-        ("Fulfilled in the ledger: %d. Unassigned requester(s): %d."):format(fulfilled, unassigned),
     }
-    appendActiveRequestLines(right, nextReq)
-    appendContributionBoard(right, 4, 3)
+    appendBankDeskTable(right, 8, self)
+    appendContributionBoard(right, 5, 0)
+    appendResaleDesk(right, 6, self)
     appendRecentLedger(right, 50)
 
     return left, right
@@ -657,6 +1134,74 @@ function Tab:PromptAssignAccount(req)
     if popup then popup.data = req.from end
 end
 
+function Tab:PromptResaleCOD(row)
+    if not row then
+        ns:Print("No resale catalog item is selected.")
+        return
+    end
+    row = self:_ResaleOrderForRow(row)
+    if row and row.buyer and ns.BankResale and ns.BankResale.PrepareCODMail then
+        local draft, reason = ns.BankResale:PrepareCODMail(row.itemId, row.qty or 1, row.buyer)
+        self._lastResaleCOD = draft
+        if draft then
+            self.pendingResaleOrder = draft
+            return
+        end
+        if reason == "mailbox_closed" then
+            ns:Print("Open your mailbox first, then prepare resale COD mail again.")
+        elseif reason == "missing_buyer" then
+            ns:Print("Resale COD mail requires a buyer.")
+        else
+            ns:Print("Could not prepare resale COD mail.")
+        end
+        return
+    end
+    if not StaticPopupDialogs or not StaticPopup_Show then
+        ns:Print("Use |cffffff00/wrl resale cod %d 1 BUYER|r to prepare COD mail.", row.itemId or 0)
+        return
+    end
+    self._lastResalePrompted = row.itemId
+    StaticPopupDialogs["WRL_RESALE_COD"] = StaticPopupDialogs["WRL_RESALE_COD"] or {
+        text = "Prepare COD mail for %s. Enter buyer and quantity:",
+        button1 = "Prepare COD",
+        button2 = "Cancel",
+        hasEditBox = 1,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        OnAccept = function(popup, data)
+            local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+            local text = editBox and editBox:GetText() or ""
+            local buyer, qtyText = text:match("^(%S+)%s*(%S*)$")
+            local qty = tonumber(qtyText) or 1
+            local saleRow = data and data.row
+            if saleRow and ns.BankResale and ns.BankResale.PrepareCODMail then
+                local draft, reason = ns.BankResale:PrepareCODMail(saleRow.itemId, math.min(qty, saleRow.count or qty), buyer)
+                Tab._lastResaleCOD = draft
+                if not draft then
+                    if reason == "mailbox_closed" then
+                        ns:Print("Open your mailbox first, then prepare resale COD mail again.")
+                    elseif reason == "missing_buyer" then
+                        ns:Print("Resale COD mail requires a buyer.")
+                    else
+                        ns:Print("Could not prepare resale COD mail.")
+                    end
+                end
+            end
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local popup = editBox:GetParent()
+            StaticPopupDialogs["WRL_RESALE_COD"].OnAccept(popup, popup.data)
+            popup:Hide()
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            editBox:GetParent():Hide()
+        end,
+    }
+    local popup = StaticPopup_Show("WRL_RESALE_COD", row.name or ("item:" .. tostring(row.itemId)))
+    if popup then popup.data = { row = row } end
+end
+
 function Tab:_ShouldShowContributionAction(rec)
     local state = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec and rec.status
     return state == "dead_pending_contribution"
@@ -692,10 +1237,12 @@ function Tab:Init(parent)
     left:SetPoint("TOPLEFT", 20, -64)
     left:SetPoint("BOTTOMLEFT", 20, 18)
     left:SetWidth(304)
+    self.leftPane = left
 
     local right = CreateFrame("Frame", nil, p)
     right:SetPoint("TOPLEFT", left, "TOPRIGHT", 16, 0)
     right:SetPoint("BOTTOMRIGHT", -20, 18)
+    self.rightPane = right
 
     self.leftTitle = Theme:Text(left, 12, Theme.c.goldH)
     self.leftTitle:SetPoint("TOPLEFT", 0, 0)
@@ -713,86 +1260,23 @@ function Tab:Init(parent)
         self.leftLines[i] = fs
     end
 
-    self.bankActionsBox = CreateFrame("Frame", nil, left)
-    self.bankActionsBox:SetPoint("TOPLEFT", self.leftLines[7], "BOTTOMLEFT", 0, -16)
-    self.bankActionsBox:SetSize(300, 96)
-    Theme:Fill(self.bankActionsBox, Theme.c.bg1, true)
-    self.bankActionsBox.borderLeft = self.bankActionsBox:CreateTexture(nil, "BORDER")
-    self.bankActionsBox.borderLeft:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
-    self.bankActionsBox.borderLeft:SetPoint("TOPLEFT", 0, 0)
-    self.bankActionsBox.borderLeft:SetPoint("BOTTOMLEFT", 0, 0)
-    self.bankActionsBox.borderLeft:SetWidth(1)
-    self.bankActionsBox.borderRight = self.bankActionsBox:CreateTexture(nil, "BORDER")
-    self.bankActionsBox.borderRight:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.28)
-    self.bankActionsBox.borderRight:SetPoint("TOPRIGHT", 0, 0)
-    self.bankActionsBox.borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
-    self.bankActionsBox.borderRight:SetWidth(1)
-    self.bankActionsBox:Hide()
-
-    self.bankActionsTitle = Theme:Text(self.bankActionsBox, 12, Theme.c.goldH)
-    self.bankActionsTitle:SetPoint("TOPLEFT", 12, -10)
-    self.bankActionsTitle:SetText("Bank Actions")
-    if self.bankActionsTitle.SetFont then
-        self.bankActionsTitle:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-    end
-
-    self.bankNextButton = Theme:Button(self.bankActionsBox, "Next Request", 132, 20)
-    self.bankNextButton:SetPoint("TOPLEFT", self.bankActionsTitle, "BOTTOMLEFT", 0, -8)
-    self.bankNextButton:SetScript("OnClick", function()
-        Tab:_AdvanceBankRequest()
-        Tab:Refresh()
-    end)
-    self.bankNextButton:Hide()
-
-    self.bankAssignButton = Theme:Button(self.bankActionsBox, "Assign Account", 132, 20)
-    self.bankAssignButton:SetPoint("LEFT", self.bankNextButton, "RIGHT", 8, 0)
-    self.bankAssignButton:SetScript("OnClick", function()
-        local activeReq = Tab:_ActiveBankRequest()
-        local req = activeReq and not activeReq.accountId and activeReq or Tab:_FirstActionableBankRequest(true)
-        if req then
-            Tab:PromptAssignAccount(req)
-        else
-            ns:Print("No unassigned pending requester at the Bank Desk.")
-        end
-    end)
-    self.bankAssignButton:Hide()
-
-    self.bankDoneButton = Theme:Button(self.bankActionsBox, "Mark Fulfilled", 132, 20)
-    self.bankDoneButton:SetPoint("TOPLEFT", self.bankNextButton, "BOTTOMLEFT", 0, -8)
-    self.bankDoneButton:SetScript("OnClick", function()
-        local req = Tab:_ActiveBankRequest()
-        if req and ns.Requests and ns.Requests.MarkFulfilled then
-            ns.Requests:MarkFulfilled(req.id)
-            Tab:Refresh()
-        else
-            ns:Print("No pending bank request to mark fulfilled.")
-        end
-    end)
-    self.bankDoneButton:Hide()
-
-    self.bankMailButton = Theme:Button(self.bankActionsBox, "Prepare Mail", 132, 20)
-    self.bankMailButton:SetPoint("LEFT", self.bankDoneButton, "RIGHT", 8, 0)
-    self.bankMailButton:SetScript("OnClick", function()
-        local req = Tab:_ActiveBankRequest()
-        if req and ns.Requests and ns.Requests.BeginMailFulfillment then
-            ns.Requests:BeginMailFulfillment(req.id)
-        else
-            ns:Print("No pending bank request is ready for mail.")
-        end
-    end)
-    self.bankMailButton:Hide()
-
     local scroll, content = Theme:ScrollArea(right)
     scroll:SetPoint("TOPLEFT", 0, -2)
     scroll:SetPoint("BOTTOMRIGHT", 0, 0)
-    content:SetSize(420, 1)
+    content:SetSize(CHARACTER_RIGHT_WIDTH, 1)
     self.scroll = scroll
     self.content = content
+    self.bankSnapshotSection = buildBankSection(content, Theme, "Bank Snapshot")
+    setBankSectionWidth(self.bankSnapshotSection, BANK_TOP_SECTION_WIDTH)
+    self.bankSnapshotSection:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -2)
+    self.bankSnapshotSection:Hide()
     self.bankDeskSection = buildBankSection(content, Theme, "Bank Desk")
-    self.bankDeskSection:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -2)
     self.bankDeskSection:Hide()
     self.bankContributionSection = buildBankSection(content, Theme, "Contribution Board")
+    setBankSectionWidth(self.bankContributionSection, BANK_TOP_SECTION_WIDTH)
     self.bankContributionSection:Hide()
+    self.bankResaleSection = buildBankSection(content, Theme, "Resale Desk")
+    self.bankResaleSection:Hide()
     self.bankLedgerSection = buildLedgerSection(content, Theme)
     self.bankLedgerSection:Hide()
 
@@ -821,10 +1305,18 @@ function Tab:Refresh()
     local key = ns:UnitKey()
     local rec = key and ns.Database and ns.Database.GetCharacter and ns.Database:GetCharacter(key) or nil
     if not key or not rec then
+        if self.leftPane then self.leftPane:Show() end
+        if self.rightPane then
+            self.rightPane:ClearAllPoints()
+            self.rightPane:SetPoint("TOPLEFT", self.leftPane, "TOPRIGHT", 16, 0)
+            self.rightPane:SetPoint("BOTTOMRIGHT", -20, 18)
+        end
+        self.content:SetSize(CHARACTER_RIGHT_WIDTH, 1)
+        if self.bankSnapshotSection then self.bankSnapshotSection:Hide() end
         if self.bankDeskSection then self.bankDeskSection:Hide() end
         if self.bankContributionSection then self.bankContributionSection:Hide() end
+        if self.bankResaleSection then self.bankResaleSection:Hide() end
         if self.bankLedgerSection then self.bankLedgerSection:Hide() end
-        if self.bankActionsBox then self.bankActionsBox:Hide() end
         writeLines(self.leftLines, {
             "Character: unavailable",
             "Run data has not initialized yet.",
@@ -839,49 +1331,58 @@ function Tab:Refresh()
 
     local name, realm = withRealm(key)
     if ns.Database:IsBankCharacter(key) then
+        local keepScroll = self.scroll and self.scroll.GetVerticalScroll and self.scroll:GetVerticalScroll() or 0
         if self.contributionButton then self.contributionButton:Hide() end
-        local actionReq = self:_ActiveBankRequest()
-        local unassignedReq = self:_FirstActionableBankRequest(true)
-        if self.bankActionsBox then self.bankActionsBox:Show() end
-        if self.bankMailButton then
-            if actionReq then self.bankMailButton:Show() else self.bankMailButton:Hide() end
+        if self.leftPane then self.leftPane:Hide() end
+        if self.rightPane then
+            self.rightPane:ClearAllPoints()
+            self.rightPane:SetPoint("TOPLEFT", self.panel, "TOPLEFT", 20, -64)
+            self.rightPane:SetPoint("BOTTOMRIGHT", self.panel, "BOTTOMRIGHT", -20, 18)
         end
-        if self.bankDoneButton then
-            if actionReq then self.bankDoneButton:Show() else self.bankDoneButton:Hide() end
-        end
-        if self.bankAssignButton then
-            if unassignedReq then self.bankAssignButton:Show() else self.bankAssignButton:Hide() end
-        end
-        if self.bankNextButton then
-            if actionReq then self.bankNextButton:Show() else self.bankNextButton:Hide() end
-        end
+        self.content:SetSize(BANK_DASHBOARD_WIDTH, 1)
+        local bankRows = self:_BankDeskRows()
+        local resaleRows = self:_ResaleRows()
+        self:_ActiveResaleRow(resaleRows)
         self.hint:SetText("Bank Desk dashboard: requests, account contributions, and recent ledger work.")
         self.leftTitle:SetText("Bank Snapshot")
         local left, right = self:_BuildBankerOverviewLines(key)
-        writeLines(self.leftLines, left)
+        hideLines(self.leftLines)
         hideLines(self.rightLines)
-        local deskLines, contributionLines, ledgerLines = splitBankSections(right)
-        local deskH = setBankSection(self.bankDeskSection, deskLines)
+        local deskLines, contributionLines, resaleLines, ledgerLines = splitBankSections(right)
+        local snapshotH = setBankSection(self.bankSnapshotSection, left)
         self.bankContributionSection:ClearAllPoints()
-        self.bankContributionSection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        self.bankContributionSection:SetPoint("TOPLEFT", self.bankSnapshotSection, "TOPRIGHT", 10, 0)
         local contributionH = setBankSection(self.bankContributionSection, contributionLines)
+        local topH = math.max(snapshotH, contributionH)
+        self.bankSnapshotSection:SetHeight(topH)
+        self.bankContributionSection:SetHeight(topH)
+        local deskH = setBankDeskSection(self.bankDeskSection, deskLines, bankRows, self)
+        self.bankDeskSection:ClearAllPoints()
+        self.bankDeskSection:SetPoint("TOPLEFT", self.bankSnapshotSection, "BOTTOMLEFT", 0, -10)
+        self.bankResaleSection:ClearAllPoints()
+        self.bankResaleSection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        local resaleH = setResaleSection(self.bankResaleSection, resaleLines, resaleRows, self)
         self.bankLedgerSection:ClearAllPoints()
-        self.bankLedgerSection:SetPoint("TOPLEFT", self.bankContributionSection, "BOTTOMLEFT", 0, -10)
+        self.bankLedgerSection:SetPoint("TOPLEFT", self.bankResaleSection, "BOTTOMLEFT", 0, -10)
         local ledgerH = setLedgerSection(self.bankLedgerSection, ledgerLines)
-        self.content:SetHeight(math.max(1, deskH + contributionH + ledgerH + 46))
-        self.scroll:SetVerticalScroll(0)
+        self.content:SetHeight(math.max(1, topH + deskH + resaleH + ledgerH + 56))
+        self.scroll:SetVerticalScroll(keepScroll)
         return
     end
 
     self.hint:SetText("Character-focused dashboard for the logged-in runner.")
+    if self.leftPane then self.leftPane:Show() end
+    if self.rightPane then
+        self.rightPane:ClearAllPoints()
+        self.rightPane:SetPoint("TOPLEFT", self.leftPane, "TOPRIGHT", 16, 0)
+        self.rightPane:SetPoint("BOTTOMRIGHT", -20, 18)
+    end
+    self.content:SetSize(CHARACTER_RIGHT_WIDTH, 1)
+    if self.bankSnapshotSection then self.bankSnapshotSection:Hide() end
     if self.bankDeskSection then self.bankDeskSection:Hide() end
     if self.bankContributionSection then self.bankContributionSection:Hide() end
+    if self.bankResaleSection then self.bankResaleSection:Hide() end
     if self.bankLedgerSection then self.bankLedgerSection:Hide() end
-    if self.bankMailButton then self.bankMailButton:Hide() end
-    if self.bankDoneButton then self.bankDoneButton:Hide() end
-    if self.bankAssignButton then self.bankAssignButton:Hide() end
-    if self.bankNextButton then self.bankNextButton:Hide() end
-    if self.bankActionsBox then self.bankActionsBox:Hide() end
     self.leftTitle:SetText("Character Dashboard")
 
     local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"
