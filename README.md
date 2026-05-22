@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.5 - Bank Resale Desk. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted, and the bank can list and record manual resale of curated quest-useful goods.
+> **Status:** v0.3.5 - Bank Resale Desk. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, and the bank can list and record manual resale of curated quest-useful goods.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
