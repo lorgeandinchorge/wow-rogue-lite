@@ -274,6 +274,17 @@ function Popup:Init()
     self.note:SetJustifyH("LEFT")
     y = y + 48
 
+    self.fontLabel, y = buildSectionHeader(content, Theme, "Font", y)
+    local fontDd = CreateFrame("Frame", "WRL_SettingsFontDropdown", content, "UIDropDownMenuTemplate")
+    fontDd:SetPoint("TOPLEFT", self.fontLabel, "BOTTOMLEFT", -16, -2)
+    dropdownSetWidth(fontDd, 196)
+    self.fontDropdown = fontDd
+    self.fontNote = Theme:Text(content, 10, Theme.c.fg2)
+    self.fontNote:SetPoint("TOPLEFT", 220, -y)
+    self.fontNote:SetWidth(400)
+    self.fontNote:SetJustifyH("LEFT")
+    y = y + 48
+
     self.deathLabel, y = buildSectionHeader(content, Theme, "Death Announcements", y)
     local deathDd = CreateFrame("Frame", "WRL_SettingsDeathDropdown", content, "UIDropDownMenuTemplate")
     deathDd:SetPoint("TOPLEFT", self.deathLabel, "BOTTOMLEFT", -16, -2)
@@ -468,6 +479,27 @@ function Popup:Refresh()
         end)
     end
 
+    if UIDropDownMenu_Initialize then
+        UIDropDownMenu_Initialize(self.fontDropdown, function(_, level)
+            for _, item in ipairs(ns.Theme:FontProfileList()) do
+                local profileId = item.id
+                local itemLabel = item.label
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = itemLabel
+                info.value = profileId
+                info.checked = item.selected
+                info.func = function()
+                    local ok = ns.Theme:SetFontProfile(profileId)
+                    if ok then
+                        ns:Print("Font set to %s.", itemLabel)
+                        Popup:Refresh()
+                    end
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
+        end)
+    end
+
     local selectedTheme = ns.Theme:GetSelectedThemeId()
     local activeTheme = ns.Theme:GetActiveThemeId()
     local label = ns.Theme:ThemeLabel(selectedTheme)
@@ -479,11 +511,18 @@ function Popup:Refresh()
     local death = ns.Settings:Get("announceDeaths", "local")
     dropdownSetText(self.deathDropdown, DEATH_LABELS[death] or tostring(death))
 
+    local selectedFont = ns.Theme:GetSelectedFontProfileId()
+    dropdownSetText(self.fontDropdown, ns.Theme:FontProfileLabel(selectedFont))
+
     setToggle(self.optBank, ns.Settings:Get("allowBankRewards", true) == true, Theme)
     setToggle(self.optSoftDeaths, ns.Settings:Get("announceSoftDeaths", false) == true, Theme)
 
     local gw2Note = ns.Theme:IsThemeAvailable("gw2") and "GW2 UI detected." or "GW2 UI is not detected yet."
     self.note:SetText(gw2Note .. " Theme changes apply immediately to open addon windows.")
+    if self.fontNote then
+        local profile = ns.Theme:GetFontProfile()
+        self.fontNote:SetText((profile.description or "") .. " Font changes apply immediately to open addon windows.")
+    end
 
     local prof = ns.Settings:GetProfile()
     self.currentProfile:SetText(("Active profile: |cffc0a060%s|r"):format(ns.Settings:ProfileDisplayName(prof)))
@@ -569,6 +608,7 @@ function Popup:RefreshTheme()
     if self.header then Theme:Fill(self.header, Theme.c.headerBg or Theme.c.bg1, false, "header") end
     if self.title then setTextColor(self.title, Theme.c.fg, 1) end
     if self.themeLabel then setTextColor(self.themeLabel, Theme.c.goldH, 1) end
+    if self.fontLabel then setTextColor(self.fontLabel, Theme.c.goldH, 1) end
     if self.deathLabel then setTextColor(self.deathLabel, Theme.c.goldH, 1) end
     if self.optionsLabel then setTextColor(self.optionsLabel, Theme.c.goldH, 1) end
     if self.modifiersLabel then setTextColor(self.modifiersLabel, Theme.c.goldH, 1) end

@@ -260,6 +260,54 @@ local function testSetThemeRefreshesVisibleUi()
     assertEqual(refreshed, true, "theme selection refreshes visible UI")
 end
 
+local function testDefaultFontProfile()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    assertEqual(ns.Settings:Get("fontProfile"), "default", "settings default font profile")
+    assertEqual(ns.Theme:GetSelectedFontProfileId(), "default", "selected font profile defaults to default")
+    assertEqual(ns.Theme:FontProfileLabel("readable"), "Readable Sans", "font profile labels are exposed")
+end
+
+local function testFontProfileCanBeSelected()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+    local refreshed = false
+    ns.MainFrame = {
+        RefreshTheme = function()
+            refreshed = true
+        end,
+    }
+
+    local ok, reason = ns.Theme:SetFontProfile("large")
+
+    assertEqual(ok, true, "large font profile selection succeeds")
+    assertEqual(reason, nil, "successful font profile selection has no failure reason")
+    assertEqual(ns.Settings:Get("fontProfile"), "large", "stored font profile changes")
+    assertEqual(ns.Theme:GetSelectedFontProfileId(), "large", "selected font profile changes")
+    assertEqual(refreshed, true, "font profile selection refreshes visible UI")
+end
+
+local function testUnknownFontProfileIsRejected()
+    useCAddOns = false
+    addonEnabled = false
+    addonId = "GW2_UI"
+    addonTitle = "GW2 UI"
+    local ns = resetHarness()
+
+    local ok, reason = ns.Theme:SetFontProfile("tiny")
+
+    assertEqual(ok, false, "unknown font profile selection fails")
+    assertEqual(reason, "unknown", "unknown font profile returns unknown reason")
+    assertEqual(ns.Settings:Get("fontProfile"), "default", "stored font profile remains unchanged after unknown profile")
+end
+
 local function testGrahamThemeCanBeSelected()
     useCAddOns = false
     addonEnabled = false
@@ -475,6 +523,9 @@ testGw2DetectedThroughCAddOns()
 testGw2DetectedThroughCAddOnsPlayerFirstEnableState()
 testRefreshAvailabilityReappliesSavedGw2AfterAddonAppears()
 testSetThemeRefreshesVisibleUi()
+testDefaultFontProfile()
+testFontProfileCanBeSelected()
+testUnknownFontProfileIsRejected()
 testGrahamThemeCanBeSelected()
 testIsabellaThemeCanBeSelected()
 testHavokThemeCanBeSelected()

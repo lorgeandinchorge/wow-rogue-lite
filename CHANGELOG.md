@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.3.5b
+
+- Add a Settings **Font** section with Default, Readable Sans, Large, and Extra Large profiles for reading accessibility.
+- Apply font profile changes immediately to open addon UI through the shared Theme text helpers.
+- Add regression coverage for font profile defaults, selection, rejection, and refresh behavior.
+
 ## v0.3.5a
 
 - Fix Bank Dashboard right-gutter layout so section borders, row actions, Resale Desk controls, and Recent Ledger content stay clear of the scrollbar.

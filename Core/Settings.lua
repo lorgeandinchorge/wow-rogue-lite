@@ -27,6 +27,7 @@ local SETTINGS_DEFAULTS = {
     announceDeaths      = "local", -- "off" | "local" | "party" | "guild"  (final death only)
     announceSoftDeaths  = false,   -- also print a local notice on soft deaths (extra lives remain)
     uiTheme             = "classic",
+    fontProfile         = "default",
     rules               = {},      -- [ruleId] = bool; absent key → rule uses its own default
     -- Reward bundle modifier settings (applied by Core/Rewards.lua: ApplyRewardModifiers).
     rewards             = {

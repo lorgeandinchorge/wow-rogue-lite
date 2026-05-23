@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.3.5a"
+ns.version     = "0.3.5b"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -298,6 +298,8 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  uiTheme            = %s (active: %s)",
             tostring(s.uiTheme),
             ns.Theme and ns.Theme:GetActiveThemeId() or "?")
+        ns:Print("  fontProfile        = %s",
+            tostring(s.fontProfile))
         if s.rules then
             local ruleLines = {}
             for ruleId, enabled in pairs(s.rules) do

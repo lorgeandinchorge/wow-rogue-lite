@@ -207,6 +207,42 @@ local FONT_HEADER  = "Fonts\\MORPHEUS.TTF"
 if not CreateFont then -- defensive; only true in non-WoW env
 elseif not (MORPHEUS_FONT or true) then FONT_HEADER = FONT_BODY end
 
+local FONT_PROFILE_ORDER = { "default", "readable", "large", "extra_large" }
+local FONT_PROFILES = {
+    default = {
+        id = "default",
+        label = "Default",
+        description = "Blizzard-style addon text.",
+        body = FONT_BODY,
+        header = FONT_HEADER,
+        scale = 1.00,
+    },
+    readable = {
+        id = "readable",
+        label = "Readable Sans",
+        description = "Plain sans-serif text with less decorative headings.",
+        body = "Fonts\\ARIALN.TTF",
+        header = "Fonts\\ARIALN.TTF",
+        scale = 1.00,
+    },
+    large = {
+        id = "large",
+        label = "Large",
+        description = "Readable sans-serif text with a modest size bump.",
+        body = "Fonts\\ARIALN.TTF",
+        header = "Fonts\\ARIALN.TTF",
+        scale = 1.15,
+    },
+    extra_large = {
+        id = "extra_large",
+        label = "Extra Large",
+        description = "Readable sans-serif text with the largest addon scale.",
+        body = "Fonts\\ARIALN.TTF",
+        header = "Fonts\\ARIALN.TTF",
+        scale = 1.30,
+    },
+}
+
 local function getAddonInfo(addonNameOrIndex)
     local api = C_AddOns
     local fn = api and api.GetAddOnInfo or GetAddOnInfo
@@ -391,6 +427,10 @@ function Theme:NotifyThemeChanged()
 end
 
 function Theme:RefreshRegisteredWidgets()
+    for _, fs in ipairs(self._texts or {}) do
+        self:ApplyFont(fs)
+    end
+
     for _, frame in ipairs(self._fills or {}) do
         if frame._skinFill then
             local role = frame._themeFillRole
@@ -407,6 +447,54 @@ function Theme:RefreshRegisteredWidgets()
             b.label:SetTextColor(self.c.fg[1], self.c.fg[2], self.c.fg[3], 1)
         end
     end
+end
+
+function Theme:NormalizeFontProfileId(profileId)
+    if FONT_PROFILES[profileId] then return profileId end
+    return "default"
+end
+
+function Theme:GetSelectedFontProfileId()
+    local selected = ns.Settings and ns.Settings:Get("fontProfile", "default") or "default"
+    return self:NormalizeFontProfileId(selected)
+end
+
+function Theme:GetFontProfile()
+    return FONT_PROFILES[self:GetSelectedFontProfileId()] or FONT_PROFILES.default
+end
+
+function Theme:FontProfileList()
+    local selected = self:GetSelectedFontProfileId()
+    local out = {}
+    for i, id in ipairs(FONT_PROFILE_ORDER) do
+        local def = FONT_PROFILES[id]
+        out[i] = {
+            id = id,
+            label = def.label,
+            description = def.description,
+            selected = selected == id,
+        }
+    end
+    return out
+end
+
+function Theme:FontProfileLabel(profileId)
+    local def = FONT_PROFILES[profileId]
+    return def and def.label or tostring(profileId)
+end
+
+function Theme:SetFontProfile(profileId)
+    if not FONT_PROFILES[profileId] then
+        return false, "unknown"
+    end
+    local prior = self:GetSelectedFontProfileId()
+    if ns.Settings and ns.Settings.Set then
+        ns.Settings:Set("fontProfile", profileId)
+    end
+    if prior ~= profileId then
+        self:NotifyThemeChanged()
+    end
+    return true
 end
 
 function Theme:SetTheme(themeId)
@@ -561,7 +649,12 @@ end
 
 function Theme:Text(parent, size, color, font)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(font or FONT_BODY, size or 12, "")
+    fs._themeBaseSize = size or 12
+    fs._themeFontRole = "body"
+    fs._themeExplicitFont = font
+    self._texts = self._texts or {}
+    self._texts[#self._texts + 1] = fs
+    self:ApplyFont(fs)
     local col = color or self.c.fg
     fs:SetTextColor(col[1], col[2], col[3], col[4] or 1)
     return fs
@@ -569,8 +662,23 @@ end
 
 function Theme:Header(parent, text, size)
     local fs = self:Text(parent, size or 18, self.c.fg, FONT_HEADER)
+    fs._themeFontRole = "header"
+    fs._themeExplicitFont = nil
+    self:ApplyFont(fs)
     fs:SetText(text or "")
     return fs
+end
+
+function Theme:ApplyFont(fs)
+    if not fs or not fs.SetFont then return end
+    local profile = self:GetFontProfile()
+    local baseSize = fs._themeBaseSize or 12
+    local scaledSize = math.max(8, math.floor((baseSize * (profile.scale or 1)) + 0.5))
+    local font = fs._themeExplicitFont
+    if not font then
+        font = fs._themeFontRole == "header" and profile.header or profile.body
+    end
+    fs:SetFont(font or FONT_BODY, scaledSize, "")
 end
 
 -- Button with themed texture support, flat fallback, and a 1px accent underline.
