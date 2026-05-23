@@ -28,13 +28,13 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.3 - Rewards And Run Modifiers Cleanup
+### Latest Update: v0.3.5a - Bank Dashboard Polish
 
-- Rewards is now a focused starter-reward request surface with a dropdown and **Prepare Mail** action.
-- Boons and burdens moved into Settings under **Run Modifiers** so testers can find them with rules/profile setup.
-- Reward request and fulfillment mail body prefill is more reliable across Classic mail-frame timing.
-- Prepared reward mail now lists requested item details for easier banker verification.
-- Smoke-test and public docs now reflect the new Rewards and Run Modifiers flow.
+- Bank Dashboard rows, buttons, section borders, and nested Recent Ledger content now stay inside a reserved right-side scrollbar gutter.
+- Contribution Board now lists contributors by character with generation, level, total contribution, and share columns.
+- Resale Desk and Recent Ledger clear actions now ask for confirmation before hiding/removing visible rows.
+- Recent Ledger clearing keeps underlying contribution, fulfillment, and resale receipts intact so totals remain trustworthy.
+- Regression coverage now guards the dashboard geometry, character contribution board, and clear-button behavior.
 
 ### Bank And Run Structure
 

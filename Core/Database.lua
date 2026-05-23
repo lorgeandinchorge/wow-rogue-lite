@@ -58,6 +58,7 @@ local function defaults()
         accountLinks         = {}, -- [Character-Realm] = accountId
         resaleReceipts       = {}, -- account-wide resale sale ledger; owned by Core/BankResale.lua
         resaleSimStock       = {}, -- temporary simulated resale stock for local testing
+        bankLedgerClearedAt  = 0,  -- visibility cutoff for the Recent Ledger UI
     }
 end
 
@@ -536,48 +537,98 @@ function D:AccountContributionRows()
     return rows
 end
 
+function D:CharacterContributionRows()
+    local grouped = {}
+    local total = 0
+
+    for _, receipt in ipairs(WRL_DB.contributionReceipts or {}) do
+        local amount = math.max(0, math.floor(receipt.amount or receipt.copper or 0))
+        if amount > 0 then
+            total = total + amount
+            local characterKey = receipt.characterKey or "Unknown"
+            local row = grouped[characterKey]
+            if not row then
+                local rec = WRL_DB.characters and WRL_DB.characters[characterKey] or nil
+                row = {
+                    characterKey = characterKey,
+                    generation = rec and (rec.generation or 1) or 1,
+                    level = rec and (rec.levelCurrent or rec.levelAtCreate) or "?",
+                    total = 0,
+                }
+                grouped[characterKey] = row
+            end
+            row.total = row.total + amount
+        end
+    end
+
+    local rows = {}
+    for _, row in pairs(grouped) do
+        row.percent = total > 0 and ((row.total / total) * 100) or 0
+        rows[#rows + 1] = row
+    end
+    table.sort(rows, function(a, b)
+        if (a.total or 0) == (b.total or 0) then
+            return tostring(a.characterKey) < tostring(b.characterKey)
+        end
+        return (a.total or 0) > (b.total or 0)
+    end)
+    return rows
+end
+
 function D:RecentBankLedgerRows(maxRows)
     maxRows = maxRows or 8
     local rows = {}
+    local clearedAt = math.max(0, tonumber(WRL_DB.bankLedgerClearedAt) or 0)
     for _, r in ipairs(WRL_DB.contributionReceipts or {}) do
-        local accountId = self:AccountIdForCharacter(r.characterKey) or r.accountId
-        rows[#rows + 1] = {
-            kind = "contribution",
-            when = r.when or 0,
-            characterKey = r.characterKey,
-            accountId = accountId,
-            accountLabel = self:AccountLabel(accountId),
-            amount = r.amount or 0,
-            source = r.source,
-        }
+        if (r.when or 0) > clearedAt then
+            local accountId = self:AccountIdForCharacter(r.characterKey) or r.accountId
+            rows[#rows + 1] = {
+                kind = "contribution",
+                when = r.when or 0,
+                characterKey = r.characterKey,
+                accountId = accountId,
+                accountLabel = self:AccountLabel(accountId),
+                amount = r.amount or 0,
+                source = r.source,
+            }
+        end
     end
     for _, f in ipairs(WRL_DB.fulfillmentReceipts or {}) do
-        local accountId = self:AccountIdForCharacter(f.requester) or f.accountId
-        rows[#rows + 1] = {
-            kind = "fulfillment",
-            when = f.when or 0,
-            characterKey = f.requester,
-            accountId = accountId,
-            accountLabel = self:AccountLabel(accountId),
-            amount = f.gold or 0,
-            method = f.method,
-        }
+        if (f.when or 0) > clearedAt then
+            local accountId = self:AccountIdForCharacter(f.requester) or f.accountId
+            rows[#rows + 1] = {
+                kind = "fulfillment",
+                when = f.when or 0,
+                characterKey = f.requester,
+                accountId = accountId,
+                accountLabel = self:AccountLabel(accountId),
+                amount = f.gold or 0,
+                method = f.method,
+            }
+        end
     end
     for _, s in ipairs(WRL_DB.resaleReceipts or {}) do
-        rows[#rows + 1] = {
-            kind = "resale",
-            when = s.when or 0,
-            characterKey = s.buyer,
-            accountId = self:AccountIdForCharacter(s.buyer),
-            accountLabel = s.buyer and self:AccountLabel(self:AccountIdForCharacter(s.buyer)) or "Unassigned",
-            amount = s.totalCopper or 0,
-            itemName = s.itemName,
-            qty = s.qty,
-        }
+        if (s.when or 0) > clearedAt then
+            rows[#rows + 1] = {
+                kind = "resale",
+                when = s.when or 0,
+                characterKey = s.buyer,
+                accountId = self:AccountIdForCharacter(s.buyer),
+                accountLabel = s.buyer and self:AccountLabel(self:AccountIdForCharacter(s.buyer)) or "Unassigned",
+                amount = s.totalCopper or 0,
+                itemName = s.itemName,
+                qty = s.qty,
+            }
+        end
     end
     table.sort(rows, function(a, b) return (a.when or 0) > (b.when or 0) end)
     while #rows > maxRows do table.remove(rows) end
     return rows
+end
+
+function D:ClearRecentBankLedger()
+    WRL_DB.bankLedgerClearedAt = time and time() or 0
+    return WRL_DB.bankLedgerClearedAt
 end
 
 -- Returns every character record (current + archived) as a flat list.

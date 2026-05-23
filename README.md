@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.5 - Bank Resale Desk. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, account-grouped banker summaries, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, and the bank can list and record manual resale of curated quest-useful goods.
+> **Status:** v0.3.5a - Bank Dashboard Polish. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, manual resale tracking, right-safe dashboard controls, and clear-confirmation flows.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.5 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.5a loaded.` in chat.
 
 ### Quick start
 
@@ -35,13 +35,13 @@ so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addo
 3. Type `/wrl` to open the main window.
 4. Use the **Legacy** tab to spend any available budget, the **Rewards** tab to prepare a starter-kit request mail, and the **Dashboard** tab to track in-progress state.
 
-For Bank Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simresale` creates simulated resale stock for the Resale Desk, and `/wrl simresale clear` removes it.
+For Bank Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simresale` creates simulated resale stock for the Resale Desk, and the Dashboard clear buttons ask before hiding ledger rows or removing simulated resale stock.
 
 ### How a run works
 
 **On a run character.** Open `/wrl` → **Legacy** to review lifetime contributions and spend available legacy budget into Storage, Stipend, and Fate. Open `/wrl` → **Rewards**, choose an unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually.
 
-**On your bank character.** Open `/wrl` → **Dashboard** to use the Bank Desk: active request readiness, missing item/gold details, account-grouped contributions, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. Use **Next Resale Item** and **Record 1 Sold** to manually record curated resale goods like Chunk of Boar Meat or Goretusk Liver. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
+**On your bank character.** Open `/wrl` → **Dashboard** to use the Bank Desk: active request readiness, missing item/gold details, character contribution rows, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. Use **Next Resale Item** and **Record 1 Sold** to manually record curated resale goods like Chunk of Boar Meat or Goretusk Liver. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
 
 The **Rewards** tab is intentionally request-only for run characters: choose one unlocked starter reward from the dropdown and use **Prepare Mail** at a mailbox. Boons and burdens are configured under gear **Settings** -> **Run Modifiers** before the reward request.
 

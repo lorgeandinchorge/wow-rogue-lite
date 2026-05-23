@@ -95,7 +95,7 @@ local function testContributionsRecordAndSummarizeByAccount()
     local ns = resetHarness()
     local account = ns.Database:CreateAccount("Graham")
     ns.Database:LinkCharacterToAccount("Graham-Realm", account.id)
-    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", generation = 2, levelCurrent = 34, contributed = 0, history = {} }
 
     local receipt = ns.Contributions:Record("Graham-Realm", 200, "manual", { confidence = "manual" })
     local rows = ns.Database:AccountContributionRows()
@@ -104,6 +104,25 @@ local function testContributionsRecordAndSummarizeByAccount()
     assertEqual(rows[1].accountId, account.id, "summary sorts highest contributor first")
     assertEqual(rows[1].total, 200, "summary rolls contribution into account total")
     assertEqual(rows[1].characters[1].characterKey, "Graham-Realm", "summary preserves character breakdown")
+end
+
+local function testContributionsCanSummarizeByCharacter()
+    local ns = resetHarness()
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", generation = 2, levelCurrent = 34, contributed = 0, history = {} }
+    WRL_DB.characters["Havok-Realm"] = { key = "Havok-Realm", generation = 1, levelAtCreate = 10, levelCurrent = 12, contributed = 0, history = {} }
+
+    ns.Contributions:Record("Havok-Realm", 100, "manual", { confidence = "manual" })
+    ns.Contributions:Record("Graham-Realm", 200, "manual", { confidence = "manual" })
+    ns.Contributions:Record("Havok-Realm", 50, "manual", { confidence = "manual" })
+    local rows = ns.Database:CharacterContributionRows()
+
+    assertEqual(rows[1].characterKey, "Graham-Realm", "character summary sorts highest contributor first")
+    assertEqual(rows[1].generation, 2, "character summary includes generation")
+    assertEqual(rows[1].level, 34, "character summary includes current level")
+    assertEqual(rows[1].total, 200, "character summary totals one character")
+    assertEqual(rows[2].characterKey, "Havok-Realm", "character summary includes local-account contributors by character")
+    assertEqual(rows[2].level, 12, "character summary uses current level")
+    assertEqual(rows[2].total, 150, "character summary rolls multiple receipts into one character row")
 end
 
 local function testAssigningAccountMovesExistingContributionReceipts()
@@ -132,6 +151,28 @@ local function testRecentLedgerUsesUpdatedAccountAssignment()
     assertEqual(rows[1].accountLabel, "Graham", "recent ledger label follows the saved account assignment")
 end
 
+local function testRecentLedgerCanBeClearedWithoutDeletingReceipts()
+    local ns = resetHarness()
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    WRL_DB.contributionReceipts = {
+        { characterKey = "Graham-Realm", amount = 200, when = 100 },
+    }
+
+    local before = ns.Database:RecentBankLedgerRows(10)
+    ns.Database:ClearRecentBankLedger()
+    WRL_DB.contributionReceipts[#WRL_DB.contributionReceipts + 1] = {
+        characterKey = "Graham-Realm",
+        amount = 300,
+        when = 12346,
+    }
+    local after = ns.Database:RecentBankLedgerRows(10)
+
+    assertEqual(#before, 1, "ledger initially shows existing receipt")
+    assertEqual(#WRL_DB.contributionReceipts, 2, "clearing visible ledger does not delete receipts")
+    assertEqual(after[1].amount, 300, "ledger shows entries newer than the clear cutoff")
+    assertEqual(#after, 1, "ledger hides entries at or before the clear cutoff")
+end
+
 local function testRequestsStoreAssignedOrUnassignedAccount()
     local ns = resetHarness()
     local account = ns.Database:CreateAccount("Tester")
@@ -147,8 +188,10 @@ end
 testMigrationCreatesDefaultAccountAndLinksLocalCharacters()
 testManualAccountLabelsCanBeCreatedAndLinked()
 testContributionsRecordAndSummarizeByAccount()
+testContributionsCanSummarizeByCharacter()
 testAssigningAccountMovesExistingContributionReceipts()
 testRecentLedgerUsesUpdatedAccountAssignment()
+testRecentLedgerCanBeClearedWithoutDeletingReceipts()
 testRequestsStoreAssignedOrUnassignedAccount()
 
 print("BankDeskAccounts.test.lua: ok")

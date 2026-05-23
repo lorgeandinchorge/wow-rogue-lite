@@ -12,6 +12,11 @@ local function resetHarness()
             ["Havok-Realm"] = "acct-local",
             ["Graham-Realm"] = "acct-graham",
         },
+        characters = {
+            ["Bank-Realm"] = { key = "Bank-Realm", generation = 1, levelCurrent = 1, levelAtCreate = 1 },
+            ["Havok-Realm"] = { key = "Havok-Realm", generation = 1, levelCurrent = 12, levelAtCreate = 10 },
+            ["Graham-Realm"] = { key = "Graham-Realm", generation = 2, levelCurrent = 34, levelAtCreate = 1 },
+        },
         contributionReceipts = {
             { characterKey = "Havok-Realm", accountId = "acct-local", amount = 10000, when = 100 },
             { characterKey = "Graham-Realm", accountId = "acct-graham", amount = 20000, when = 101 },
@@ -74,6 +79,12 @@ local function resetHarness()
                     { characterKey = "Havok-Realm", total = 10000 },
                 },
             },
+        }
+    end
+    function ns.Database:CharacterContributionRows()
+        return {
+            { characterKey = "Graham-Realm", generation = 2, level = 34, total = 20000, percent = 66.7 },
+            { characterKey = "Havok-Realm", generation = 1, level = 12, total = 10000, percent = 33.3 },
         }
     end
     function ns.Database:RecentBankLedgerRows()
@@ -154,6 +165,12 @@ local function assertContains(line, needle, message)
     end
 end
 
+local function assertNotContains(line, needle, message)
+    if line and line:find(needle, 1, true) then
+        error(string.format("%s: expected %q not to contain %q", message, tostring(line), needle), 2)
+    end
+end
+
 local function testBankerOverviewReplacesRunSnapshotCopy()
     local tab = resetHarness()
 
@@ -174,8 +191,15 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(right[4], "Havok-Realm", "bank desk table lists the next requester")
     assertContains(right[5], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
     assertContains(right[6], "#", "contribution board uses leaderboard heading")
-    assertContains(right[7], "Graham", "contribution board is grouped by account")
-    assertContains(right[8], "Local Account", "contribution board lists another ranked account")
+    assertContains(right[6], "Character", "contribution board is grouped by character")
+    assertContains(right[6], "| G | Lv |", "contribution board uses compact separated generation and level columns")
+    assertContains(right[7], "Graham-Realm", "contribution board lists the contributor character")
+    assertContains(right[7], " | ", "contribution board row uses separators for proportional font alignment")
+    assertContains(right[7], "2", "contribution board lists contributor generation")
+    assertContains(right[7], "34", "contribution board lists contributor level")
+    assertContains(right[7], "20000c", "contribution board lists contributor amount")
+    assertContains(right[8], "Havok-Realm", "contribution board lists former local-account contributor by character")
+    assertNotContains(right[8], "Local Account", "contribution board should not render account labels")
     assertContains(right[10], "|cffc0a060Resale Desk|r", "right pane includes resale desk")
     assertContains(right[11], "Item", "resale desk table includes item header")
     assertContains(right[11], "Who", "resale desk table includes requester header")
@@ -195,6 +219,31 @@ local function testContributionActionOnlyShowsForPendingContributionRuns()
         "active runs do not show contribution recovery action")
     assertEqual(tab:_ShouldShowContributionAction({ status = "retired" }), false,
         "fully retired runs do not show contribution recovery action")
+end
+
+local function testContributionBoardShowsLocalAccountContributionsByCharacter()
+    local tab = resetHarness()
+    tab._testNS.Database.CharacterContributionRows = function()
+        return {
+            {
+                characterKey = "Havok-Realm",
+                generation = 1,
+                level = 12,
+                total = 819,
+                percent = 100,
+            },
+        }
+    end
+    WRL_DB.accountLinks["Graham-Realm"] = nil
+    WRL_DB.requests = {}
+
+    local _, right = tab:_BuildBankerOverviewLines("Bank-Realm")
+    local text = table.concat(right, "\n")
+
+    assertContains(text, "|cffc0a060Contribution Board|r", "contribution board still renders")
+    assertContains(text, "Havok-Realm", "default-account contributions render as character rows")
+    assertContains(text, "819c", "default-account contributions keep their amount")
+    assertNotContains(text, "Local Account", "contribution board should not show account labels")
 end
 
 local function testBankDeskActionButtonsAreDashboardOwned()
@@ -347,6 +396,19 @@ local function testBankDeskCanCycleActiveRequests()
     assertEqual(tab:_ActiveBankRequest().id, "req-1", "next request wraps around")
 end
 
+local function testEmptyBankDeskMessageSitsUnderHeader()
+    local tab = resetHarness()
+    for _, req in ipairs(WRL_DB.requests) do
+        req.status = "fulfilled"
+    end
+
+    local _, right = tab:_BuildBankerOverviewLines("Bank-Realm")
+
+    assertEqual(right[1], "|cffc0a060Bank Desk|r", "right pane starts with Bank Desk heading")
+    assertContains(right[2], "No pending bank requests", "empty bank desk message sits directly under the header")
+    assertContains(right[3], "Mailbox work", "mailbox empty-state follows the no-pending line")
+end
+
 local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     local f = assert(io.open("UI/Tab_Run.lua", "rb"))
     local src = f:read("*a"):gsub("\r\n", "\n")
@@ -368,7 +430,12 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "self.bankResaleSection", "Resale Desk should have its own right-side section")
     assertContains(src, "self.bankLedgerSection", "Recent ledger should have its own right-side section")
     assertContains(src, "buildBankSection(content, Theme, \"Contribution Board\")", "Contribution Board should have a strong section heading")
-    assertContains(src, "setBankSection(self.bankContributionSection", "Contribution Board should be rendered as its own bordered box")
+    assertContains(src, "ensureContributionRows", "Contribution Board should render with dedicated row frames")
+    assertContains(src, "setContributionSection(self.bankContributionSection", "Contribution Board should use a real column renderer")
+    assertContains(src, "row.character:SetPoint(\"LEFT\", row, \"LEFT\", 24, 0)", "Contribution Board character column should have a fixed x position")
+    assertContains(src, "row.gen:SetPoint(\"LEFT\", row, \"LEFT\", 184, 0)", "Contribution Board generation column should have a fixed x position")
+    assertContains(src, "row.total:SetJustifyH(\"RIGHT\")", "Contribution Board money column should right-align")
+    assertContains(src, "row.share:SetJustifyH(\"RIGHT\")", "Contribution Board share column should right-align")
     assertContains(src, "buildBankSection(content, Theme, \"Resale Desk\")", "Resale Desk should have a strong section heading")
     assertContains(src, "setResaleSection(self.bankResaleSection", "Resale Desk should render through selectable row controls")
     assertContains(src, "resaleTableHeader", "Resale Desk should render as a compact table")
@@ -377,12 +444,20 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "Own", "Resale Desk table should expose owned quantity")
     assertContains(src, "section.clearResaleButton", "Resale Desk should include a top-right clear all button")
     assertContains(src, "button.text:SetText(\"x\")", "Resale Desk clear all should use a distinct white x instead of the red cancel icon")
-    assertContains(src, "owner:_ClearResaleDesk()", "Resale Desk clear all button should clear test resale rows")
+    assertContains(src, "owner:ConfirmClearResaleDesk()", "Resale Desk clear all button should ask before clearing rows")
+    assertContains(src, "StaticPopupDialogs[\"WRL_CLEAR_RESALE_DESK\"]", "Resale Desk clear all should use a confirmation popup")
     assertContains(src, "section.resaleButtons", "Resale Desk should create clickable row targets")
     assertContains(src, "button.selection:SetColorTexture", "selected resale rows should have a full-line highlight texture")
-    assertContains(src, "button:SetSize(650, 18)", "selected resale row highlight should leave room for requester names and inline action buttons")
+    assertContains(src, "local BANK_SCROLLBAR_GUTTER = 38", "bank dashboard should reserve an inside scrollbar gutter")
+    assertContains(src, "local BANK_SECTION_WIDTH = BANK_DASHBOARD_WIDTH - BANK_SCROLLBAR_GUTTER", "bank sections should end before the scrollbar gutter")
+    assertContains(src, "local BANK_ROW_ACTION_GAP = 10", "bank row actions should use a shared gap from row text")
+    assertContains(src, "local BANK_ROW_TARGET_WIDTH = BANK_SECTION_WIDTH - 196", "bank desk row actions should stay inside the scrollbar gutter")
+    assertContains(src, "local BANK_CLEAR_BUTTON_RIGHT_INSET = -(BANK_SCROLLBAR_GUTTER + 8)", "clear button should share the bank dashboard gutter")
+    assertContains(src, "button:SetSize(BANK_ROW_TARGET_WIDTH, 18)", "selected resale row highlight should leave room for requester names and inline action buttons")
+    assertContains(src, "fs:SetWidth(BANK_ROW_TARGET_WIDTH)", "bank desk row text should share the right-safe action width")
+    assertContains(src, "button:SetPoint(\"TOPRIGHT\", section, \"TOPRIGHT\", BANK_CLEAR_BUTTON_RIGHT_INSET, -8)", "Resale Desk clear all should sit inside the scrollbar gutter")
     assertContains(src, "button:SetPoint(\"TOPLEFT\", fs, \"TOPLEFT\", -4, 3)", "selected resale row highlight should align to the visible text line")
-    assertContains(src, "button.mailButton:SetPoint(\"LEFT\", button, \"RIGHT\", 10, 0)", "resale row actions should align vertically to the selected row")
+    assertContains(src, "button.mailButton:SetPoint(\"LEFT\", button, \"RIGHT\", BANK_ROW_ACTION_GAP, 0)", "resale row actions should align vertically to the selected row")
     assertContains(src, "button.selection:Show()", "active resale row should show its full-line highlight")
     assertContains(src, "local keepScroll = self.scroll and self.scroll.GetVerticalScroll", "banker refresh should preserve scroll position")
     assertContains(src, "self.scroll:SetVerticalScroll(keepScroll)", "banker refresh should restore scroll after row selection")
@@ -392,18 +467,30 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "ledger.searchBox:SetScript(\"OnTextChanged\"", "Recent Ledger search should refresh results")
     assertContains(src, "Theme:ScrollArea(ledger)", "Recent Ledger should have an inner scrollable surface")
     assertContains(src, "ledger.searchBox:SetSize(180, 18)", "Recent Ledger search box should stay compact")
+    assertContains(src, "section.clearLedgerButton", "Recent Ledger should include a clear button")
+    assertContains(src, "owner:ConfirmClearRecentLedger()", "Recent Ledger clear button should ask before hiding the ledger feed")
+    assertContains(src, "StaticPopupDialogs[\"WRL_CLEAR_RECENT_LEDGER\"]", "Recent Ledger clear should use a confirmation popup")
+    assertContains(src, "ns.Database:ClearRecentBankLedger()", "Recent Ledger clear should store a visibility cutoff instead of deleting receipts")
+    assertContains(src, "section.owner = owner or section.owner", "Recent Ledger redraws should preserve their owner for clear-button callbacks")
+    assertContains(src, "setLedgerSection(ledger, ledger._allLines or {}, ledger.owner)", "Recent Ledger search redraws should keep the clear button wired")
+    assertContains(src, "ledgerScroll:SetPoint(\"BOTTOMRIGHT\", ledger, \"BOTTOMRIGHT\", -BANK_SCROLLBAR_GUTTER, 10)", "ledger inner scroll should stay inside the dashboard gutter")
+    assertContains(src, "ledgerContent:SetSize(BANK_LEDGER_CONTENT_WIDTH, 1)", "ledger content width should derive from the right-safe section width")
+    assertContains(src, "fs:SetWidth(BANK_LEDGER_CONTENT_WIDTH)", "ledger text should use the right-safe ledger content width")
     assertContains(src, "setLedgerSection(self.bankLedgerSection", "Recent Ledger should render through its scrollable section")
     assertContains(src, "appendRecentLedger(right, 50)", "Recent Ledger should search across more than the default visible rows")
     assertContains(src, "left:SetWidth(304)", "left snapshot should shrink to give the Bank Desk more room")
-    assertContains(src, "local BANK_DASHBOARD_WIDTH = 820", "bank Dashboard should use a wide single-column content width")
+    assertContains(src, "local BANK_DASHBOARD_WIDTH = 760", "bank Dashboard should leave a visible gutter before the scrollbar")
+    assertContains(src, "local BANK_TOP_SECTION_WIDTH = math.floor((BANK_SECTION_WIDTH - 10) / 2)", "top-row bank boxes should fit inside the dashboard gutter")
     assertContains(src, "self.leftPane:Hide()", "bank Dashboard should hide the left pane for a single-column layout")
     assertContains(src, "self.rightPane:SetPoint(\"TOPLEFT\", self.panel, \"TOPLEFT\", 20, -64)", "bank Dashboard should stretch the scroll column across the panel")
     assertContains(src, "self.bankSnapshotSection = buildBankSection(content, Theme, \"Bank Snapshot\")", "bank snapshot should render in the single scroll column")
-    assertContains(src, "self.content:SetSize(BANK_DASHBOARD_WIDTH, 1)", "bank scroll content should use the wide dashboard width")
+    assertContains(src, "self.content:SetSize(BANK_DASHBOARD_WIDTH, 1)", "bank scroll content should reserve width for the inside scrollbar gutter")
+    assertContains(src, "section:SetWidth(BANK_SECTION_WIDTH)", "bank sections should not draw under the main scrollbar")
 end
 
 testBankerOverviewReplacesRunSnapshotCopy()
 testContributionActionOnlyShowsForPendingContributionRuns()
+testContributionBoardShowsLocalAccountContributionsByCharacter()
 testBankDeskActionButtonsAreDashboardOwned()
 testBankDeskCanSelectResaleRowsByClickTarget()
 testSelectedResaleOrderDefaultsToRequesterAndFullRow()
@@ -413,6 +500,7 @@ testResaleCODRehydratesStaleSelectionWithRequester()
 testResaleCODUsesSimulatedBuyerWithoutBankRequest()
 testResaleDeskClearAllClearsSimulatedRowsAndSelection()
 testBankDeskCanCycleActiveRequests()
+testEmptyBankDeskMessageSitsUnderHeader()
 testBankDeskUsesBorderedSectionsWithStrongHeadings()
 
 print("RunTabBankerOverview.test.lua: ok")

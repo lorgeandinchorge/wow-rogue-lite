@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.3.5a
+
+- Fix Bank Dashboard right-gutter layout so section borders, row actions, Resale Desk controls, and Recent Ledger content stay clear of the scrollbar.
+- Change the Contribution Board from account labels to character rows with generation, level, total contribution, and share columns.
+- Add confirmation prompts before clearing the Resale Desk and the Recent Ledger.
+- Make Recent Ledger clearing hide the current visible feed with a timestamp cutoff while keeping contribution, fulfillment, and resale receipts intact.
+- Add regression coverage for character contribution rows, dashboard geometry constants, clear confirmations, and ledger clear behavior.
+
 ## v0.3.5
 
 - Add the Bank Dashboard **Resale Desk** for curated quest-useful goods such as Chunk of Boar Meat and Goretusk Liver.
