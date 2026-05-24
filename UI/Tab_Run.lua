@@ -370,6 +370,8 @@ function Tab:_BuildResaleOrder(row)
         qty = qty,
         buyer = (req and req.from) or self:_DefaultResaleBuyer(),
         priceEach = row.priceEach,
+        priceSource = row.priceSource,
+        priceLabel = row.priceLabel,
         totalCopper = (row.priceEach or 0) * qty,
     }
 end
@@ -384,6 +386,8 @@ function Tab:_ResaleOrderForRow(row)
         pending.name = pending.name or (fresh and fresh.name)
         pending.itemName = pending.itemName or (fresh and fresh.itemName)
         pending.priceEach = pending.priceEach or (fresh and fresh.priceEach) or row.priceEach
+        pending.priceSource = pending.priceSource or (fresh and fresh.priceSource) or row.priceSource
+        pending.priceLabel = pending.priceLabel or (fresh and fresh.priceLabel) or row.priceLabel
         pending.totalCopper = (pending.priceEach or 0) * math.max(1, math.floor(tonumber(pending.qty) or 1))
         return pending
     end
@@ -394,12 +398,14 @@ function Tab:_RecordResaleRow(row)
     local draft = ns.BankResale and ns.BankResale.pendingCOD
     local sale = draft or self:_ResaleOrderForRow(row)
     if sale and ns.BankResale and ns.BankResale.RecordSale then
-        local receipt = ns.BankResale:RecordSale(sale.itemId, math.max(1, math.floor(tonumber(sale.qty) or 1)), sale.buyer)
+        local receipt, reason = ns.BankResale:RecordSale(sale.itemId, math.max(1, math.floor(tonumber(sale.qty) or 1)), sale.buyer)
         if receipt then
             ns:Print("Recorded resale: %dx %s for %s.",
                 receipt.qty or sale.qty or 1,
                 receipt.itemName or sale.name or ("item:" .. tostring(sale.itemId)),
                 ns.Tiers:FormatMoney(receipt.totalCopper or sale.totalCopper or 0))
+        elseif reason == "no_price" then
+            ns:Print("No resale price is available for that item with the current pricing setting.")
         end
         self.pendingResaleOrder = nil
         self:Refresh()
@@ -664,7 +670,7 @@ local function appendResaleDesk(lines, maxRows, owner)
         lines[#lines + 1] = "No resale catalog goods found. The shelves are judging everyone equally."
         return
     end
-    local resaleTableHeader = string.format("%-20s %-18s %3s %3s %8s %8s", "Item", "Who", "Req", "Own", "Each", "Total")
+    local resaleTableHeader = string.format("%-20s %-18s %3s %3s %13s %8s", "Item", "Who", "Req", "Own", "Each", "Total")
     lines[#lines + 1] = resaleTableHeader
     local limit = math.min(maxRows or 5, #rows)
     for i = 1, limit do
@@ -674,12 +680,23 @@ local function appendResaleDesk(lines, maxRows, owner)
         local buyer = (order and order.buyer) or "Unknown"
         if #name > 20 then name = name:sub(1, 17) .. "..." end
         if #buyer > 18 then buyer = buyer:sub(1, 15) .. "..." end
-        lines[#lines + 1] = string.format("%-20s %-18s %3s %3d %8s %8s",
+        local priceLabel = row.priceLabel or ""
+        if priceLabel == "TSM DBMarket" then
+            priceLabel = "TSM"
+        elseif priceLabel == "double vendor" then
+            priceLabel = "vendor"
+        elseif priceLabel == "catalog fallback" then
+            priceLabel = "fallback"
+        elseif priceLabel ~= "" and #priceLabel > 8 then
+            priceLabel = priceLabel:sub(1, 8)
+        end
+        local eachText = ("%s %s"):format(ns.Tiers:FormatMoney(row.priceEach or 0), priceLabel):gsub("%s+$", "")
+        lines[#lines + 1] = string.format("%-20s %-18s %3s %3d %13s %8s",
             name,
             buyer,
             tostring(order and order.qty or row.count or 0),
             row.count or 0,
-            ns.Tiers:FormatMoney(row.priceEach or 0),
+            eachText,
             ns.Tiers:FormatMoney((order and order.totalCopper) or row.totalCopper or 0))
     end
     if #rows > limit then
@@ -1262,7 +1279,7 @@ function Tab:_BuildBankerOverviewLines(key)
 
     local nextReq = self:_ActiveBankRequest()
     local right = {
-        "|cffc0a060Bank Desk|r",
+        "|cffc0a060Requisitions Desk|r",
     }
     appendBankDeskTable(right, 8, self)
     appendContributionBoard(right, 5)
@@ -1329,6 +1346,8 @@ function Tab:PromptResaleCOD(row)
             ns:Print("Open your mailbox first, then prepare resale COD mail again.")
         elseif reason == "missing_buyer" then
             ns:Print("Resale COD mail requires a buyer.")
+        elseif reason == "no_price" then
+            ns:Print("No resale price is available for that item with the current pricing setting.")
         else
             ns:Print("Could not prepare resale COD mail.")
         end
@@ -1361,6 +1380,8 @@ function Tab:PromptResaleCOD(row)
                         ns:Print("Open your mailbox first, then prepare resale COD mail again.")
                     elseif reason == "missing_buyer" then
                         ns:Print("Resale COD mail requires a buyer.")
+                    elseif reason == "no_price" then
+                        ns:Print("No resale price is available for that item with the current pricing setting.")
                     else
                         ns:Print("Could not prepare resale COD mail.")
                     end
@@ -1448,7 +1469,7 @@ function Tab:Init(parent)
     setBankSectionWidth(self.bankSnapshotSection, BANK_TOP_SECTION_WIDTH)
     self.bankSnapshotSection:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -2)
     self.bankSnapshotSection:Hide()
-    self.bankDeskSection = buildBankSection(content, Theme, "Bank Desk")
+    self.bankDeskSection = buildBankSection(content, Theme, "Requisitions Desk")
     self.bankDeskSection:Hide()
     self.bankContributionSection = buildBankSection(content, Theme, "Contribution Board")
     setBankSectionWidth(self.bankContributionSection, BANK_TOP_SECTION_WIDTH)
@@ -1521,7 +1542,7 @@ function Tab:Refresh()
         local bankRows = self:_BankDeskRows()
         local resaleRows = self:_ResaleRows()
         self:_ActiveResaleRow(resaleRows)
-        self.hint:SetText("Bank Desk dashboard: requests, account contributions, and recent ledger work.")
+        self.hint:SetText("Requisitions Desk dashboard: requests, account contributions, and recent ledger work.")
         self.leftTitle:SetText("Bank Snapshot")
         local left, right = self:_BuildBankerOverviewLines(key)
         hideLines(self.leftLines)

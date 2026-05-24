@@ -49,6 +49,15 @@ local function testSettingsOwnsRunModifiersSurface()
     assertContains(src, "SetBurdens", "Settings should persist selected burdens")
 end
 
+local function testSettingsOwnsPricingSurface()
+    local src = readFile("UI/SettingsPopup.lua")
+
+    assertContains(src, "Pricing", "Settings should include a pricing section")
+    assertContains(src, "Resale Desk pricing", "Settings should include resale pricing control")
+    assertContains(src, "WRL_SettingsResalePricingDropdown", "Settings should expose a resale pricing dropdown")
+    assertContains(src, "pricing.resaleSource", "Settings should persist resale pricing source")
+end
+
 local function testOldRulesTabNoLongerLoads()
     local toc = readFile("WoWRoguelite.toc")
 
@@ -65,6 +74,7 @@ end
 testRulesMoveOutOfMainTabs()
 testSettingsOwnsRulesProfilesSurface()
 testSettingsOwnsRunModifiersSurface()
+testSettingsOwnsPricingSurface()
 testOldRulesTabNoLongerLoads()
 testInterfaceOptionsPointsRulesToSettings()
 

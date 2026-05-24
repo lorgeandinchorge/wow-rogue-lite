@@ -36,6 +36,9 @@ local SETTINGS_DEFAULTS = {
         bagsOnly            = false,  -- only include bag items; strips gold, lives, and potions
         allowPotionRewards  = true,   -- set false to strip potion items from bundles
     },
+    pricing             = {
+        resaleSource        = "auto", -- "auto" | "tsm_dbmarket" | "local_fallback"
+    },
 }
 
 -- ── Profile definitions ──────────────────────────────────────────────────────
@@ -295,9 +298,9 @@ function S:Init()
 
     -- Merge top-level defaults for any key absent in the stored settings.
     -- This handles both new installs and existing installs that gain new keys.
-    -- Sub-tables (rules, rewards) are handled separately below.
+    -- Sub-tables (rules, rewards, pricing) are handled separately below.
     for k, v in pairs(SETTINGS_DEFAULTS) do
-        if k ~= "rules" and k ~= "rewards" and settings[k] == nil then
+        if k ~= "rules" and k ~= "rewards" and k ~= "pricing" and settings[k] == nil then
             settings[k] = v
         end
     end
@@ -312,6 +315,18 @@ function S:Init()
         if settings.rewards[k] == nil then
             settings.rewards[k] = v
         end
+    end
+
+    settings.pricing = settings.pricing or {}
+    for k, v in pairs(SETTINGS_DEFAULTS.pricing) do
+        if settings.pricing[k] == nil then
+            settings.pricing[k] = v
+        end
+    end
+    if ns.Pricing and ns.Pricing.NormalizeResaleSource then
+        settings.pricing.resaleSource = ns.Pricing:NormalizeResaleSource(settings.pricing.resaleSource)
+    elseif settings.pricing.resaleSource ~= "tsm_dbmarket" and settings.pricing.resaleSource ~= "local_fallback" then
+        settings.pricing.resaleSource = "auto"
     end
 
     -- Validate profile; reset to default if the stored value is unrecognised

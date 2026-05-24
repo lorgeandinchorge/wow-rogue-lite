@@ -1,5 +1,14 @@
 # WoW Roguelite Changelog
 
+## v0.3.6
+
+- Add configurable Resale Desk pricing with Auto, TSM DBMarket only, and local fallback modes.
+- Make Auto pricing use TSM DBMarket when available, then double vendor, then catalog fallback.
+- Store resale price source metadata on inventory rows, COD drafts, and sale receipts.
+- Add a Settings **Pricing** section for choosing the Resale Desk pricing source.
+- Rename the visible Bank Desk dashboard surface to **Requisitions Desk**.
+- Add regression coverage for resale pricing modes, settings defaults, source labels, strict TSM handling, and dashboard copy.
+
 ## v0.3.5c
 
 - Add an optional TSM DBMarket adapter for request readiness hints while keeping TradeSkillMaster fully optional.

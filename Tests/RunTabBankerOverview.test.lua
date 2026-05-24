@@ -181,7 +181,7 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(left[5], "bank infrastructure", "banker overview names the bank run state")
     assertContains(left[6], "Lives remaining: n/a", "banker overview avoids runner life accounting")
 
-    assertEqual(right[1], "|cffc0a060Bank Desk|r", "right pane starts with Bank Desk heading")
+    assertEqual(right[1], "|cffc0a060Requisitions Desk|r", "right pane starts with Requisitions Desk heading")
     assertContains(right[2], "Who", "bank desk table includes requester header")
     assertContains(right[2], "Account", "bank desk table includes account header")
     assertContains(right[2], "Ready", "bank desk table includes readiness header")
@@ -404,7 +404,7 @@ local function testEmptyBankDeskMessageSitsUnderHeader()
 
     local _, right = tab:_BuildBankerOverviewLines("Bank-Realm")
 
-    assertEqual(right[1], "|cffc0a060Bank Desk|r", "right pane starts with Bank Desk heading")
+    assertEqual(right[1], "|cffc0a060Requisitions Desk|r", "right pane starts with Requisitions Desk heading")
     assertContains(right[2], "No pending bank requests", "empty bank desk message sits directly under the header")
     assertContains(right[3], "Mailbox work", "mailbox empty-state follows the no-pending line")
 end

@@ -18,6 +18,51 @@ local DEATH_LABELS = {
     guild = "Guild",
 }
 
+local RESALE_PRICING_FALLBACKS = {
+    {
+        id = "auto",
+        label = "Auto: TSM DBMarket -> double vendor -> catalog fallback",
+        note = "Uses TSM DBMarket when available, otherwise local fallback.",
+    },
+    {
+        id = "tsm_dbmarket",
+        label = "TSM DBMarket only",
+        note = "Rows without TSM data cannot be priced.",
+    },
+    {
+        id = "local_fallback",
+        label = "Local fallback: double vendor -> catalog fallback",
+        note = "Uses double vendor or catalog fallback; does not query TSM.",
+    },
+}
+
+local function resalePricingOptions()
+    if ns.Pricing and ns.Pricing.ResaleSourceOptions then
+        return ns.Pricing:ResaleSourceOptions()
+    end
+    return RESALE_PRICING_FALLBACKS
+end
+
+local function resalePricingLabel(source)
+    if ns.Pricing and ns.Pricing.ResaleSourceLabel then
+        return ns.Pricing:ResaleSourceLabel(source)
+    end
+    for _, item in ipairs(RESALE_PRICING_FALLBACKS) do
+        if item.id == source then return item.label end
+    end
+    return RESALE_PRICING_FALLBACKS[1].label
+end
+
+local function resalePricingNote(source)
+    if ns.Pricing and ns.Pricing.ResaleSourceNote then
+        return ns.Pricing:ResaleSourceNote(source)
+    end
+    for _, item in ipairs(RESALE_PRICING_FALLBACKS) do
+        if item.id == source then return item.note end
+    end
+    return RESALE_PRICING_FALLBACKS[1].note
+end
+
 local function setTextColor(fs, color, alpha)
     if fs and color then
         fs:SetTextColor(color[1], color[2], color[3], alpha or 1)
@@ -308,6 +353,20 @@ function Popup:Init()
     self.optBank:SetPoint("RIGHT", content, "RIGHT", 0, 0)
     y = y + ROW_H + 18
 
+    self.pricingLabel, y = buildSectionHeader(content, Theme, "Pricing", y)
+    self.resalePricingText = Theme:Text(content, 11, Theme.c.fg)
+    self.resalePricingText:SetPoint("TOPLEFT", 0, -y)
+    self.resalePricingText:SetText("Resale Desk pricing")
+    local resalePricingDd = CreateFrame("Frame", "WRL_SettingsResalePricingDropdown", content, "UIDropDownMenuTemplate")
+    resalePricingDd:SetPoint("TOPLEFT", 168, -(y + 2))
+    dropdownSetWidth(resalePricingDd, 318)
+    self.resalePricingDropdown = resalePricingDd
+    self.resalePricingNote = Theme:Text(content, 10, Theme.c.fg2)
+    self.resalePricingNote:SetPoint("TOPLEFT", 0, -(y + 30))
+    self.resalePricingNote:SetWidth(620)
+    self.resalePricingNote:SetJustifyH("LEFT")
+    y = y + 58
+
     self.modifiersLabel, y = buildSectionHeader(content, Theme, "Run Modifiers", y)
     self.modifiersHint = Theme:Text(content, 10, Theme.c.fg2)
     self.modifiersHint:SetPoint("TOPLEFT", 0, -y)
@@ -500,6 +559,25 @@ function Popup:Refresh()
         end)
     end
 
+    if UIDropDownMenu_Initialize then
+        UIDropDownMenu_Initialize(self.resalePricingDropdown, function(_, level)
+            local cur = ns.Settings:Get("pricing.resaleSource", "auto")
+            for _, item in ipairs(resalePricingOptions()) do
+                local sourceId = item.id
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = item.label
+                info.value = sourceId
+                info.checked = cur == sourceId
+                info.func = function()
+                    ns.Settings:Set("pricing.resaleSource", sourceId)
+                    Popup:Refresh()
+                    if ns.MainFrame then ns.MainFrame:RefreshCurrentTab() end
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
+        end)
+    end
+
     local selectedTheme = ns.Theme:GetSelectedThemeId()
     local activeTheme = ns.Theme:GetActiveThemeId()
     local label = ns.Theme:ThemeLabel(selectedTheme)
@@ -513,6 +591,12 @@ function Popup:Refresh()
 
     local selectedFont = ns.Theme:GetSelectedFontProfileId()
     dropdownSetText(self.fontDropdown, ns.Theme:FontProfileLabel(selectedFont))
+
+    local resaleSource = ns.Settings:Get("pricing.resaleSource", "auto")
+    dropdownSetText(self.resalePricingDropdown, resalePricingLabel(resaleSource))
+    if self.resalePricingNote then
+        self.resalePricingNote:SetText(resalePricingNote(resaleSource))
+    end
 
     setToggle(self.optBank, ns.Settings:Get("allowBankRewards", true) == true, Theme)
     setToggle(self.optSoftDeaths, ns.Settings:Get("announceSoftDeaths", false) == true, Theme)

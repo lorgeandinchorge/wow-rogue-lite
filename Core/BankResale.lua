@@ -151,13 +151,28 @@ end
 function BR:PriceForItem(itemId)
     local catalogItem = self:CatalogItem(itemId)
     if not catalogItem then return nil, "not_catalog" end
-    local fallback = math.max(0, math.floor(catalogItem.fallbackCopper or 0))
+    local fallback = math.max(0, math.floor(tonumber(catalogItem.fallbackCopper or 0) or 0))
+    if ns.Pricing and ns.Pricing.ResalePrice then
+        local detail, reason, label = ns.Pricing:ResalePrice(itemId, fallback)
+        if not detail then
+            return nil, reason or "no_price", {
+                sourceId = "unpriced",
+                sourceLabel = label or "No price",
+            }
+        end
+        return detail.copper or 0, nil, detail
+    end
     local sellPrice = 0
     if GetItemInfo then
         local _, _, _, _, _, _, _, _, _, _, liveSellPrice = GetItemInfo(tonumber(itemId))
         sellPrice = tonumber(liveSellPrice or 0) or 0
     end
-    return math.max(fallback, sellPrice * 2)
+    local copper = math.max(fallback, sellPrice * 2)
+    return copper, nil, {
+        copper = copper,
+        sourceId = (sellPrice * 2) > fallback and "double_vendor" or "catalog_fallback",
+        sourceLabel = (sellPrice * 2) > fallback and "double vendor" or "catalog fallback",
+    }
 end
 
 function BR:CODSubject()
@@ -171,6 +186,7 @@ function BR:CODBody(draft)
         "",
         ("Item: %dx %s"):format(draft.qty or 0, draft.itemName or ("item:" .. tostring(draft.itemId))),
         ("COD due: %s"):format(money),
+        ("Price source: %s"):format(draft.priceLabel or "unknown"),
         "",
         "Here are the items you ordered. The bank has selected a price and is trying to look casual about it.",
     }
@@ -201,12 +217,17 @@ function BR:PrepareCODMail(itemId, qty, buyer)
 
     if MailFrameTab2 and MailFrameTab2.Click then MailFrameTab2:Click() end
 
-    local priceEach = self:PriceForItem(itemId) or 0
+    local priceEach, priceReason, priceDetail = self:PriceForItem(itemId)
+    if not priceEach then
+        return nil, "no_price", priceReason
+    end
     local draft = {
         itemId = itemId,
         itemName = self:ItemName(itemId),
         qty = qty,
         priceEach = priceEach,
+        priceSource = priceDetail and priceDetail.sourceId or nil,
+        priceLabel = priceDetail and priceDetail.sourceLabel or nil,
         totalCopper = priceEach * qty,
         buyer = buyer,
         seller = ns.UnitKey and ns:UnitKey() or nil,
@@ -364,12 +385,15 @@ function BR:InventoryRows()
             if itemId and qty > 0 and self:IsCatalogItem(itemId) then
                 local row = byId[itemId]
                 if not row then
-                    local price = self:PriceForItem(itemId) or 0
+                    local price, _, priceDetail = self:PriceForItem(itemId)
+                    price = price or 0
                     row = {
                         itemId = itemId,
                         name = self:ItemName(itemId),
                         count = 0,
                         priceEach = price,
+                        priceSource = priceDetail and priceDetail.sourceId or nil,
+                        priceLabel = priceDetail and priceDetail.sourceLabel or nil,
                         totalCopper = 0,
                     }
                     byId[itemId] = row
@@ -385,12 +409,15 @@ function BR:InventoryRows()
         if itemId and qty > 0 and self:IsCatalogItem(itemId) then
             local row = byId[itemId]
             if not row then
-                local price = self:PriceForItem(itemId) or 0
+                local price, _, priceDetail = self:PriceForItem(itemId)
+                price = price or 0
                 row = {
                     itemId = itemId,
                     name = self:ItemName(itemId),
                     count = 0,
                     priceEach = price,
+                    priceSource = priceDetail and priceDetail.sourceId or nil,
+                    priceLabel = priceDetail and priceDetail.sourceLabel or nil,
                     totalCopper = 0,
                     simulated = true,
                 }
@@ -425,13 +452,18 @@ function BR:RecordSale(itemId, qty, buyer)
 
     WRL_DB = WRL_DB or {}
     WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
-    local priceEach = self:PriceForItem(itemId) or 0
+    local priceEach, priceReason, priceDetail = self:PriceForItem(itemId)
+    if not priceEach then
+        return nil, "no_price", priceReason
+    end
     local receipt = {
         when = time and time() or 0,
         itemId = itemId,
         itemName = self:ItemName(itemId),
         qty = qty,
         priceEach = priceEach,
+        priceSource = priceDetail and priceDetail.sourceId or nil,
+        priceLabel = priceDetail and priceDetail.sourceLabel or nil,
         totalCopper = priceEach * qty,
         buyer = buyer and buyer ~= "" and buyer or nil,
         seller = ns.UnitKey and ns:UnitKey() or nil,

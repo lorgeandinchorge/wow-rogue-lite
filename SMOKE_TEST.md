@@ -105,13 +105,13 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] If rewards are unlocked, choose one from the Rewards dropdown and click **Prepare Mail** at a mailbox.
   Expected: the request mail is prepared cleanly and final Send remains manual.
 
-### 4. Bank Desk / Rewards Flow
+### 4. Requisitions Desk / Rewards Flow
 
 - [ ] On the bank character, open the Dashboard tab.
-  Expected: the Bank Desk shows an active request, readiness details, character contribution rows, Resale Desk goods, and recent ledger activity.
+  Expected: the Requisitions Desk shows an active request, readiness details, character contribution rows, Resale Desk goods, and recent ledger activity.
 
 - [ ] If you do not have a live request, run `/wrl simrequest Tester-Realm 101`.
-  Expected: the Bank Desk receives a simulated pending request for testing.
+  Expected: the Requisitions Desk receives a simulated pending request for testing.
 
 - [ ] If there are multiple pending/preparing requests, click **Next Request**.
   Expected: the active request changes without leaving the Dashboard.
@@ -131,7 +131,7 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] Click the Recent Ledger clear button.
   Expected: a confirmation popup appears, current visible ledger activity is hidden, and later bank activity appears normally.
 
-- [ ] With a pending request selected by the Bank Desk, click **Prepare Mail** at a mailbox.
+- [ ] With a pending request selected by the Requisitions Desk, click **Prepare Mail** at a mailbox.
   Expected: the mail recipient, subject, body, and gold are prepared; ready and missing item/gold checklist details remain clear, with final Send still manual.
 
 - [ ] On the bank character, open the Rewards tab.

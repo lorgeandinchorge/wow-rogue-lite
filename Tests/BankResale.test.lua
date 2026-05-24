@@ -2,6 +2,11 @@ local function resetHarness()
     WRL_DB = {
         bankCharacter = "Bank-Realm",
         resaleReceipts = {},
+        settings = {
+            pricing = {
+                resaleSource = "local_fallback",
+            },
+        },
     }
     WRL_CharDB = {}
     NUM_BAG_SLOTS = 0
@@ -17,6 +22,7 @@ local function resetHarness()
     _G.SendMailCOD = nil
     _G.SendMailCODMoney = nil
     _G.MoneyInputFrame_SetCopper = nil
+    _G.TSM_API = nil
     _G.GetItemInfo = function(itemId)
         if itemId == 723 then
             return "Goretusk Liver", nil, nil, nil, nil, nil, nil, nil, nil, nil, 12
@@ -34,6 +40,7 @@ local function resetHarness()
         Database = {},
         MainFrame = {},
         Print = function() end,
+        Settings = {},
         Tiers = { FormatMoney = function(_, copper) return tostring(copper or 0) .. "c" end },
     }
 
@@ -47,6 +54,13 @@ local function resetHarness()
         return "Bank-Realm"
     end
 
+    function ns.Settings:Get(path, default)
+        if path == "pricing.resaleSource" then
+            return WRL_DB.settings.pricing.resaleSource or default
+        end
+        return default
+    end
+
     local refreshed = 0
     function ns.MainFrame:RefreshCurrentTab()
         refreshed = refreshed + 1
@@ -56,6 +70,7 @@ local function resetHarness()
     end
 
     assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
+    assert(loadfile("Core/Pricing.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/BankResale.lua"))("WoWRoguelite", ns)
     return ns
 end
@@ -96,6 +111,23 @@ local function testPriceUsesFallbackWhenGetItemInfoIsUncached()
     assertEqual(ns.BankResale:PriceForItem(769), 25, "uncached item info uses catalog fallback without crashing")
 end
 
+local function testAutoPricingUsesTSMWithSourceMetadata()
+    local ns = resetHarness()
+    WRL_DB.settings.pricing.resaleSource = "auto"
+    _G.TSM_API = {
+        GetCustomPriceValue = function(source, itemString)
+            if source == "DBMarket" and itemString == "i:769" then return 333 end
+        end,
+    }
+
+    local price, reason, detail = ns.BankResale:PriceForItem(769)
+
+    assertEqual(reason, nil, "TSM resale price has no error")
+    assertEqual(price, 333, "auto resale pricing prefers TSM")
+    assertEqual(detail.sourceId, "tsm_dbmarket", "price detail records TSM source id")
+    assertEqual(detail.sourceLabel, "TSM DBMarket", "price detail records TSM label")
+end
+
 local function testInventoryRowsAggregateCatalogStacks()
     local ns = resetHarness()
     ns.Container = {
@@ -121,6 +153,8 @@ local function testInventoryRowsAggregateCatalogStacks()
     assertEqual(rows[1].itemId, 769, "rows sort by item name")
     assertEqual(rows[1].count, 5, "matching stacks aggregate")
     assertEqual(rows[1].priceEach, 25, "row includes fallback price")
+    assertEqual(rows[1].priceSource, "catalog_fallback", "row includes fallback source id")
+    assertEqual(rows[1].priceLabel, "catalog fallback", "row includes fallback source label")
     assertEqual(rows[1].totalCopper, 125, "row includes total value")
     assertEqual(rows[2].itemId, 723, "second catalog item included")
     assertEqual(rows[2].count, 5, "visible bank slots aggregate with carried bags")
@@ -178,6 +212,8 @@ local function testRecordSaleStoresReceipt()
     assertEqual(receipt.itemName, "Chunk of Boar Meat", "receipt stores item name")
     assertEqual(receipt.qty, 2, "receipt stores quantity")
     assertEqual(receipt.priceEach, 25, "receipt stores current price")
+    assertEqual(receipt.priceSource, "catalog_fallback", "receipt stores price source id")
+    assertEqual(receipt.priceLabel, "catalog fallback", "receipt stores price source label")
     assertEqual(receipt.totalCopper, 50, "receipt stores total copper")
     assertEqual(receipt.buyer, "Tester-Realm", "receipt stores buyer")
     assertEqual(receipt.seller, "Bank-Realm", "receipt stores seller")
@@ -231,10 +267,15 @@ local function testPrepareCODMailPrefillsDraftWithoutReceipt()
     assertEqual(draft.itemId, 769, "draft stores item ID")
     assertEqual(draft.qty, 2, "draft stores quantity")
     assertEqual(draft.totalCopper, 50, "draft stores total copper")
+    assertEqual(draft.priceSource, "catalog_fallback", "draft stores price source id")
+    assertEqual(draft.priceLabel, "catalog fallback", "draft stores price source label")
     assertEqual(ns.BankResale.pendingCOD, draft, "draft is kept as transient pending COD")
     assertEqual(#WRL_DB.resaleReceipts, 0, "cod prep does not record a sale receipt")
     if not fields.body or not fields.body:find("Chunk of Boar Meat", 1, true) then
         error("cod prep body should name the resale item")
+    end
+    if not fields.body:find("Price source: catalog fallback", 1, true) then
+        error("cod prep body should include price source")
     end
 end
 
@@ -258,9 +299,26 @@ local function testPrepareCODMailValidation()
     assertEqual(noMailboxReason, "mailbox_closed", "closed mailbox reason is explicit")
 end
 
+local function testStrictTSMBlocksCODAndSaleWhenPriceMissing()
+    local ns = resetHarness()
+    WRL_DB.settings.pricing.resaleSource = "tsm_dbmarket"
+    _G.MailFrame = { IsShown = function() return true end }
+    _G.SendMailCOD = {}
+    _G.MoneyInputFrame_SetCopper = function() end
+
+    local receipt, saleReason = ns.BankResale:RecordSale(769, 1, "Tester-Realm")
+    local draft, mailReason = ns.BankResale:PrepareCODMail(769, 1, "Tester-Realm")
+
+    assertEqual(receipt, nil, "strict TSM mode blocks sale receipt without a price")
+    assertEqual(saleReason, "no_price", "strict TSM sale failure is explicit")
+    assertEqual(draft, nil, "strict TSM mode blocks COD without a price")
+    assertEqual(mailReason, "no_price", "strict TSM COD failure is explicit")
+end
+
 testCatalogRecognizesQuestGoods()
 testPriceUsesVendorDoubleOrFallbackMinimum()
 testPriceUsesFallbackWhenGetItemInfoIsUncached()
+testAutoPricingUsesTSMWithSourceMetadata()
 testInventoryRowsAggregateCatalogStacks()
 testSimulatedStockAppearsInInventoryRows()
 testRemoveSimulatedStockRemovesOneItemLine()
@@ -268,5 +326,6 @@ testRecordSaleStoresReceipt()
 testRecordSaleConsumesSimulatedStock()
 testPrepareCODMailPrefillsDraftWithoutReceipt()
 testPrepareCODMailValidation()
+testStrictTSMBlocksCODAndSaleWhenPriceMissing()
 
 print("BankResale.test.lua: ok")

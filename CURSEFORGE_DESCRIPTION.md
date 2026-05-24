@@ -28,12 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.5c - Readiness and Intake Hotfix
+### Latest Update: v0.3.6 - Resale Pricing Layer
 
-- Bank request checklists now label tailor-made starter bags and can show optional TSM DBMarket hints when TradeSkillMaster is installed.
-- TradeSkillMaster remains optional; missing TSM data falls back to the existing readiness and vendor-value behavior.
-- Final-death contribution prompts now list captured bag and equipped-gear item stacks with their vendor sell value.
-- Regression coverage guards the new readiness hints and captured item-value reporting.
+- Resale Desk pricing is now configurable from Settings under Pricing.
+- Auto pricing uses TSM DBMarket when available, then double vendor, then catalog fallback.
+- Resale inventory rows, COD drafts, and sale receipts now record the source behind each price.
+- The bank fulfillment dashboard is now labeled Requisitions Desk for clearer quartermaster-style banking.
 
 ### Bank And Run Structure
 
