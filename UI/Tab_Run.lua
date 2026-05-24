@@ -523,10 +523,16 @@ local function bankDeskItemLine(item)
     local required = item and item.required or 0
     local available = item and item.available or 0
     local missing = item and item.missing or 0
-    if missing > 0 then
-        return ("Item: %s - available %d / requested %d / missing %d"):format(name, available, required, missing)
+    local hints = {}
+    if item and item.craftHint then hints[#hints + 1] = item.craftHint end
+    if item and item.marketCopper and item.marketLabel and ns.Tiers and ns.Tiers.FormatMoney then
+        hints[#hints + 1] = ("%s %s"):format(item.marketLabel, ns.Tiers:FormatMoney(item.marketCopper))
     end
-    return ("Item: %s - available %d / requested %d / ready"):format(name, available, required)
+    local hintText = #hints > 0 and (" (" .. table.concat(hints, "; ") .. ")") or ""
+    if missing > 0 then
+        return ("Item: %s - available %d / requested %d / missing %d%s"):format(name, available, required, missing, hintText)
+    end
+    return ("Item: %s - available %d / requested %d / ready%s"):format(name, available, required, hintText)
 end
 
 local function bankDeskGoldLine(ready)

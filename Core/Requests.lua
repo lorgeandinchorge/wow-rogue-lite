@@ -168,10 +168,16 @@ local function readinessItemText(item)
     local required = item and item.required or 0
     local available = item and item.available or 0
     local missing = item and item.missing or 0
-    if missing > 0 then
-        return ("%s: available %d / requested %d / missing %d"):format(name, available, required, missing)
+    local hints = {}
+    if item and item.craftHint then hints[#hints + 1] = item.craftHint end
+    if item and item.marketCopper and item.marketLabel and ns.Tiers and ns.Tiers.FormatMoney then
+        hints[#hints + 1] = ("%s %s"):format(item.marketLabel, ns.Tiers:FormatMoney(item.marketCopper))
     end
-    return ("%s: available %d / requested %d / ready"):format(name, available, required)
+    local hintText = #hints > 0 and (" (" .. table.concat(hints, "; ") .. ")") or ""
+    if missing > 0 then
+        return ("%s: available %d / requested %d / missing %d%s"):format(name, available, required, missing, hintText)
+    end
+    return ("%s: available %d / requested %d / ready%s"):format(name, available, required, hintText)
 end
 
 function R:FulfillmentMailSubject(req)
@@ -312,10 +318,10 @@ function R:NeededItemMap()
 
     local map = {}
     for _, req in ipairs(self:PendingRequests()) do
-        local bundle = self:Bundle(req)
-        for _, it in ipairs(bundle.items or {}) do
+        local readiness = self:FulfillmentReadiness(req)
+        for _, it in ipairs((readiness and readiness.items) or {}) do
             local itemId = tonumber(it.id)
-            local qty = tonumber(it.qty) or 0
+            local qty = tonumber(it.required) or 0
             if itemId and qty > 0 then
                 local cur = map[itemId]
                 if not cur then
@@ -324,6 +330,9 @@ function R:NeededItemMap()
                 end
                 cur.qty = cur.qty + qty
                 cur.requests = cur.requests + 1
+                cur.craftHint = cur.craftHint or it.craftHint
+                cur.marketCopper = cur.marketCopper or it.marketCopper
+                cur.marketLabel = cur.marketLabel or it.marketLabel
             end
         end
     end
@@ -344,7 +353,12 @@ end
 function R:TooltipNeededLine(itemId)
     local info = self:NeededItemInfo(itemId)
     if not info then return nil end
-    return ("Needed for Roguelite request: %d"):format(info.qty or 0)
+    local hint = ""
+    if info.craftHint then hint = hint .. "; " .. info.craftHint end
+    if info.marketCopper and info.marketLabel and ns.Tiers and ns.Tiers.FormatMoney then
+        hint = hint .. "; " .. info.marketLabel .. " " .. ns.Tiers:FormatMoney(info.marketCopper)
+    end
+    return ("Needed for Roguelite request: %d%s"):format(info.qty or 0, hint)
 end
 
 local function bagSlotItemId(bag, slot)
@@ -486,6 +500,18 @@ local function itemDisplayName(itemId, note)
     return note and note ~= "" and (fallback .. " (" .. note .. ")") or fallback
 end
 
+local TAILOR_MADE_ITEMS = {
+    [4496] = true,  -- Linen Bag
+    [4245] = true,  -- Small Silk Pack
+    [10050] = true, -- Mageweave Bag
+    [14046] = true, -- Runecloth Bag
+    [21841] = true, -- Netherweave Bag
+}
+
+local function craftHintForItem(itemId)
+    return TAILOR_MADE_ITEMS[tonumber(itemId)] and "tailor-made" or nil
+end
+
 function R:CountItemInBags(itemId)
     local have = 0
     local Container = ns.Container
@@ -519,6 +545,14 @@ function R:FulfillmentReadiness(req)
             missing = miss,
             note = it.note,
         }
+        line.craftHint = craftHintForItem(it.id)
+        if ns.Pricing and ns.Pricing.MarketValue then
+            local marketCopper, marketLabel = ns.Pricing:MarketValue(it.id)
+            if marketCopper then
+                line.marketCopper = marketCopper
+                line.marketLabel = marketLabel
+            end
+        end
         details[#details + 1] = line
         if miss > 0 then
             allItemsAvailable = false

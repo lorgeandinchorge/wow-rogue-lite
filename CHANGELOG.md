@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.3.5c
+
+- Add an optional TSM DBMarket adapter for request readiness hints while keeping TradeSkillMaster fully optional.
+- Label tailor-made starter bags in Bank Desk, fulfillment mail, chat checklists, and needed-item tooltips.
+- Show captured bag and equipped-gear vendor value lines in the final-death contribution popup.
+- Bump docs and metadata for the v0.3.5c readiness/intake hotfix.
+
 ## v0.3.5b
 
 - Add a Settings **Font** section with Default, Readable Sans, Large, and Extra Large profiles for reading accessibility.

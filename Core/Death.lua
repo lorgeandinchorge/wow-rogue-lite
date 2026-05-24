@@ -344,7 +344,7 @@ local function itemSummary(items, limit)
             rows[#rows + 1] = ("...and %d more"):format(#items - limit)
             break
         end
-        rows[#rows + 1] = ("x%d %s (%s)"):format(
+        rows[#rows + 1] = ("x%d %s - %s vendor"):format(
             it.count or 1,
             it.link or "item",
             ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(it.copper or 0) or tostring(it.copper or 0)
@@ -589,6 +589,8 @@ function D:_ShowFinalDeathPopup(rec, snap)
         "Bag vendor value: %s\n" ..
         "Equipped gear vendor value: %s\n" ..
         "Expected final contribution: %s%s\n\n" ..
+        "Captured bag value:\n%s\n\n" ..
+        "Captured gear value:\n%s\n\n" ..
         "1. Go to a mailbox.\n" ..
         "2. Sell vendorable bags and gear first so the contribution is currency-only.\n" ..
         "3. The addon will pre-fill mail to your bank (|cffffd700%s|r).\n" ..
@@ -600,6 +602,8 @@ function D:_ShowFinalDeathPopup(rec, snap)
         ns.Tiers:FormatMoney(gearValue),
         ns.Tiers:FormatMoney(maxPotential),
         postageWarning,
+        itemSummary(snap.bagItems, 6),
+        itemSummary(snap.gearItems, 6),
         bank,
         ns.Tiers:FormatMoney(mailPostageCopper())
     )

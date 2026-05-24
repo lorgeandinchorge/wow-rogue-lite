@@ -19,6 +19,12 @@ local function resetHarness()
                     estimatedGearValue = 0,
                     totalLiquid = 1500,
                     maximumPotential = 1500,
+                    bagItems = {
+                        { link = "|cffffffff|Hitem:2589::::::::|h[Linen Cloth]|h|r", count = 4, copper = 40, sellPrice = 10 },
+                    },
+                    gearItems = {
+                        { link = "|cff9d9d9d|Hitem:25::::::::|h[Worn Shortsword]|h|r", count = 1, copper = 70, sellPrice = 70 },
+                    },
                     credited = false,
                 },
                 _pendingContribution = 1500,
@@ -100,6 +106,20 @@ local function testBagValueDeltaIsCredited()
     assertEqual(receipt.postEstimatedBagValue, 200, "receipt records post-mail bag value")
 end
 
+local function testFinalDeathReceiptPreservesCapturedItemValues()
+    local contributions = resetHarness()
+
+    currentMoney = 250
+    currentBagValue = 200
+    currentGearValue = 0
+    local receipt = contributions:CreditFinalDeath("Runner-Realm")
+
+    assertEqual(receipt.bagItems[1].link, "|cffffffff|Hitem:2589::::::::|h[Linen Cloth]|h|r", "receipt preserves captured bag item link")
+    assertEqual(receipt.bagItems[1].copper, 40, "receipt preserves captured bag item vendor value")
+    assertEqual(receipt.gearItems[1].link, "|cff9d9d9d|Hitem:25::::::::|h[Worn Shortsword]|h|r", "receipt preserves captured gear item link")
+    assertEqual(receipt.gearItems[1].copper, 70, "receipt preserves captured gear item vendor value")
+end
+
 local function testSoldGearValueCanBeCreditedUpToMaximumPotential()
     local contributions = resetHarness()
     local rec = WRL_DB.characters["Runner-Realm"]
@@ -154,6 +174,7 @@ end
 
 testUnsentBagValueIsNotCredited()
 testBagValueDeltaIsCredited()
+testFinalDeathReceiptPreservesCapturedItemValues()
 testSoldGearValueCanBeCreditedUpToMaximumPotential()
 testSnapshotDeathSubtractsMailPostageFromMaximumPotential()
 testSnapshotDeathDoesNotGoNegativeAfterPostage()

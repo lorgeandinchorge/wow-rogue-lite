@@ -2,11 +2,11 @@
 ## Title: WoW Roguelite
 ## Notes: A rogue-lite run/bank system. Contribute on death, unlock perks for future runs.
 ## Author: Paul
-## Version: 0.3.5b
+## Version: 0.3.5c
 ## IconTexture: Interface\AddOns\WoWRoguelite\WRL_MinimapIcon.png
 ## SavedVariables: WRL_DB
 ## SavedVariablesPerCharacter: WRL_CharDB
-## OptionalDeps: GW2_UI, GW2_UI_Mainline, GW2_UI_TBC, GW2_UI_Vanilla, GW2_UI_Classic, GW2_UI_Mists, GW2_UI_Wrath
+## OptionalDeps: GW2_UI, GW2_UI_Mainline, GW2_UI_TBC, GW2_UI_Vanilla, GW2_UI_Classic, GW2_UI_Mists, GW2_UI_Wrath, TradeSkillMaster
 
 # --- Bootstrap ---
 WoWRoguelite.lua
@@ -23,6 +23,7 @@ Core/LegacyUnlocks.lua
 Core/Rewards.lua
 Core/Vendor.lua
 Core/Merchant.lua
+Core/Pricing.lua
 Core/BankResale.lua
 Core/Contributions.lua
 Core/Achievements.lua

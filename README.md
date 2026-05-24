@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.5a - Bank Dashboard Polish. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, manual resale tracking, right-safe dashboard controls, and clear-confirmation flows.
+> **Status:** v0.3.5c - Readiness and Intake Hotfix. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, and GW2 UI texture-backed theme loading are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, optional TSM DBMarket hints, tailor-made starter bag labels, manual resale tracking, right-safe dashboard controls, and clear-confirmation flows.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.5a loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.5c loaded.` in chat.
 
 ### Quick start
 
@@ -45,7 +45,7 @@ For Bank Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simula
 
 The **Rewards** tab is intentionally request-only for run characters: choose one unlocked starter reward from the dropdown and use **Prepare Mail** at a mailbox. Boons and burdens are configured under gear **Settings** -> **Run Modifiers** before the reward request.
 
-**On death (non-bank characters).** If you have lives left from Fate unlocks, you get a soft popup and carry on. On a final death, the addon snapshots your carried currency plus vendor value. Visit a vendor and click **WRL: Sell All** to confirm and automatically sell vendorable bag contents plus equipped gear. At a mailbox, click **WRL: Contribute** in the mail header to prepare the currency-only contribution mail, reserving 30c for postage; press Send when ready. If you defer or close the prompt, the **Dashboard** tab has a **Prepare Contribution Mail** button and `/wrl contribute` reopens it. The character is then marked **retired** and further play won't be credited.
+**On death (non-bank characters).** If you have lives left from Fate unlocks, you get a soft popup and carry on. On a final death, the addon snapshots your carried currency plus vendor value and lists the captured item stacks with their vendor sell value. Visit a vendor and click **WRL: Sell All** to confirm and automatically sell vendorable bag contents plus equipped gear. At a mailbox, click **WRL: Contribute** in the mail header to prepare the currency-only contribution mail, reserving 30c for postage; press Send when ready. If you defer or close the prompt, the **Dashboard** tab has a **Prepare Contribution Mail** button and `/wrl contribute` reopens it. The character is then marked **retired** and further play won't be credited.
 
 ### Profiles, rules, and run modifiers
 

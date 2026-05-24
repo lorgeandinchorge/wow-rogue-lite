@@ -28,13 +28,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.5a - Bank Dashboard Polish
+### Latest Update: v0.3.5c - Readiness and Intake Hotfix
 
-- Bank Dashboard rows, buttons, section borders, and nested Recent Ledger content now stay inside a reserved right-side scrollbar gutter.
-- Contribution Board now lists contributors by character with generation, level, total contribution, and share columns.
-- Resale Desk and Recent Ledger clear actions now ask for confirmation before hiding/removing visible rows.
-- Recent Ledger clearing keeps underlying contribution, fulfillment, and resale receipts intact so totals remain trustworthy.
-- Regression coverage now guards the dashboard geometry, character contribution board, and clear-button behavior.
+- Bank request checklists now label tailor-made starter bags and can show optional TSM DBMarket hints when TradeSkillMaster is installed.
+- TradeSkillMaster remains optional; missing TSM data falls back to the existing readiness and vendor-value behavior.
+- Final-death contribution prompts now list captured bag and equipped-gear item stacks with their vendor sell value.
+- Regression coverage guards the new readiness hints and captured item-value reporting.
 
 ### Bank And Run Structure
 

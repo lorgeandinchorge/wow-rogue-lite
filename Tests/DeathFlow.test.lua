@@ -220,6 +220,12 @@ local function resetHarness(opts)
             estimatedGearValue = 3000,
             totalLiquid = currentMoney + 2000,
             maximumPotential = math.max(0, currentMoney + 2000 + 3000 - 30),
+            bagItems = {
+                { link = "|cffffffff|Hitem:2589::::::::|h[Linen Cloth]|h|r", count = 4, copper = 40, sellPrice = 10 },
+            },
+            gearItems = {
+                { link = "|cff9d9d9d|Hitem:25::::::::|h[Worn Shortsword]|h|r", count = 1, copper = 70, sellPrice = 70 },
+            },
         }
         return rec.deathSnapshot
     end
@@ -534,6 +540,22 @@ local function testDeathPopupExplainsNextStepsAndMaximumPotential()
     assertContains(text, "Go to a mailbox", "popup lists mailbox step")
     assertContains(text, "Sell vendorable bags and gear", "popup explains currency-only preparation")
     assertNotContains(text, "drag", "popup no longer asks the player to drag items")
+end
+
+local function testDeathPopupShowsCapturedItemVendorValues()
+    local ns = resetHarness({ currentDead = false })
+    local rec = WRL_DB.characters["Runner-Realm"]
+
+    local text = popupShown[1] and popupShown[1].args[1] or ""
+    assertContains(text, "Captured bag value:", "popup names captured bag item values")
+    assertContains(text, "x4 |cffffffff|Hitem:2589::::::::|h[Linen Cloth]|h|r - 40c vendor",
+        "popup lists bag stack vendor value")
+    assertContains(text, "Captured gear value:", "popup names captured gear item values")
+    assertContains(text, "x1 |cff9d9d9d|Hitem:25::::::::|h[Worn Shortsword]|h|r - 70c vendor",
+        "popup lists gear vendor value")
+    assertEqual(rec.status, "dead_pending_contribution",
+        "item value reporting does not change death state")
+    assert(ns ~= nil, "harness returns namespace")
 end
 
 local function testFinalDeathPopupUsesSingleFormattedMessageArgument()
@@ -1097,6 +1119,7 @@ testEnteringWorldRechecksAlreadyDeadCharacter()
 testOutOfLivesActiveCharacterFinalizesOnLoginEvenWhenAlive()
 testOutOfLivesActiveCharacterFinalizesOnReviveEvent()
 testDeathPopupExplainsNextStepsAndMaximumPotential()
+testDeathPopupShowsCapturedItemVendorValues()
 testFinalDeathPopupUsesSingleFormattedMessageArgument()
 testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
 testRetirePopupCancelKeepsContributionPending()

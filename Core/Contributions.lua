@@ -50,6 +50,21 @@ local function ensureStorage()
     WRL_DB.contributionReceipts = WRL_DB.contributionReceipts or {}
 end
 
+local function copyItemRows(rows)
+    local out = {}
+    for i, row in ipairs(rows or {}) do
+        out[i] = {
+            bag = row.bag,
+            slot = row.slot,
+            link = row.link,
+            count = row.count,
+            sellPrice = row.sellPrice,
+            copper = row.copper,
+        }
+    end
+    return out
+end
+
 -- One-shot: back-fill receipts from pre-receipt rec.history so lifetime
 -- ledgers aren't empty on upgrade.  Guarded by WRL_DB._receiptsMigrated so we
 -- don't duplicate on every login.
@@ -140,6 +155,10 @@ function C:Record(characterKey, amount, source, info)
         postMoney         = info.postMoney,
         estimatedBagValue = info.estimatedBagValue,
         postEstimatedBagValue = info.postEstimatedBagValue,
+        estimatedGearValue = info.estimatedGearValue,
+        postEstimatedGearValue = info.postEstimatedGearValue,
+        bagItems          = copyItemRows(info.bagItems),
+        gearItems         = copyItemRows(info.gearItems),
     }
     table.insert(WRL_DB.contributionReceipts, receipt)
 
@@ -289,6 +308,8 @@ function C:CreditFinalDeath(characterKey, opts)
         postEstimatedBagValue = postBagEst,
         estimatedGearValue = snap.estimatedGearValue,
         postEstimatedGearValue = postGearEst,
+        bagItems          = snap.bagItems,
+        gearItems         = snap.gearItems,
     })
 
     -- Mark the snapshot consumed; second calls short-circuit at the top.

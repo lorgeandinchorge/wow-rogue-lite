@@ -56,6 +56,7 @@ function ns.Database:AccountIdForCharacter()
 end
 
     assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
+    assert(loadfile("Core/Pricing.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/Requests.lua"))("WoWRoguelite", ns)
     return ns
 end
@@ -287,6 +288,52 @@ local function testFulfillmentMailAndChatUseAvailableMissingChecklist()
     end
 end
 
+local function testReadinessIncludesOptionalPricingAndTailorHints()
+    local ns = resetHarness()
+    ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
+    ns.Rewards = {
+        BuildRewardForTierIds = function()
+            return {
+                gold = 0,
+                extraLives = 0,
+                items = {
+                    { id = 4496, qty = 1, note = "small brown pouch" },
+                    { id = 202, qty = 2, note = "training stone" },
+                },
+            }
+        end,
+    }
+    ns.Container = {
+        GetNumSlots = function() return 0 end,
+        GetItemInfo = function() return nil end,
+    }
+    _G.GetMoney = function() return 0 end
+    _G.GetItemInfo = function(itemId)
+        if tonumber(itemId) == 4496 then return "Small Brown Pouch" end
+        if tonumber(itemId) == 202 then return "Training Stone" end
+    end
+    _G.TSM_API = {
+        GetCustomPriceValue = function(source, itemString)
+            if source == "DBMarket" and itemString == "i:4496" then return 1234 end
+        end,
+    }
+    WRL_DB.requests[1] = { id = "req-1", from = "Graham-Realm", tierIds = { 101 }, status = "pending" }
+
+    local readiness = ns.Requests:FulfillmentReadiness(WRL_DB.requests[1])
+    assertEqual(readiness.items[1].marketCopper, 1234, "readiness stores optional TSM market value")
+    assertEqual(readiness.items[1].marketLabel, "TSM DBMarket", "readiness labels TSM market source")
+    assertEqual(readiness.items[1].craftHint, "tailor-made", "known starter bag gets tailor hint")
+    assertEqual(readiness.items[2].marketCopper, nil, "missing TSM values stay optional")
+
+    local lines = table.concat(ns.Requests:ReadinessItemLines(readiness, { prefix = "" }), "\n")
+    if not lines:find("Small Brown Pouch %(small brown pouch%): available 0 / requested 1 / missing 1 %(tailor%-made; TSM DBMarket 1234c%)") then
+        error("readiness item lines should include tailor and TSM hints")
+    end
+    if not lines:find("Training Stone %(training stone%): available 0 / requested 2 / missing 2") then
+        error("readiness item lines should keep normal items readable")
+    end
+end
+
 local function testRequestInventoryScansUseCContainerFallback()
     local ns = resetHarness()
     NUM_BAG_SLOTS = 0
@@ -329,6 +376,7 @@ testFulfillmentMailUsesBankerFlavorAndRewardDetails()
 testBeginMailFulfillmentPrefillsBankDeskMailAndMarksGathering()
 testBeginMailFulfillmentRetriesBodyAfterSendTabSwitch()
 testFulfillmentMailAndChatUseAvailableMissingChecklist()
+testReadinessIncludesOptionalPricingAndTailorHints()
 testRequestInventoryScansUseCContainerFallback()
 
 print("RequestMailFallback.test.lua: ok")
