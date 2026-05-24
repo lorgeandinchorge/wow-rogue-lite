@@ -466,6 +466,15 @@ function Tab:ConfirmClearResaleDesk()
     StaticPopup_Show("WRL_CLEAR_RESALE_DESK", nil, nil, self)
 end
 
+function Tab:_ClearLoanRow(accountId)
+    local removed = 0
+    if ns.Loans and ns.Loans.ClearSimulatedLoansForAccount then
+        removed = ns.Loans:ClearSimulatedLoansForAccount(accountId) or 0
+    end
+    ns:Print("Cleared %d simulated loan row receipt(s). Real loan receipts were kept.", removed)
+    self:Refresh()
+end
+
 function Tab:_ClearRecentLedger()
     if ns.Database and ns.Database.ClearRecentBankLedger then
         ns.Database:ClearRecentBankLedger()
@@ -662,6 +671,43 @@ local function appendContributionBoard(lines, maxAccounts, maxCharacters)
     end
 end
 
+local function loanGold(copper)
+    if ns.Loans and ns.Loans.FormatGold then
+        return ns.Loans:FormatGold(copper or 0)
+    end
+    return tostring(math.floor((tonumber(copper) or 0) / 10000)) .. "g"
+end
+
+local function appendLoansDesk(lines, maxRows)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "|cffc0a060Loans Desk|r"
+    local rows = ns.Loans and ns.Loans.AccountLoanRows and ns.Loans:AccountLoanRows() or {}
+    if #rows == 0 then
+        lines[#lines + 1] = "No active loans. The ledger is pretending to be relaxed."
+        return
+    end
+    lines[#lines + 1] = string.format("%-14s %-18s %8s %8s %8s %-8s", "Account", "Borrower", "Cap", "Debt", "Avail", "Latest")
+    local limit = math.min(maxRows or 5, #rows)
+    for i = 1, limit do
+        local row = rows[i]
+        local account = row.label or "Unassigned"
+        local borrower = row.characterKey or "Unknown"
+        local latest = row.latestKind or "loan"
+        if #account > 14 then account = account:sub(1, 11) .. "..." end
+        if #borrower > 18 then borrower = borrower:sub(1, 15) .. "..." end
+        lines[#lines + 1] = string.format("%-14s %-18s %8s %8s %8s %-8s",
+            account,
+            borrower,
+            loanGold(row.capCopper or 0),
+            loanGold(row.outstandingCopper or 0),
+            loanGold(row.availableCopper or 0),
+            latest)
+    end
+    if #rows > limit then
+        lines[#lines + 1] = ("... and %d more loan account(s)"):format(#rows - limit)
+    end
+end
+
 local function appendResaleDesk(lines, maxRows, owner)
     lines[#lines + 1] = ""
     lines[#lines + 1] = "|cffc0a060Resale Desk|r"
@@ -712,27 +758,38 @@ local function appendRecentLedger(lines, maxRows)
         lines[#lines + 1] = "No recent ledger activity. The ink is getting ideas."
         return
     end
+    local ledgerTableHeader = string.format("%-11s %-11s %-18s %-12s %8s %-18s", "Time", "Type", "Who", "Account", "Amount", "Detail")
+    lines[#lines + 1] = ledgerTableHeader
     for _, row in ipairs(rows) do
-        if row.kind == "fulfillment" then
-            lines[#lines + 1] = (" - %s fulfilled for %s (%s, %s)"):format(
-                fmtWhen(row.when),
-                row.characterKey or "Unknown",
-                row.accountLabel or "Unassigned",
-                row.method or "manual")
-        elseif row.kind == "resale" then
-            lines[#lines + 1] = (" - %s resale to %s: %dx %s for %s"):format(
-                fmtWhen(row.when),
-                row.characterKey or "Unknown",
-                row.qty or 0,
-                row.itemName or "catalog item",
-                ns.Tiers:FormatMoney(row.amount or 0))
-        else
-            lines[#lines + 1] = (" - %s contribution from %s (%s): %s"):format(
-                fmtWhen(row.when),
-                row.characterKey or "Unknown",
-                row.accountLabel or "Unassigned",
-                ns.Tiers:FormatMoney(row.amount or 0))
+        local kind = row.kind or "contribution"
+        local who = row.characterKey or "Unknown"
+        local account = row.accountLabel or "Unassigned"
+        local amount = ns.Tiers:FormatMoney(row.amount or 0)
+        local detail = row.source or ""
+        if kind == "fulfillment" then
+            kind = "fulfill"
+            detail = row.method or "manual"
+        elseif kind == "resale" then
+            detail = ("%dx %s"):format(row.qty or 0, row.itemName or "catalog item")
+        elseif kind == "loan_borrow" then
+            kind = "loan"
+            amount = loanGold(row.amount or 0)
+            detail = row.source or "borrow"
+        elseif kind == "loan_repayment" then
+            kind = "repay"
+            amount = loanGold(row.amount or 0)
+            detail = row.source or "repayment"
         end
+        if #who > 18 then who = who:sub(1, 15) .. "..." end
+        if #account > 12 then account = account:sub(1, 9) .. "..." end
+        if #detail > 18 then detail = detail:sub(1, 15) .. "..." end
+        lines[#lines + 1] = string.format("%-11s %-11s %-18s %-12s %8s %-18s",
+            fmtWhen(row.when),
+            kind,
+            who,
+            account,
+            amount,
+            detail)
     end
 end
 
@@ -758,6 +815,7 @@ end
 local function splitBankSections(lines)
     local desk = {}
     local contributions = {}
+    local loans = {}
     local resale = {}
     local ledger = {}
     local target = desk
@@ -766,10 +824,14 @@ local function splitBankSections(lines)
             -- The framed section title owns this heading.
         elseif line == "|cffc0a060Contribution Board|r" then
             target = contributions
+        elseif line == "|cffc0a060Loans Desk|r" then
+            target = loans
         elseif line == "|cffc0a060Resale Desk|r" then
             target = resale
         elseif line == "" then
             if target == contributions then
+                target = loans
+            elseif target == loans then
                 target = resale
             else
                 target = ledger
@@ -780,7 +842,7 @@ local function splitBankSections(lines)
             target[#target + 1] = line
         end
     end
-    return desk, contributions, resale, ledger
+    return desk, contributions, loans, resale, ledger
 end
 
 local setLedgerSection
@@ -1195,6 +1257,37 @@ local function setResaleSection(section, lines, rows, owner)
     return height
 end
 
+local function setLoansSection(section, lines, owner)
+    local height = setBankSection(section, lines)
+    if not section then return height end
+    if section.clearLoansButton then
+        section.clearLoansButton:Hide()
+    end
+    section.loanClearButtons = section.loanClearButtons or {}
+    local rows = ns.Loans and ns.Loans.AccountLoanRows and ns.Loans:AccountLoanRows() or {}
+    local visibleRows = math.min(#rows, math.max(0, #(section.lines or {}) - 1))
+    for i = 1, math.max(#section.loanClearButtons, visibleRows) do
+        local button = section.loanClearButtons[i]
+        if not button then
+            button = createInlineIconButton(section, "x", nil)
+            section.loanClearButtons[i] = button
+        end
+        local row = rows[i]
+        local fs = section.lines and section.lines[i + 1]
+        if row and row.hasSimulatedLoan and fs and fs:IsShown() then
+            button:ClearAllPoints()
+            button:SetPoint("LEFT", fs, "LEFT", BANK_SECTION_WIDTH + BANK_CLEAR_BUTTON_RIGHT_INSET - 18, 0)
+            button:SetScript("OnClick", function()
+                owner:_ClearLoanRow(row.accountId)
+            end)
+            button:Show()
+        else
+            button:Hide()
+        end
+    end
+    return height
+end
+
 local function ensureLedgerClearButton(section, owner)
     if not section or not owner then return end
     if not section.clearLedgerButton then
@@ -1283,10 +1376,53 @@ function Tab:_BuildBankerOverviewLines(key)
     }
     appendBankDeskTable(right, 8, self)
     appendContributionBoard(right, 5)
+    appendLoansDesk(right, 5)
     appendResaleDesk(right, 6, self)
     appendRecentLedger(right, 50)
 
     return left, right
+end
+
+function Tab:_BuildCharacterOverviewLines(key, rec)
+    local right = {}
+    if ns.Loans and ns.Loans.BorrowCapForCharacter then
+        local cap = ns.Loans:BorrowCapForCharacter(key)
+        right[#right + 1] = "|cffc0a060Loan status|r"
+        right[#right + 1] = ("Loan cap: %s (rank %d)"):format(loanGold(cap.capCopper or 0), cap.highestRank or 0)
+        right[#right + 1] = ("Outstanding loan: %s"):format(loanGold(cap.outstandingCopper or 0))
+        right[#right + 1] = ("Borrow available: %s"):format(loanGold(cap.availableCopper or 0))
+        right[#right + 1] = ""
+    end
+    right[#right + 1] = "|cffc0a060Active rules|r"
+    local ruleBits = rulesSummary(6)
+    for i = 1, #ruleBits do right[#right + 1] = ruleBits[i] end
+    right[#right + 1] = ""
+    right[#right + 1] = "|cffc0a060Claimed rewards|r"
+    local claimBits = claimedSummary(rec, 6)
+    for i = 1, #claimBits do right[#right + 1] = claimBits[i] end
+    right[#right + 1] = ""
+    right[#right + 1] = "|cffc0a060Active boons and burdens|r"
+    local boonBits = activeBoonsSummary(rec)
+    for i = 1, #boonBits do right[#right + 1] = boonBits[i] end
+    local burdenBits = activeBurdensSummary(rec)
+    for i = 1, #burdenBits do right[#right + 1] = burdenBits[i] end
+    right[#right + 1] = ""
+    right[#right + 1] = "|cffc0a060Recent contribution receipts|r"
+    local receipts = recentReceipts(key, 5)
+    for i = 1, #receipts do right[#right + 1] = receipts[i] end
+    right[#right + 1] = ""
+    right[#right + 1] = "|cffc0a060Recent taint/warning log entries|r"
+    local warnings = recentRuleWarnings(key, 6)
+    for i = 1, #warnings do right[#right + 1] = warnings[i] end
+
+    local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec and rec.status
+    if runState == "retired" or runState == "archived" then
+        right[#right + 1] = ""
+        right[#right + 1] = "|cffc0a060Death history|r"
+        local deaths = recentDeaths(rec, 6)
+        for i = 1, #deaths do right[#right + 1] = deaths[i] end
+    end
+    return right
 end
 
 function Tab:PromptAssignAccount(req)
@@ -1327,6 +1463,57 @@ function Tab:PromptAssignAccount(req)
     }
     local popup = StaticPopup_Show("WRL_ACCOUNT_LABEL", req.from)
     if popup then popup.data = req.from end
+end
+
+function Tab:PromptRecordLoan()
+    if not StaticPopupDialogs or not StaticPopup_Show then
+        ns:Print("Record a loan with |cffffff00/wrl loan borrow Character-Realm GOLD|r.")
+        return
+    end
+    local req = self:_ActiveBankRequest()
+    StaticPopupDialogs["WRL_RECORD_LOAN"] = StaticPopupDialogs["WRL_RECORD_LOAN"] or {
+        text = "Record loan as Character-Realm gold:",
+        button1 = "Record",
+        button2 = "Cancel",
+        hasEditBox = 1,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        OnAccept = function(popup)
+            local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+            local text = editBox and editBox:GetText() or ""
+            local characterKey, amountText = text:match("^(%S+)%s+(%S+)$")
+            local amount = tonumber(amountText)
+            if not characterKey or not amount then
+                ns:Print("Loan entry needs Character-Realm and gold amount.")
+                return
+            end
+            local receipt, reason, cap = ns.Loans and ns.Loans.RecordLoan and ns.Loans:RecordLoan(characterKey, amount, "dashboard", "manual banker entry")
+            if receipt then
+                ns:Print("Recorded loan to %s: %s.", characterKey, loanGold(receipt.amount or 0))
+            elseif reason == "over_cap" then
+                ns:Print("Loan would exceed available cap (%s available).", loanGold(cap and cap.availableCopper or 0))
+            else
+                ns:Print("Could not record loan.")
+            end
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local popup = editBox:GetParent()
+            StaticPopupDialogs["WRL_RECORD_LOAN"].OnAccept(popup)
+            popup:Hide()
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            editBox:GetParent():Hide()
+        end,
+    }
+    local popup = StaticPopup_Show("WRL_RECORD_LOAN")
+    if popup then
+        local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+        if editBox and req and req.from then
+            editBox:SetText(req.from .. " 1")
+            if editBox.HighlightText then editBox:HighlightText() end
+        end
+    end
 end
 
 function Tab:PromptResaleCOD(row)
@@ -1474,6 +1661,11 @@ function Tab:Init(parent)
     self.bankContributionSection = buildBankSection(content, Theme, "Contribution Board")
     setBankSectionWidth(self.bankContributionSection, BANK_TOP_SECTION_WIDTH)
     self.bankContributionSection:Hide()
+    self.bankLoansSection = buildBankSection(content, Theme, "Loans Desk")
+    self.bankLoansSection.recordLoanButton = Theme:Button(self.bankLoansSection, "Record Loan", 96, 18)
+    self.bankLoansSection.recordLoanButton:SetPoint("TOPRIGHT", self.bankLoansSection, "TOPRIGHT", BANK_CLEAR_BUTTON_RIGHT_INSET, -8)
+    self.bankLoansSection.recordLoanButton:SetScript("OnClick", function() Tab:PromptRecordLoan() end)
+    self.bankLoansSection:Hide()
     self.bankResaleSection = buildBankSection(content, Theme, "Resale Desk")
     self.bankResaleSection:Hide()
     self.bankLedgerSection = buildLedgerSection(content, Theme)
@@ -1514,6 +1706,7 @@ function Tab:Refresh()
         if self.bankSnapshotSection then self.bankSnapshotSection:Hide() end
         if self.bankDeskSection then self.bankDeskSection:Hide() end
         if self.bankContributionSection then self.bankContributionSection:Hide() end
+        if self.bankLoansSection then self.bankLoansSection:Hide() end
         if self.bankResaleSection then self.bankResaleSection:Hide() end
         if self.bankLedgerSection then self.bankLedgerSection:Hide() end
         writeLines(self.leftLines, {
@@ -1547,7 +1740,7 @@ function Tab:Refresh()
         local left, right = self:_BuildBankerOverviewLines(key)
         hideLines(self.leftLines)
         hideLines(self.rightLines)
-        local deskLines, contributionLines, resaleLines, ledgerLines = splitBankSections(right)
+        local deskLines, contributionLines, loansLines, resaleLines, ledgerLines = splitBankSections(right)
         local snapshotH = setBankSection(self.bankSnapshotSection, left)
         self.bankContributionSection:ClearAllPoints()
         self.bankContributionSection:SetPoint("TOPLEFT", self.bankSnapshotSection, "TOPRIGHT", 10, 0)
@@ -1558,13 +1751,16 @@ function Tab:Refresh()
         local deskH = setBankDeskSection(self.bankDeskSection, deskLines, bankRows, self)
         self.bankDeskSection:ClearAllPoints()
         self.bankDeskSection:SetPoint("TOPLEFT", self.bankSnapshotSection, "BOTTOMLEFT", 0, -10)
+        self.bankLoansSection:ClearAllPoints()
+        self.bankLoansSection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        local loansH = setLoansSection(self.bankLoansSection, loansLines, self)
         self.bankResaleSection:ClearAllPoints()
-        self.bankResaleSection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        self.bankResaleSection:SetPoint("TOPLEFT", self.bankLoansSection, "BOTTOMLEFT", 0, -10)
         local resaleH = setResaleSection(self.bankResaleSection, resaleLines, resaleRows, self)
         self.bankLedgerSection:ClearAllPoints()
         self.bankLedgerSection:SetPoint("TOPLEFT", self.bankResaleSection, "BOTTOMLEFT", 0, -10)
         local ledgerH = setLedgerSection(self.bankLedgerSection, ledgerLines, self)
-        self.content:SetHeight(math.max(1, topH + deskH + resaleH + ledgerH + 56))
+        self.content:SetHeight(math.max(1, topH + deskH + loansH + resaleH + ledgerH + 66))
         self.scroll:SetVerticalScroll(keepScroll)
         return
     end
@@ -1580,6 +1776,7 @@ function Tab:Refresh()
     if self.bankSnapshotSection then self.bankSnapshotSection:Hide() end
     if self.bankDeskSection then self.bankDeskSection:Hide() end
     if self.bankContributionSection then self.bankContributionSection:Hide() end
+    if self.bankLoansSection then self.bankLoansSection:Hide() end
     if self.bankResaleSection then self.bankResaleSection:Hide() end
     if self.bankLedgerSection then self.bankLedgerSection:Hide() end
     self.leftTitle:SetText("Character Dashboard")
@@ -1623,35 +1820,7 @@ function Tab:Refresh()
 
     writeLines(self.leftLines, left)
 
-    local right = {}
-    right[#right + 1] = "|cffc0a060Active rules|r"
-    local ruleBits = rulesSummary(6)
-    for i = 1, #ruleBits do right[#right + 1] = ruleBits[i] end
-    right[#right + 1] = ""
-    right[#right + 1] = "|cffc0a060Claimed rewards|r"
-    local claimBits = claimedSummary(rec, 6)
-    for i = 1, #claimBits do right[#right + 1] = claimBits[i] end
-    right[#right + 1] = ""
-    right[#right + 1] = "|cffc0a060Active boons and burdens|r"
-    local boonBits = activeBoonsSummary(rec)
-    for i = 1, #boonBits do right[#right + 1] = boonBits[i] end
-    local burdenBits = activeBurdensSummary(rec)
-    for i = 1, #burdenBits do right[#right + 1] = burdenBits[i] end
-    right[#right + 1] = ""
-    right[#right + 1] = "|cffc0a060Recent contribution receipts|r"
-    local receipts = recentReceipts(key, 5)
-    for i = 1, #receipts do right[#right + 1] = receipts[i] end
-    right[#right + 1] = ""
-    right[#right + 1] = "|cffc0a060Recent taint/warning log entries|r"
-    local warnings = recentRuleWarnings(key, 6)
-    for i = 1, #warnings do right[#right + 1] = warnings[i] end
-
-    if runState == "retired" or runState == "archived" then
-        right[#right + 1] = ""
-        right[#right + 1] = "|cffc0a060Death history|r"
-        local deaths = recentDeaths(rec, 6)
-        for i = 1, #deaths do right[#right + 1] = deaths[i] end
-    end
+    local right = self:_BuildCharacterOverviewLines(key, rec)
 
     writeLines(self.rightLines, right)
     self.content:SetHeight(math.max(1, (#right * 16) + 20))

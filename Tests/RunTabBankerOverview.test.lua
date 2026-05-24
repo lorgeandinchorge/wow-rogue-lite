@@ -42,6 +42,7 @@ local function resetHarness()
         Tiers = {},
         Requests = {},
         BankResale = {},
+        Loans = {},
     }
 
     function ns:NewModule(name)
@@ -90,7 +91,36 @@ local function resetHarness()
     function ns.Database:RecentBankLedgerRows()
         return {
             { kind = "fulfillment", characterKey = "Graham-Realm", accountLabel = "Graham", amount = 500, method = "mail", when = 102 },
+            { kind = "loan_borrow", characterKey = "Graham-Realm", accountLabel = "Graham", amount = 10000, when = 103 },
         }
+    end
+    function ns.Loans:BorrowCapForCharacter()
+        return { capCopper = 30000, outstandingCopper = 10000, availableCopper = 20000, highestRank = 2 }
+    end
+    function ns.Loans:AccountLoanRows()
+        return {
+            {
+                accountId = "acct-graham",
+                label = "Graham",
+                characterKey = "Graham-Realm",
+                capCopper = 30000,
+                outstandingCopper = 10000,
+                availableCopper = 20000,
+                latestWhen = 103,
+                latestKind = "borrow",
+            },
+        }
+    end
+    function ns.Loans:FormatGold(copper)
+        return tostring(math.floor((copper or 0) / 10000)) .. "g"
+    end
+    function ns.Loans:ClearSimulatedLoans()
+        self.clearedSimLoans = true
+        return 1
+    end
+    function ns.Loans:ClearSimulatedLoansForAccount(accountId)
+        self.clearedLoanAccount = accountId
+        return 1
     end
     function ns.BankResale:InventoryRows()
         return {
@@ -200,14 +230,30 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(right[7], "20000c", "contribution board lists contributor amount")
     assertContains(right[8], "Havok-Realm", "contribution board lists former local-account contributor by character")
     assertNotContains(right[8], "Local Account", "contribution board should not render account labels")
-    assertContains(right[10], "|cffc0a060Resale Desk|r", "right pane includes resale desk")
-    assertContains(right[11], "Item", "resale desk table includes item header")
-    assertContains(right[11], "Who", "resale desk table includes requester header")
-    assertContains(right[11], "Req", "resale desk table includes requested quantity header")
-    assertContains(right[12], "Chunk of Boar Meat", "resale desk lists catalog inventory")
-    assertContains(right[12], "Graham-Realm", "resale desk lists who requested the resale item")
-    assertContains(right[13], "Goretusk Liver", "resale desk lists additional catalog inventory")
-    assertContains(right[15], "ledger", "right pane includes ledger heading")
+    local allRight = table.concat(right, "\n")
+    assertContains(allRight, "|cffc0a060Loans Desk|r", "right pane includes loans desk")
+    assertContains(allRight, "Account", "loans desk includes table header")
+    assertContains(allRight, "Borrower", "loans desk includes borrower column")
+    assertContains(allRight, "Graham", "loans desk lists borrower account")
+    assertContains(allRight, "1g", "loans desk lists outstanding debt in gold")
+    assertContains(allRight, "|cffc0a060Resale Desk|r", "right pane includes resale desk")
+    assertContains(allRight, "Chunk of Boar Meat", "resale desk lists catalog inventory")
+    assertContains(allRight, "Goretusk Liver", "resale desk lists additional catalog inventory")
+    assertContains(allRight, "ledger", "right pane includes ledger heading")
+    assertContains(allRight, "Time", "recent ledger uses a table header")
+    assertContains(allRight, "Type", "recent ledger uses a type column")
+    assertContains(allRight, "Amount", "recent ledger uses an amount column")
+end
+
+local function testRunnerDashboardShowsLoanSummary()
+    local tab = resetHarness()
+    local lines = tab:_BuildCharacterOverviewLines("Graham-Realm", WRL_DB.characters["Graham-Realm"])
+    local text = table.concat(lines, "\n")
+
+    assertContains(text, "Loan cap:", "runner dashboard shows loan cap")
+    assertContains(text, "Outstanding loan:", "runner dashboard shows outstanding debt")
+    assertContains(text, "Borrow available:", "runner dashboard shows available borrow amount")
+    assertContains(text, "1g", "runner dashboard renders loan values in gold")
 end
 
 local function testContributionActionOnlyShowsForPendingContributionRuns()
@@ -396,6 +442,14 @@ local function testBankDeskCanCycleActiveRequests()
     assertEqual(tab:_ActiveBankRequest().id, "req-1", "next request wraps around")
 end
 
+local function testLoansDeskRowClearClearsOneSimulatedRow()
+    local tab = resetHarness()
+
+    tab:_ClearLoanRow("acct-graham")
+
+    assertEqual(tab._testNS.Loans.clearedLoanAccount, "acct-graham", "loans row clear removes simulated rows for one account")
+end
+
 local function testEmptyBankDeskMessageSitsUnderHeader()
     local tab = resetHarness()
     for _, req in ipairs(WRL_DB.requests) do
@@ -427,6 +481,7 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "Theme:Text(section, 11, Theme.c.fg2)", "Bank Desk section body text should be larger for readability")
     assertContains(src, "self.bankDeskSection", "Bank Desk should have its own right-side section")
     assertContains(src, "self.bankContributionSection", "Contribution Board should have its own right-side section")
+    assertContains(src, "self.bankLoansSection", "Loans Desk should have its own right-side section")
     assertContains(src, "self.bankResaleSection", "Resale Desk should have its own right-side section")
     assertContains(src, "self.bankLedgerSection", "Recent ledger should have its own right-side section")
     assertContains(src, "buildBankSection(content, Theme, \"Contribution Board\")", "Contribution Board should have a strong section heading")
@@ -437,7 +492,13 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "row.total:SetJustifyH(\"RIGHT\")", "Contribution Board money column should right-align")
     assertContains(src, "row.share:SetJustifyH(\"RIGHT\")", "Contribution Board share column should right-align")
     assertContains(src, "buildBankSection(content, Theme, \"Resale Desk\")", "Resale Desk should have a strong section heading")
+    assertContains(src, "buildBankSection(content, Theme, \"Loans Desk\")", "Loans Desk should have a strong section heading")
+    assertContains(src, "section.loanClearButtons", "Loans Desk should include row clear buttons")
+    assertContains(src, "button:SetPoint(\"LEFT\", fs, \"LEFT\", BANK_SECTION_WIDTH + BANK_CLEAR_BUTTON_RIGHT_INSET - 18, 0)", "Loans Desk row clear buttons should sit inside the section edge")
+    assertContains(src, "owner:_ClearLoanRow(row.accountId)", "Loans Desk clear should target one account row")
+    assertContains(src, "ns.Loans:ClearSimulatedLoansForAccount(accountId)", "Loans Desk clear should remove simulated loan receipts only for one account")
     assertContains(src, "setResaleSection(self.bankResaleSection", "Resale Desk should render through selectable row controls")
+    assertContains(src, "local ledgerTableHeader", "Recent Ledger should render as a compact table")
     assertContains(src, "resaleTableHeader", "Resale Desk should render as a compact table")
     assertContains(src, "\"Who\"", "Resale Desk table should expose requester names")
     assertContains(src, "Req", "Resale Desk table should expose requested quantity")
@@ -489,6 +550,7 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
 end
 
 testBankerOverviewReplacesRunSnapshotCopy()
+testRunnerDashboardShowsLoanSummary()
 testContributionActionOnlyShowsForPendingContributionRuns()
 testContributionBoardShowsLocalAccountContributionsByCharacter()
 testBankDeskActionButtonsAreDashboardOwned()
@@ -499,6 +561,7 @@ testSelectedResaleOrderUsesRequestedQuantityWhenRequestMatchesItem()
 testResaleCODRehydratesStaleSelectionWithRequester()
 testResaleCODUsesSimulatedBuyerWithoutBankRequest()
 testResaleDeskClearAllClearsSimulatedRowsAndSelection()
+testLoansDeskRowClearClearsOneSimulatedRow()
 testBankDeskCanCycleActiveRequests()
 testEmptyBankDeskMessageSitsUnderHeader()
 testBankDeskUsesBorderedSectionsWithStrongHeadings()

@@ -5,6 +5,9 @@ local resaleSale = nil
 local resaleCOD = nil
 local resaleRowsPrinted = 0
 local simulatedResale = nil
+local loanBorrow = nil
+local loanRepay = nil
+local loanRowsPrinted = 0
 
 _G.DEFAULT_CHAT_FRAME = { AddMessage = function() end }
 _G.SlashCmdList = {}
@@ -31,6 +34,7 @@ local ns = {
     Comm = {},
     Requests = {},
     BankResale = {},
+    Loans = {},
     Death = {},
     Export = {},
     Theme = {},
@@ -88,6 +92,44 @@ function ns.BankResale:ClearSimulatedStock()
     simulatedResale = {}
     self.simulatedBuyer = nil
     return true
+end
+
+function ns.Loans:BorrowCapForCharacter(characterKey)
+    return {
+        characterKey = characterKey,
+        capCopper = 30000,
+        outstandingCopper = 10000,
+        availableCopper = 20000,
+        highestRank = 2,
+    }
+end
+
+function ns.Loans:RecordLoan(characterKey, amount, source, note)
+    if amount <= 0 then return nil, "bad_amount" end
+    if amount > 2 then return nil, "over_cap" end
+    loanBorrow = { characterKey = characterKey, amount = amount * 10000, source = source, note = note }
+    return loanBorrow
+end
+
+function ns.Loans:RecordTestLoan(characterKey, amount, note)
+    loanBorrow = { characterKey = characterKey, amount = amount * 10000, source = "simulated", note = note }
+    return loanBorrow
+end
+
+function ns.Loans:RecordManualRepayment(characterKey, amount, source, note)
+    if amount <= 0 then return nil, "bad_amount" end
+    loanRepay = { characterKey = characterKey, amount = amount * 10000, source = source, note = note }
+    return { repaid = amount * 10000, contributionRemainder = 0, receipt = loanRepay }
+end
+
+function ns.Loans:AccountLoanRows()
+    return {
+        { label = "Graham", characterKey = "Graham-Realm", capCopper = 30000, outstandingCopper = 10000, availableCopper = 20000 },
+    }
+end
+
+function ns.Loans:FormatGold(copper)
+    return tostring(math.floor((copper or 0) / 10000)) .. "g"
 end
 
 function ns.MainFrame:ShowTab(tab)
@@ -212,6 +254,46 @@ end
 if not foundBadQty then error("expected zero resale quantity to print quantity error", 2) end
 if not foundNotCatalog then error("expected non-catalog resale item to print catalog error", 2) end
 if not foundMissingBuyer then error("expected missing resale COD buyer to print buyer error", 2) end
+ns.Print = origPrint
+
+-- /wrl loan prints loan rows and opens Dashboard.
+printedMessages = {}
+ns.Print = function(self, msg, ...)
+    if select("#", ...) > 0 then msg = msg:format(...) end
+    printedMessages[#printedMessages + 1] = tostring(msg)
+    if tostring(msg):find("Graham", 1, true) then loanRowsPrinted = loanRowsPrinted + 1 end
+end
+SlashCmdList.WRL("loan")
+if ns.MainFrame.lastTab ~= "Run" then
+    error("expected /wrl loan to open Dashboard", 2)
+end
+if loanRowsPrinted ~= 1 then
+    error("expected /wrl loan to print current loan rows", 2)
+end
+
+-- /wrl loan borrow records a manual borrower loan.
+loanBorrow = nil
+SlashCmdList.WRL("loan borrow Graham-Realm 1")
+if not loanBorrow or loanBorrow.characterKey ~= "Graham-Realm" or loanBorrow.amount ~= 10000 then
+    error("expected /wrl loan borrow to treat amount as gold", 2)
+end
+
+-- /wrl loan repay records a manual repayment.
+loanRepay = nil
+SlashCmdList.WRL("loan repay Graham-Realm 1")
+if not loanRepay or loanRepay.characterKey ~= "Graham-Realm" or loanRepay.amount ~= 10000 then
+    error("expected /wrl loan repay to treat amount as gold", 2)
+end
+
+-- /wrl simloan seeds a local loan and opens Dashboard.
+loanBorrow = nil
+SlashCmdList.WRL("simloan Tester-Realm 1")
+if ns.MainFrame.lastTab ~= "Run" then
+    error("expected /wrl simloan to open Dashboard", 2)
+end
+if not loanBorrow or loanBorrow.characterKey ~= "Tester-Realm" or loanBorrow.amount ~= 10000 then
+    error("expected /wrl simloan to seed a tester loan in gold", 2)
+end
 ns.Print = origPrint
 
 -- When Merchant module is absent the command should print rather than crash.

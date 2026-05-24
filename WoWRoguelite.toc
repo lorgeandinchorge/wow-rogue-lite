@@ -2,7 +2,7 @@
 ## Title: WoW Roguelite
 ## Notes: A rogue-lite run/bank system. Contribute on death, unlock perks for future runs.
 ## Author: Paul
-## Version: 0.3.6
+## Version: 0.3.7
 ## IconTexture: Interface\AddOns\WoWRoguelite\WRL_MinimapIcon.png
 ## SavedVariables: WRL_DB
 ## SavedVariablesPerCharacter: WRL_CharDB
@@ -25,6 +25,7 @@ Core/Vendor.lua
 Core/Merchant.lua
 Core/Pricing.lua
 Core/BankResale.lua
+Core/Loans.lua
 Core/Contributions.lua
 Core/Achievements.lua
 Core/Comm.lua

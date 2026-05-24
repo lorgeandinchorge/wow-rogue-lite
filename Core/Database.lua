@@ -9,7 +9,7 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Database")
 
-local SCHEMA_VERSION = 13
+local SCHEMA_VERSION = 14
 
 local function normalizeCharacterKey(key)
     if not key or key == "" then return nil end
@@ -57,6 +57,7 @@ local function defaults()
         accounts             = {}, -- [accountId] = { id, label, createdAt }
         accountLinks         = {}, -- [Character-Realm] = accountId
         resaleReceipts       = {}, -- account-wide resale sale ledger; owned by Core/BankResale.lua
+        loanReceipts         = {}, -- account-wide loan borrow/repayment ledger; owned by Core/Loans.lua
         resaleSimStock       = {}, -- temporary simulated resale stock for local testing
         bankLedgerClearedAt  = 0,  -- visibility cutoff for the Recent Ledger UI
     }
@@ -172,11 +173,15 @@ function D:Init()
             WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
             WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
         end
+        if WRL_DB.schema < 14 then
+            WRL_DB.loanReceipts = WRL_DB.loanReceipts or {}
+        end
         WRL_DB.schema = SCHEMA_VERSION
     end
 
     WRL_DB.achievements = WRL_DB.achievements or {}
     WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
+    WRL_DB.loanReceipts = WRL_DB.loanReceipts or {}
     WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
     WRL_DB.accounts = WRL_DB.accounts or {}
     WRL_DB.accountLinks = WRL_DB.accountLinks or {}
@@ -480,6 +485,11 @@ function D:AssignCharacterToAccountLabel(characterKey, label)
             receipt.accountId = account.id
         end
     end
+    for _, receipt in ipairs(WRL_DB.loanReceipts or {}) do
+        if receipt.characterKey == characterKey then
+            receipt.accountId = account.id
+        end
+    end
     return account
 end
 
@@ -618,6 +628,20 @@ function D:RecentBankLedgerRows(maxRows)
                 amount = s.totalCopper or 0,
                 itemName = s.itemName,
                 qty = s.qty,
+            }
+        end
+    end
+    for _, loan in ipairs(WRL_DB.loanReceipts or {}) do
+        if (loan.when or 0) > clearedAt then
+            local accountId = self:AccountIdForCharacter(loan.characterKey) or loan.accountId
+            rows[#rows + 1] = {
+                kind = loan.kind == "repayment" and "loan_repayment" or "loan_borrow",
+                when = loan.when or 0,
+                characterKey = loan.characterKey,
+                accountId = accountId,
+                accountLabel = self:AccountLabel(accountId),
+                amount = loan.amount or 0,
+                source = loan.source,
             }
         end
     end

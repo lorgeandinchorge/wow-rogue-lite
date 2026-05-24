@@ -22,18 +22,20 @@ It is part hardcore challenge, part account progression, and part self-made meta
 - account-wide contribution totals
 - unlocked legacy rewards
 - request and fulfillment flow between run and bank
+- manual loan cap, debt, and repayment accounting
 - roguelite rule profiles
 - optional boons and burdens for a run
 - retirements, rule logs, and exports
 
 ## Main Features
 
-### Latest Update: v0.3.6 - Resale Pricing Layer
+### Latest Update: v0.3.7 - Loans Prototype
 
-- Resale Desk pricing is now configurable from Settings under Pricing.
-- Auto pricing uses TSM DBMarket when available, then double vendor, then catalog fallback.
-- Resale inventory rows, COD drafts, and sale receipts now record the source behind each price.
-- The bank fulfillment dashboard is now labeled Requisitions Desk for clearer quartermaster-style banking.
+- The bank Dashboard now includes a manual Loans Desk with cap, debt, available borrow room, borrower, and recent loan activity.
+- Loan cap is based on the highest purchased Legacy rank: `floor(rank * 3 / 2)` gold.
+- Borrowing is enforced by linked account while receipts keep the borrower character for audit.
+- Contribution credit now repays outstanding account debt first; only overflow becomes normal contribution progress.
+- `/wrl loan`, `/wrl loan borrow`, `/wrl loan repay`, and `/wrl simloan` support prototype testing and fallback entry.
 
 ### Bank And Run Structure
 
@@ -46,6 +48,10 @@ When a run dies permanently, the addon tracks its final contribution and adds it
 ### Starter Reward Requests
 
 On a new run, spend budget on the Legacy tab, then open the Rewards tab, choose an unlocked starter reward, and prepare a request mail for the bank. On the bank character, open the Rewards tab to see what is needed and fulfill it by mail or trade.
+
+### Loans Prototype
+
+Loans are fully manual. The addon records the loan paperwork and shows debt/cap visibility, but it does not mail, trade, or move gold. The bank can record a loan after handing gold over manually, and repayments are accounted for before normal contribution credit.
 
 ### Profiles, Rules, And Run Modifiers
 
@@ -83,6 +89,10 @@ Because of Blizzard API restrictions, the addon cannot click protected buttons f
 /wrl rules
 /wrl export
 /wrl contribute
+/wrl loan
+/wrl loan borrow
+/wrl loan repay
+/wrl simloan
 /wrl sellfinal
 ```
 

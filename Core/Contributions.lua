@@ -137,6 +137,14 @@ function C:Record(characterKey, amount, source, info)
     amount = math.max(0, math.floor(amount or 0))
     info = info or {}
 
+    if ns.Loans and ns.Loans.ApplyRepayment then
+        local repayment = ns.Loans:ApplyRepayment(characterKey, amount, source or "contribution", info)
+        amount = math.max(0, math.floor((repayment and repayment.contributionRemainder) or amount))
+        if amount <= 0 then
+            return nil
+        end
+    end
+
     ensureStorage()
 
     local confidence = info.confidence

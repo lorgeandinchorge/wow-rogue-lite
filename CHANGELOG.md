@@ -1,5 +1,15 @@
 # WoW Roguelite Changelog
 
+## v0.3.7
+
+- Add a manual **Loans Desk** prototype to the bank Dashboard with account-level cap, debt, available borrow room, borrower, and latest activity.
+- Add loan receipts for borrow and repayment records, enforced by linked account while preserving borrower character detail.
+- Calculate loan cap from highest purchased Legacy rank across Storage, Stipend, and Fate using `floor(rank * 3 / 2)` gold.
+- Apply contribution credit to outstanding loan debt first, with only overflow becoming normal contribution progress.
+- Add runner Dashboard loan status lines for cap, outstanding debt, and available borrow room.
+- Add `/wrl loan`, `/wrl loan borrow`, `/wrl loan repay`, and `/wrl simloan` commands for prototype testing and fallback entry.
+- Add regression coverage for cap math, account-level debt, repayment overflow, account reassignment, ledger visibility, Dashboard loan copy, slash commands, and TOC load order.
+
 ## v0.3.6
 
 - Add configurable Resale Desk pricing with Auto, TSM DBMarket only, and local fallback modes.

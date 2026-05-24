@@ -10,6 +10,7 @@ local function resetHarness()
         requests = {},
         contributionReceipts = {},
         fulfillmentReceipts = {},
+        loanReceipts = {},
     }
     WRL_CharDB = {}
 
@@ -51,10 +52,12 @@ local function resetHarness()
     end
 
     assert(loadfile("Core/Database.lua"))("WoWRoguelite", ns)
+    assert(loadfile("Core/Loans.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/Contributions.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
     assert(loadfile("Core/Requests.lua"))("WoWRoguelite", ns)
     ns.Database:Init()
+    ns.Loans:Init()
     ns.Contributions:Init()
     return ns
 end
@@ -173,6 +176,35 @@ local function testRecentLedgerCanBeClearedWithoutDeletingReceipts()
     assertEqual(#after, 1, "ledger hides entries at or before the clear cutoff")
 end
 
+local function testAssigningAccountMovesExistingLoanReceipts()
+    local ns = resetHarness()
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    WRL_DB.loanReceipts = {
+        { kind = "borrow", characterKey = "Graham-Realm", accountId = "acct-local", amount = 10000, when = 100 },
+    }
+
+    local account = ns.Database:AssignCharacterToAccountLabel("Graham-Realm", "Graham")
+
+    assertEqual(WRL_DB.loanReceipts[1].accountId, account.id, "assignment backfills existing loan receipts")
+end
+
+local function testRecentLedgerIncludesLoanActivity()
+    local ns = resetHarness()
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    local account = ns.Database:AssignCharacterToAccountLabel("Graham-Realm", "Graham")
+    WRL_DB.loanReceipts = {
+        { kind = "borrow", characterKey = "Graham-Realm", accountId = account.id, amount = 10000, when = 101 },
+        { kind = "repayment", characterKey = "Graham-Realm", accountId = account.id, amount = 2500, when = 102 },
+    }
+
+    local rows = ns.Database:RecentBankLedgerRows(10)
+
+    assertEqual(rows[1].kind, "loan_repayment", "newest loan repayment appears in recent ledger")
+    assertEqual(rows[1].amount, 2500, "ledger row keeps repayment amount")
+    assertEqual(rows[2].kind, "loan_borrow", "loan borrow appears in recent ledger")
+    assertEqual(rows[2].accountLabel, "Graham", "loan ledger row resolves account label")
+end
+
 local function testRequestsStoreAssignedOrUnassignedAccount()
     local ns = resetHarness()
     local account = ns.Database:CreateAccount("Tester")
@@ -192,6 +224,8 @@ testContributionsCanSummarizeByCharacter()
 testAssigningAccountMovesExistingContributionReceipts()
 testRecentLedgerUsesUpdatedAccountAssignment()
 testRecentLedgerCanBeClearedWithoutDeletingReceipts()
+testAssigningAccountMovesExistingLoanReceipts()
+testRecentLedgerIncludesLoanActivity()
 testRequestsStoreAssignedOrUnassignedAccount()
 
 print("BankDeskAccounts.test.lua: ok")

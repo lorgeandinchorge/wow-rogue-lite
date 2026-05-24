@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.3.6"
+ns.version     = "0.3.7"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -41,6 +41,22 @@ function ns:UnitKey(unit)
     -- Collapse spaces in realm name — Blizzard does this in cross-realm IDs.
     realm = realm:gsub("%s+", "")
     return name .. "-" .. realm
+end
+
+local function parseGoldAmount(text)
+    text = tostring(text or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    local number, suffix = text:match("^(%d+)(g?)$")
+    if not number then return nil end
+    local value = tonumber(number)
+    if not value then return nil end
+    return value
+end
+
+local function formatLoanGold(copper)
+    if ns.Loans and ns.Loans.FormatGold then
+        return ns.Loans:FormatGold(copper or 0)
+    end
+    return tostring(math.floor((tonumber(copper) or 0) / 10000)) .. "g"
 end
 
 -- Central event frame. Individual modules register callbacks on ns:On(event, cb).
@@ -78,6 +94,7 @@ ns:On("PLAYER_LOGIN", function()
     ns.Merchant:Init()
     ns.Pricing:Init()
     ns.BankResale:Init()
+    ns.Loans:Init()
     ns.Contributions:Init() -- must follow Database + Vendor; used by Death
     ns.Achievements:Init()  -- must follow Contributions/Run/Rules/Tiers for criteria checks
     ns.Comm:Init()
@@ -203,11 +220,94 @@ SlashCmdList["WRL"] = function(msg)
         elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
             ns.MainFrame:RefreshCurrentTab()
         end
+    elseif cmd == "simloan" then
+        if not (ns.Loans and ns.Loans.RecordLoan) then
+            ns:Print("Loan desk is not ready yet.")
+            return
+        end
+        local borrower, amountText = rest:match("^(%S+)%s*(%S*)$")
+        borrower = borrower and borrower ~= "" and borrower or "Tester-Realm"
+        local amount = parseGoldAmount(amountText ~= "" and amountText or "1")
+        local recorder = ns.Loans.RecordTestLoan or ns.Loans.RecordLoan
+        local receipt, reason, cap = recorder(ns.Loans, borrower, amount or 0, "local loan simulation")
+        if not receipt then
+            if reason == "over_cap" then
+                ns:Print("Simulated loan would exceed cap; available: %s.", formatLoanGold(cap and cap.availableCopper or 0))
+            else
+                ns:Print("Usage: /wrl simloan [Character-Realm] [GOLD]")
+            end
+            return
+        end
+        ns:Print("Simulated loan recorded for %s: %s.", borrower, formatLoanGold(receipt.amount or 0))
+        if ns.MainFrame and ns.MainFrame.ShowTab then
+            ns.MainFrame:ShowTab("Run")
+        elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+            ns.MainFrame:RefreshCurrentTab()
+        end
     elseif cmd == "contribute" or cmd == "contribution" then
         if ns.Death and ns.Death.PrepareContributionMail then
             ns.Death:PrepareContributionMail()
         else
             ns:Print("Contribution flow is not ready yet.")
+        end
+    elseif cmd == "loan" or cmd == "loans" then
+        if not (ns.Loans and ns.Loans.AccountLoanRows) then
+            ns:Print("Loan desk is not ready yet.")
+            return
+        end
+        local sub, subRest = rest:match("^(%S+)%s*(.-)$")
+        sub = (sub or ""):lower()
+        subRest = subRest or ""
+        if sub == "borrow" or sub == "repay" then
+            local characterKey, amountText = subRest:match("^(%S+)%s+(%S+)$")
+            local amount = parseGoldAmount(amountText)
+            if not characterKey or not amount then
+                ns:Print(sub == "borrow" and "Usage: /wrl loan borrow Character-Realm GOLD" or "Usage: /wrl loan repay Character-Realm GOLD")
+                return
+            end
+            if sub == "borrow" then
+                local receipt, reason, cap = ns.Loans:RecordLoan(characterKey, amount, "manual", "slash command")
+                if not receipt then
+                    if reason == "over_cap" then
+                        ns:Print("Loan would exceed available cap (%s available). Buy Legacy ranks first, or use /wrl simloan for UI testing.", formatLoanGold(cap and cap.availableCopper or 0))
+                    else
+                        ns:Print("Could not record loan.")
+                    end
+                    return
+                end
+                ns:Print("Recorded loan to %s: %s.", characterKey, formatLoanGold(receipt.amount or 0))
+            else
+                local result = ns.Loans:RecordManualRepayment(characterKey, amount, "manual", "slash command")
+                if not result or (result.repaid or 0) <= 0 then
+                    ns:Print("No outstanding loan debt found for %s.", characterKey)
+                    return
+                end
+                ns:Print("Recorded loan repayment from %s: %s.", characterKey, formatLoanGold(result.repaid or 0))
+            end
+            if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+                ns.MainFrame:RefreshCurrentTab()
+            end
+        elseif sub ~= "" then
+            ns:Print("Usage: /wrl loan | /wrl loan borrow Character-Realm GOLD | /wrl loan repay Character-Realm GOLD")
+            return
+        else
+            local rows = ns.Loans:AccountLoanRows()
+            if #rows == 0 then
+                ns:Print("Loans Desk: no active loans.")
+            else
+                ns:Print("Loans Desk:")
+                for _, row in ipairs(rows) do
+                    ns:Print("  %s / %s - debt %s, available %s, cap %s",
+                        row.label or "Unassigned",
+                        row.characterKey or "Unknown",
+                        formatLoanGold(row.outstandingCopper or 0),
+                        formatLoanGold(row.availableCopper or 0),
+                        formatLoanGold(row.capCopper or 0))
+                end
+            end
+            if ns.MainFrame and ns.MainFrame.ShowTab then
+                ns.MainFrame:ShowTab("Run")
+            end
         end
     elseif cmd == "resale" then
         if not (ns.BankResale and ns.BankResale.InventoryRows) then
@@ -436,7 +536,11 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl account L C-R  - assign Character-Realm to account label L")
         ns:Print("  /wrl simrequest C-R IDS - simulate a pending bank request")
         ns:Print("  /wrl simresale IDS  - simulate resale stock, e.g. 769:4,723:2")
+        ns:Print("  /wrl simloan C-R GOLD - simulate a manual loan")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")
+        ns:Print("  /wrl loan           - show loan desk status")
+        ns:Print("  /wrl loan borrow C-R GOLD - record a manual loan")
+        ns:Print("  /wrl loan repay C-R GOLD - record a manual repayment")
         ns:Print("  /wrl resale         - show the bank resale desk inventory")
         ns:Print("  /wrl resale cod ID QTY BUYER - prepare COD mail for resale")
         ns:Print("  /wrl resale sold ID QTY [BUYER] - record a manual resale")
