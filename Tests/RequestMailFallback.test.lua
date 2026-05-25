@@ -368,6 +368,74 @@ local function testRequestInventoryScansUseCContainerFallback()
     assertEqual(count, 3, "request inventory find returns C_Container stack count")
 end
 
+local function testNeededSupplyRowsAggregatePendingRequests()
+    local ns = resetHarness()
+    ns.Tiers = { FormatMoney = function(_, copper) return tostring(copper) .. "c" end }
+    ns.Rewards = {
+        BuildRewardForTierIds = function(_, tierIds)
+            local tierId = tierIds and tierIds[1]
+            if tierId == 101 then
+                return {
+                    gold = 0,
+                    extraLives = 0,
+                    items = {
+                        { id = 4496, qty = 2, note = "small brown pouch" },
+                        { id = 202, qty = 1, note = "training stone" },
+                    },
+                }
+            end
+            return {
+                gold = 0,
+                extraLives = 0,
+                items = {
+                    { id = 4496, qty = 1, note = "small brown pouch" },
+                },
+            }
+        end,
+    }
+    ns.Container = {
+        GetNumSlots = function(_, bag) return bag == 0 and 1 or 0 end,
+        GetItemInfo = function(_, bag, slot)
+            if bag == 0 and slot == 1 then
+                return { itemID = 4496, count = 1 }
+            end
+        end,
+    }
+    _G.GetMoney = function() return 0 end
+    _G.GetItemInfo = function(itemId)
+        if tonumber(itemId) == 4496 then return "Small Brown Pouch" end
+        if tonumber(itemId) == 202 then return "Training Stone" end
+    end
+    _G.TSM_API = {
+        GetCustomPriceValue = function(source, itemString)
+            if source == "DBMarket" and itemString == "i:4496" then return 1234 end
+        end,
+    }
+    WRL_DB.requests = {
+        { id = "req-1", from = "Graham-Realm", tierIds = { 101 }, status = "pending" },
+        { id = "req-2", from = "Havok-Realm", tierIds = { 201 }, status = "gathering" },
+        { id = "req-3", from = "Done-Realm", tierIds = { 101 }, status = "fulfilled" },
+    }
+
+    local rows = ns.Requests:NeededSupplyRows()
+
+    assertEqual(#rows, 2, "aggregate supply report only includes actionable requests")
+    assertEqual(rows[1].itemId, 4496, "tailor-made items sort first")
+    assertEqual(rows[1].required, 3, "aggregate sums required starter bags")
+    assertEqual(rows[1].available, 1, "aggregate counts shared available stock once")
+    assertEqual(rows[1].missing, 2, "aggregate missing is requested total minus available stock")
+    assertEqual(rows[1].requests, 2, "aggregate counts requesting rows")
+    assertEqual(rows[1].craftHint, "tailor-made", "aggregate keeps tailor hint")
+    assertEqual(rows[1].marketCopper, 1234, "aggregate keeps optional TSM market value")
+    assertEqual(rows[1].marketLabel, "TSM DBMarket", "aggregate keeps optional TSM market label")
+    assertEqual(rows[2].itemId, 202, "non-tailor item still appears")
+
+    local lines = table.concat(ns.Requests:NeededSupplyLines(rows), "\n")
+    if not lines:find("Small Brown Pouch %(small brown pouch%): requested 3 / available 1 / missing 2 / requests 2 %(tailor%-made; TSM DBMarket 1234c%)") then
+        error("needed supply lines should include aggregate counts plus tailor and TSM hints")
+    end
+end
+
 testMailFallbackSubjectUsesRewardCsv()
 testOutgoingRequestKeepsMailFallbackSubject()
 testMailFallbackBodyNamesRequesterAndRewards()
@@ -378,5 +446,6 @@ testBeginMailFulfillmentRetriesBodyAfterSendTabSwitch()
 testFulfillmentMailAndChatUseAvailableMissingChecklist()
 testReadinessIncludesOptionalPricingAndTailorHints()
 testRequestInventoryScansUseCContainerFallback()
+testNeededSupplyRowsAggregatePendingRequests()
 
 print("RequestMailFallback.test.lua: ok")

@@ -217,6 +217,38 @@ local function testRequestsStoreAssignedOrUnassignedAccount()
     assertEqual(WRL_DB.requests[2].accountId, nil, "unknown requester remains unassigned")
 end
 
+local function testAccountBankingSummaryRowsIncludeDebtAndActivity()
+    local ns = resetHarness()
+    local graham = ns.Database:CreateAccount("Graham")
+    ns.Database:LinkCharacterToAccount("Graham-Realm", graham.id)
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    WRL_DB.characters["Havok-Realm"] = { key = "Havok-Realm", contributed = 0, history = {} }
+    WRL_DB.contributionReceipts = {
+        { characterKey = "Graham-Realm", accountId = graham.id, amount = 20000, when = 100 },
+        { characterKey = "Havok-Realm", accountId = "acct-local", amount = 10000, when = 101 },
+    }
+    WRL_DB.loanReceipts = {
+        { kind = "borrow", characterKey = "Graham-Realm", accountId = graham.id, amount = 10000, when = 102 },
+        { kind = "repayment", characterKey = "Graham-Realm", accountId = graham.id, amount = 2500, when = 103 },
+    }
+    WRL_DB.resaleReceipts = {
+        { buyer = "Graham-Realm", totalCopper = 500, when = 104 },
+    }
+    WRL_DB.fulfillmentReceipts = {
+        { requester = "Graham-Realm", accountId = graham.id, when = 105, gold = 1200 },
+    }
+    ns.Loans.HighestLegacyRank = function() return 2 end
+
+    local rows = ns.Database:AccountBankingSummaryRows()
+
+    assertEqual(rows[1].accountId, graham.id, "summary sorts active debt account first")
+    assertEqual(rows[1].contributedCopper, 20000, "summary includes account contribution total")
+    assertEqual(rows[1].outstandingCopper, 7500, "summary includes net outstanding debt")
+    assertEqual(rows[1].availableCopper, 22500, "summary includes remaining borrow room")
+    assertEqual(rows[1].resaleCopper, 500, "summary includes resale purchase total")
+    assertEqual(rows[1].fulfillmentCount, 1, "summary includes fulfillment count")
+end
+
 testMigrationCreatesDefaultAccountAndLinksLocalCharacters()
 testManualAccountLabelsCanBeCreatedAndLinked()
 testContributionsRecordAndSummarizeByAccount()
@@ -227,5 +259,6 @@ testRecentLedgerCanBeClearedWithoutDeletingReceipts()
 testAssigningAccountMovesExistingLoanReceipts()
 testRecentLedgerIncludesLoanActivity()
 testRequestsStoreAssignedOrUnassignedAccount()
+testAccountBankingSummaryRowsIncludeDebtAndActivity()
 
 print("BankDeskAccounts.test.lua: ok")

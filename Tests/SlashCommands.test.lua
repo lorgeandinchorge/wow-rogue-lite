@@ -8,6 +8,8 @@ local simulatedResale = nil
 local loanBorrow = nil
 local loanRepay = nil
 local loanRowsPrinted = 0
+local bankReportPrinted = 0
+local neededPrinted = 0
 
 _G.DEFAULT_CHAT_FRAME = { AddMessage = function() end }
 _G.SlashCmdList = {}
@@ -130,6 +132,19 @@ end
 
 function ns.Loans:FormatGold(copper)
     return tostring(math.floor((copper or 0) / 10000)) .. "g"
+end
+
+function ns.Database:BankerSummaryLines()
+    return {
+        "Requests: 1 pending / 1 ready",
+        "Outstanding loans: 1g",
+    }
+end
+
+function ns.Requests:NeededSupplyLines()
+    return {
+        "Small Brown Pouch: requested 3 / available 1 / missing 2 / requests 2 (tailor-made)",
+    }
 end
 
 function ns.MainFrame:ShowTab(tab)
@@ -293,6 +308,31 @@ if ns.MainFrame.lastTab ~= "Run" then
 end
 if not loanBorrow or loanBorrow.characterKey ~= "Tester-Realm" or loanBorrow.amount ~= 10000 then
     error("expected /wrl simloan to seed a tester loan in gold", 2)
+end
+ns.Print = origPrint
+
+-- /wrl bankreport prints banker summary fallback.
+printedMessages = {}
+ns.Print = function(self, msg, ...)
+    if select("#", ...) > 0 then msg = msg:format(...) end
+    printedMessages[#printedMessages + 1] = tostring(msg)
+    if tostring(msg):find("Outstanding loans", 1, true) then bankReportPrinted = bankReportPrinted + 1 end
+end
+SlashCmdList.WRL("bankreport")
+if bankReportPrinted ~= 1 then
+    error("expected /wrl bankreport to print banker summary lines", 2)
+end
+
+-- /wrl needed prints aggregate needed supplies fallback.
+printedMessages = {}
+ns.Print = function(self, msg, ...)
+    if select("#", ...) > 0 then msg = msg:format(...) end
+    printedMessages[#printedMessages + 1] = tostring(msg)
+    if tostring(msg):find("Small Brown Pouch", 1, true) then neededPrinted = neededPrinted + 1 end
+end
+SlashCmdList.WRL("needed")
+if neededPrinted ~= 1 then
+    error("expected /wrl needed to print aggregate needed supply lines", 2)
 end
 ns.Print = origPrint
 

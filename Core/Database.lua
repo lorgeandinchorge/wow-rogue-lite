@@ -628,6 +628,9 @@ function D:RecentBankLedgerRows(maxRows)
                 amount = s.totalCopper or 0,
                 itemName = s.itemName,
                 qty = s.qty,
+                priceLabel = s.priceLabel,
+                priceShortLabel = s.priceShortLabel,
+                priceSource = s.priceSource,
             }
         end
     end
@@ -653,6 +656,143 @@ end
 function D:ClearRecentBankLedger()
     WRL_DB.bankLedgerClearedAt = time and time() or 0
     return WRL_DB.bankLedgerClearedAt
+end
+
+function D:AccountBankingSummaryRows()
+    self:EnsureDefaultAccount()
+    local rowsById = {}
+
+    local function ensureRow(accountId)
+        accountId = accountId or "unassigned"
+        local row = rowsById[accountId]
+        if not row then
+            row = {
+                accountId = accountId,
+                label = accountId == "unassigned" and "Unassigned" or self:AccountLabel(accountId),
+                contributedCopper = 0,
+                borrowedCopper = 0,
+                repaidCopper = 0,
+                outstandingCopper = 0,
+                capCopper = 0,
+                availableCopper = 0,
+                resaleCopper = 0,
+                resaleCount = 0,
+                fulfillmentCount = 0,
+            }
+            rowsById[accountId] = row
+        end
+        return row
+    end
+
+    for _, account in pairs(WRL_DB.accounts or {}) do
+        ensureRow(account.id)
+    end
+    for _, receipt in ipairs(WRL_DB.contributionReceipts or {}) do
+        local amount = math.max(0, math.floor(tonumber(receipt.amount or receipt.copper) or 0))
+        local accountId = receipt.accountId or self:AccountIdForCharacter(receipt.characterKey)
+        ensureRow(accountId).contributedCopper = ensureRow(accountId).contributedCopper + amount
+    end
+    for _, loan in ipairs(WRL_DB.loanReceipts or {}) do
+        local amount = math.max(0, math.floor(tonumber(loan.amount) or 0))
+        local accountId = loan.accountId or self:AccountIdForCharacter(loan.characterKey)
+        local row = ensureRow(accountId)
+        if loan.kind == "repayment" then
+            row.repaidCopper = row.repaidCopper + amount
+        else
+            row.borrowedCopper = row.borrowedCopper + amount
+        end
+    end
+    for _, resale in ipairs(WRL_DB.resaleReceipts or {}) do
+        local accountId = self:AccountIdForCharacter(resale.buyer)
+        local row = ensureRow(accountId)
+        row.resaleCopper = row.resaleCopper + math.max(0, math.floor(tonumber(resale.totalCopper) or 0))
+        row.resaleCount = row.resaleCount + 1
+    end
+    for _, fulfillment in ipairs(WRL_DB.fulfillmentReceipts or {}) do
+        local accountId = fulfillment.accountId or self:AccountIdForCharacter(fulfillment.requester)
+        ensureRow(accountId).fulfillmentCount = ensureRow(accountId).fulfillmentCount + 1
+    end
+
+    local rows = {}
+    for accountId, row in pairs(rowsById) do
+        row.outstandingCopper = math.max(0, (row.borrowedCopper or 0) - (row.repaidCopper or 0))
+        if ns.Loans and ns.Loans.BorrowCapForAccount then
+            local cap = ns.Loans:BorrowCapForAccount(accountId)
+            row.capCopper = cap.capCopper or 0
+            row.availableCopper = cap.availableCopper or math.max(0, (row.capCopper or 0) - (row.outstandingCopper or 0))
+            row.highestRank = cap.highestRank or 0
+        end
+        if row.contributedCopper > 0 or row.outstandingCopper > 0 or row.resaleCopper > 0 or row.fulfillmentCount > 0 then
+            rows[#rows + 1] = row
+        end
+    end
+    table.sort(rows, function(a, b)
+        if (a.outstandingCopper or 0) ~= (b.outstandingCopper or 0) then
+            return (a.outstandingCopper or 0) > (b.outstandingCopper or 0)
+        end
+        if (a.contributedCopper or 0) ~= (b.contributedCopper or 0) then
+            return (a.contributedCopper or 0) > (b.contributedCopper or 0)
+        end
+        return tostring(a.label) < tostring(b.label)
+    end)
+    return rows
+end
+
+function D:BankerSummary()
+    local pending, ready, missing = 0, 0, 0
+    if ns.Requests and ns.Requests.PendingRequests then
+        for _, req in ipairs(ns.Requests:PendingRequests()) do
+            pending = pending + 1
+            local ok, readiness = pcall(function() return ns.Requests:FulfillmentReadiness(req) end)
+            if ok and readiness then
+                if readiness.fulfillable then ready = ready + 1 end
+                missing = missing + #(readiness.missingItems or {})
+            end
+        end
+    end
+
+    local outstanding = 0
+    if ns.Loans and ns.Loans.AccountLoanRows then
+        for _, row in ipairs(ns.Loans:AccountLoanRows()) do
+            outstanding = outstanding + math.max(0, math.floor(tonumber(row.outstandingCopper) or 0))
+        end
+    end
+
+    local resaleRows = 0
+    if ns.BankResale and ns.BankResale.InventoryRows then
+        resaleRows = #(ns.BankResale:InventoryRows() or {})
+    end
+
+    local ledgerRows = #(self:RecentBankLedgerRows(50) or {})
+    local pricingStatus = "Pricing: local fallback available."
+    if ns.Pricing and ns.Pricing.MarketValue then
+        local value = ns.Pricing:MarketValue(769)
+        pricingStatus = value and "Pricing: TSM DBMarket available." or "Pricing: TSM unavailable; using fallback labels when needed."
+    end
+
+    return {
+        pendingRequests = pending,
+        readyRequests = ready,
+        missingItemLines = missing,
+        resaleRows = resaleRows,
+        outstandingLoanCopper = outstanding,
+        recentLedgerRows = ledgerRows,
+        pricingStatus = pricingStatus,
+    }
+end
+
+function D:BankerSummaryLines()
+    local summary = self:BankerSummary()
+    local loanText = ns.Loans and ns.Loans.FormatGold and ns.Loans:FormatGold(summary.outstandingLoanCopper or 0)
+        or tostring(summary.outstandingLoanCopper or 0)
+    return {
+        ("Requests: %d pending / %d ready"):format(summary.pendingRequests or 0, summary.readyRequests or 0),
+        ("Missing item lines: %d"):format(summary.missingItemLines or 0),
+        ("Resale rows: %d"):format(summary.resaleRows or 0),
+        ("Outstanding loans: %s"):format(loanText),
+        ("Recent ledger rows: %d"):format(summary.recentLedgerRows or 0),
+        summary.pricingStatus or "Pricing: local fallback available.",
+    }
 end
 
 -- Returns every character record (current + archived) as a flat list.

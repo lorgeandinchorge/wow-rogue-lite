@@ -88,6 +88,15 @@ function Pricing:ResaleSourceNote(source)
     return RESALE_SOURCE_NOTES[source]
 end
 
+function Pricing:ShortSourceLabel(source)
+    local value = tostring(source or ""):lower()
+    if value == "tsm_dbmarket" or value == "tsm dbmarket" or value == "tsm" then return "TSM" end
+    if value == "double_vendor" or value == "double vendor" or value == "vendor" then return "vendor" end
+    if value == "catalog_fallback" or value == "catalog fallback" or value == "fallback" then return "fallback" end
+    if value == "no_tsm_price" or value == "unpriced" then return "unpriced" end
+    return source and tostring(source) or "fallback"
+end
+
 local function vendorSellPrice(itemId)
     if not GetItemInfo then return 0 end
     local _, _, _, _, _, _, _, _, _, _, liveSellPrice = GetItemInfo(tonumber(itemId))

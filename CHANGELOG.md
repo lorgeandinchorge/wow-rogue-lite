@@ -1,5 +1,15 @@
 # WoW Roguelite Changelog
 
+## v0.3.8
+
+- Add a compact **Banker Summary** to the bank Dashboard with pending/ready request counts, missing item lines, resale row count, outstanding loan total, recent ledger count, and pricing-source status.
+- Add aggregate **Needed Supplies** reporting across actionable requests, with requested/available/missing totals, request counts, tailor-made starter bag hints, and optional TSM DBMarket hints.
+- Add account-level banking summary rows that combine contribution totals, outstanding loan debt, borrow room, resale purchases, and fulfillment counts.
+- Add `/wrl bankreport` and `/wrl needed` slash-command fallbacks for banker status and aggregate supply reporting.
+- Add short resale pricing labels (`TSM`, `vendor`, `fallback`, `unpriced`) to inventory rows, COD drafts, sale receipts, and ledger details while keeping TradeSkillMaster optional.
+- Give the Recent Ledger real fixed columns with visible separators so Time, Type, Who, Account, Amount, and Detail stay readable in-game.
+- Bump docs, metadata, and regression coverage for the v0.3.8 final banking/reporting push.
+
 ## v0.3.7
 
 - Add a manual **Loans Desk** prototype to the bank Dashboard with account-level cap, debt, available borrow room, borrower, and latest activity.

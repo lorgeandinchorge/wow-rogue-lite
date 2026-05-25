@@ -33,6 +33,8 @@ WoW Roguelite turns your account into a run-based progression system:
 /wrl bank
 /wrl dashboard
 /wrl account LABEL Character-Realm
+/wrl bankreport
+/wrl needed
 /wrl simrequest Character-Realm 101,201
 /wrl simresale
 /wrl simresale clear
@@ -108,7 +110,7 @@ If you only have 10 to 15 minutes, please do this section.
 ### 4. Requisitions Desk / Rewards Flow
 
 - [ ] On the bank character, open the Dashboard tab.
-  Expected: the Requisitions Desk shows an active request, readiness details, character contribution rows, Resale Desk goods, and recent ledger activity.
+  Expected: the Requisitions Desk shows an active request, readiness details, Banker Summary, Needed Supplies, Account Summary, character contribution rows, Resale Desk goods, Loans Desk, and recent ledger activity.
 
 - [ ] If you do not have a live request, run `/wrl simrequest Tester-Realm 101`.
   Expected: the Requisitions Desk receives a simulated pending request for testing.
@@ -116,11 +118,20 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] If there are multiple pending/preparing requests, click **Next Request**.
   Expected: the active request changes without leaving the Dashboard.
 
+- [ ] Run `/wrl bankreport`.
+  Expected: banker summary lines print pending/ready requests, missing item lines, resale rows, outstanding loan total, recent ledger count, and pricing source status.
+
+- [ ] Run `/wrl needed`.
+  Expected: aggregate needed supplies print by item with requested, available, missing, request count, and any tailor-made or TSM DBMarket hints.
+
 - [ ] If a requester is unassigned, use **Assign Account** or `/wrl account LABEL Character-Realm`.
   Expected: the requester is assigned to that account label and future request/ledger lines use the label.
 
 - [ ] Run `/wrl simresale`, then `/wrl resale`.
-  Expected: the Resale Desk prints simulated catalog goods, including count and fallback price.
+  Expected: the Resale Desk prints simulated catalog goods, including count, price, and a source label such as TSM, vendor, or fallback.
+
+- [ ] Run `/wrl simloan Tester-Realm 1`, then `/wrl bankreport`.
+  Expected: the Loans Desk and banker summary show outstanding debt, and Account Summary shows debt beside contribution and resale activity.
 
 - [ ] Use **Next Resale Item** and **Record 1 Sold**, or run `/wrl resale sold 769 1 Tester-Realm` if you have Chunk of Boar Meat.
   Expected: the addon records a manual resale receipt and recent ledger activity updates; it does not move, mail, trade, auction, or vendor items.
@@ -130,6 +141,9 @@ If you only have 10 to 15 minutes, please do this section.
 
 - [ ] Click the Recent Ledger clear button.
   Expected: a confirmation popup appears, current visible ledger activity is hidden, and later bank activity appears normally.
+
+- [ ] Use the Recent Ledger search box after fulfillment, resale, or loan activity.
+  Expected: matching ledger rows remain visible and resale rows include a compact price-source label when available.
 
 - [ ] With a pending request selected by the Requisitions Desk, click **Prepare Mail** at a mailbox.
   Expected: the mail recipient, subject, body, and gold are prepared; ready and missing item/gold checklist details remain clear, with final Send still manual.
@@ -194,6 +208,7 @@ If you want to go deeper, these are the main areas to cover.
 
 - [ ] Legacy contribution totals increase correctly.
 - [ ] Receipts and history feel believable.
+- [ ] Outstanding loans reduce future contribution credit before normal contribution progress increases.
 - [ ] `/wrl export` works and produces readable output.
 
 ## Please Report These Immediately

@@ -228,6 +228,7 @@ function BR:PrepareCODMail(itemId, qty, buyer)
         priceEach = priceEach,
         priceSource = priceDetail and priceDetail.sourceId or nil,
         priceLabel = priceDetail and priceDetail.sourceLabel or nil,
+        priceShortLabel = ns.Pricing and ns.Pricing.ShortSourceLabel and ns.Pricing:ShortSourceLabel(priceDetail and (priceDetail.sourceId or priceDetail.sourceLabel)) or nil,
         totalCopper = priceEach * qty,
         buyer = buyer,
         seller = ns.UnitKey and ns:UnitKey() or nil,
@@ -394,6 +395,7 @@ function BR:InventoryRows()
                         priceEach = price,
                         priceSource = priceDetail and priceDetail.sourceId or nil,
                         priceLabel = priceDetail and priceDetail.sourceLabel or nil,
+                        priceShortLabel = ns.Pricing and ns.Pricing.ShortSourceLabel and ns.Pricing:ShortSourceLabel(priceDetail and (priceDetail.sourceId or priceDetail.sourceLabel)) or nil,
                         totalCopper = 0,
                     }
                     byId[itemId] = row
@@ -418,6 +420,7 @@ function BR:InventoryRows()
                     priceEach = price,
                     priceSource = priceDetail and priceDetail.sourceId or nil,
                     priceLabel = priceDetail and priceDetail.sourceLabel or nil,
+                    priceShortLabel = ns.Pricing and ns.Pricing.ShortSourceLabel and ns.Pricing:ShortSourceLabel(priceDetail and (priceDetail.sourceId or priceDetail.sourceLabel)) or nil,
                     totalCopper = 0,
                     simulated = true,
                 }
@@ -464,6 +467,7 @@ function BR:RecordSale(itemId, qty, buyer)
         priceEach = priceEach,
         priceSource = priceDetail and priceDetail.sourceId or nil,
         priceLabel = priceDetail and priceDetail.sourceLabel or nil,
+        priceShortLabel = ns.Pricing and ns.Pricing.ShortSourceLabel and ns.Pricing:ShortSourceLabel(priceDetail and (priceDetail.sourceId or priceDetail.sourceLabel)) or nil,
         totalCopper = priceEach * qty,
         buyer = buyer and buyer ~= "" and buyer or nil,
         seller = ns.UnitKey and ns:UnitKey() or nil,

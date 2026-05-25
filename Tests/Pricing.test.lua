@@ -106,6 +106,8 @@ local function testAutoResalePriceFallsBackToLocal()
     assertEqual(vendor.sourceLabel, "double vendor", "double vendor label is explicit")
     assertEqual(fallback.copper, 25, "auto resale falls back to catalog fallback")
     assertEqual(fallback.sourceId, "catalog_fallback", "catalog fallback source is explicit")
+    assertEqual(ns.Pricing:ShortSourceLabel(vendor.sourceId), "vendor", "double vendor short label is explicit")
+    assertEqual(ns.Pricing:ShortSourceLabel(fallback.sourceId), "fallback", "catalog fallback short label is explicit")
 end
 
 local function testStrictTSMReturnsNoPriceWhenMissing()

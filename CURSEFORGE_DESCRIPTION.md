@@ -22,6 +22,7 @@ It is part hardcore challenge, part account progression, and part self-made meta
 - account-wide contribution totals
 - unlocked legacy rewards
 - request and fulfillment flow between run and bank
+- bank reporting, aggregate supplies, and resale ledgers
 - manual loan cap, debt, and repayment accounting
 - roguelite rule profiles
 - optional boons and burdens for a run
@@ -29,13 +30,14 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.7 - Loans Prototype
+### Latest Update: v0.3.8 - Banker Reporting Polish
 
-- The bank Dashboard now includes a manual Loans Desk with cap, debt, available borrow room, borrower, and recent loan activity.
-- Loan cap is based on the highest purchased Legacy rank: `floor(rank * 3 / 2)` gold.
-- Borrowing is enforced by linked account while receipts keep the borrower character for audit.
-- Contribution credit now repays outstanding account debt first; only overflow becomes normal contribution progress.
-- `/wrl loan`, `/wrl loan borrow`, `/wrl loan repay`, and `/wrl simloan` support prototype testing and fallback entry.
+- The bank Dashboard now includes a compact Banker Summary, aggregate Needed Supplies, and account-level banking report.
+- Needed Supplies groups pending request items by item, including requested, available, missing, request count, tailor-made hints, and optional TSM DBMarket hints.
+- Account Summary combines contribution totals, active debt, borrow room, resale purchases, and fulfillment counts.
+- Resale rows and ledgers now use compact price-source labels like TSM, vendor, fallback, or unpriced while keeping TradeSkillMaster optional.
+- Recent Ledger columns now use fixed UI columns with visible separators for easier in-game scanning.
+- `/wrl bankreport` and `/wrl needed` provide chat fallback reports for banker status and missing supplies.
 
 ### Bank And Run Structure
 
@@ -52,6 +54,10 @@ On a new run, spend budget on the Legacy tab, then open the Rewards tab, choose 
 ### Loans Prototype
 
 Loans are fully manual. The addon records the loan paperwork and shows debt/cap visibility, but it does not mail, trade, or move gold. The bank can record a loan after handing gold over manually, and repayments are accounted for before normal contribution credit.
+
+### Banker Reporting
+
+The bank Dashboard is the main work surface for final fulfillment: Requisitions Desk, Banker Summary, Needed Supplies, Account Summary, Contribution Board, Loans Desk, Resale Desk, and Recent Ledger all live together so the banker can see what is ready, what is missing, what is owed, and what was recently handled.
 
 ### Profiles, Rules, And Run Modifiers
 
@@ -89,6 +95,8 @@ Because of Blizzard API restrictions, the addon cannot click protected buttons f
 /wrl rules
 /wrl export
 /wrl contribute
+/wrl bankreport
+/wrl needed
 /wrl loan
 /wrl loan borrow
 /wrl loan repay

@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.7 - Loans Prototype. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, and manual loan accounting are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, optional TSM DBMarket hints, tailor-made starter bag labels, manual resale tracking, debt-first repayment accounting, right-safe dashboard controls, and clear-confirmation flows.
+> **Status:** v0.3.8 - Banker Reporting Polish. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, and bank reporting are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, aggregate needed-supplies reporting, optional TSM DBMarket hints, tailor-made starter bag labels, manual resale tracking, debt-first repayment accounting, account summaries, right-safe dashboard controls, and clear-confirmation flows.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.7 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.8 loaded.` in chat.
 
 ### Quick start
 
@@ -35,13 +35,13 @@ so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addo
 3. Type `/wrl` to open the main window.
 4. Use the **Legacy** tab to spend any available budget, the **Rewards** tab to prepare a starter-kit request mail, and the **Dashboard** tab to track in-progress state.
 
-For Requisitions Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simresale` creates simulated resale stock for the Resale Desk, `/wrl simloan Tester-Realm 1` creates a local 1g loan record, and the Dashboard clear buttons ask before hiding ledger rows or removing simulated resale stock.
+For Requisitions Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simresale` creates simulated resale stock for the Resale Desk, `/wrl simloan Tester-Realm 1` creates a local 1g loan record, `/wrl bankreport` prints compact bank status, `/wrl needed` prints aggregate missing supplies, and the Dashboard clear buttons ask before hiding ledger rows or removing simulated resale stock.
 
 ### How a run works
 
 **On a run character.** Open `/wrl` → **Legacy** to review lifetime contributions and spend available legacy budget into Storage, Stipend, and Fate. Open `/wrl` → **Rewards**, choose an unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually. The Dashboard also shows your current loan cap, outstanding debt, and remaining borrow room.
 
-**On your bank character.** Open `/wrl` → **Dashboard** to use the Requisitions Desk: active request readiness, missing item/gold details, character contribution rows, loan balances, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. Use **Record Loan** or `/wrl loan borrow Character-Realm GOLD` after manually handing out gold; the addon records the paperwork but does not move gold. Use **Next Resale Item** and **Record 1 Sold** to manually record curated resale goods like Chunk of Boar Meat or Goretusk Liver. Resale pricing defaults to Auto: TSM DBMarket when available, then double vendor, then catalog fallback; change it under gear **Settings** -> **Pricing**. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
+**On your bank character.** Open `/wrl` → **Dashboard** to use the Requisitions Desk: active request readiness, Banker Summary, aggregate Needed Supplies, account summaries, character contribution rows, loan balances, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. Use **Record Loan** or `/wrl loan borrow Character-Realm GOLD` after manually handing out gold; the addon records the paperwork but does not move gold. Use **Next Resale Item** and **Record 1 Sold** to manually record curated resale goods like Chunk of Boar Meat or Goretusk Liver. Resale pricing defaults to Auto: TSM DBMarket when available, then double vendor, then catalog fallback, and rows label the source as TSM, vendor, fallback, or unpriced; change it under gear **Settings** -> **Pricing**. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
 
 The **Rewards** tab is intentionally request-only for run characters: choose one unlocked starter reward from the dropdown and use **Prepare Mail** at a mailbox. Boons and burdens are configured under gear **Settings** -> **Run Modifiers** before the reward request.
 
@@ -69,6 +69,8 @@ Loans are banker-operated and manual. The addon records who borrowed, which link
 
 When a character with outstanding account debt contributes money, the addon applies that credit to loan repayment first. Only money above the remaining debt becomes normal contribution progress.
 
+Banker reports show that debt-first behavior at account level: contribution totals, active debt, available borrow room, resale purchases, and fulfillment counts are shown together so the bank can see what is owed before celebrating any shiny new contribution credit.
+
 ### Slash commands
 
 ```text
@@ -82,6 +84,8 @@ Bank identity
   /wrl setbank NAME     set an external bank character by Name-Realm
   /wrl bank             show the current bank character
   /wrl account L C-R    assign Character-Realm to account label L
+  /wrl bankreport       print banker summary lines
+  /wrl needed           print aggregate needed supplies
   /wrl loan             show loan desk status
   /wrl loan borrow C-R AMT
                         record a manual loan
@@ -91,6 +95,8 @@ Bank identity
   /wrl simresale        simulate resale stock for testing
   /wrl simresale IDS    simulate stock, e.g. 769:4,723:2
   /wrl resale           show bank resale catalog inventory
+  /wrl resale cod ID QTY BUYER
+                        prepare resale COD mail
   /wrl resale sold ID QTY [BUYER]
                         record a manual resale receipt
 

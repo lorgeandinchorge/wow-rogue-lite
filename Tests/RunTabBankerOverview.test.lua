@@ -92,6 +92,40 @@ local function resetHarness()
         return {
             { kind = "fulfillment", characterKey = "Graham-Realm", accountLabel = "Graham", amount = 500, method = "mail", when = 102 },
             { kind = "loan_borrow", characterKey = "Graham-Realm", accountLabel = "Graham", amount = 10000, when = 103 },
+            { kind = "resale", characterKey = "Graham-Realm", accountLabel = "Graham", amount = 125, itemName = "Chunk of Boar Meat", qty = 5, priceLabel = "TSM", when = 104 },
+        }
+    end
+    function ns.Database:BankerSummary()
+        return {
+            pendingRequests = 2,
+            readyRequests = 1,
+            missingItemLines = 1,
+            resaleRows = 2,
+            outstandingLoanCopper = 10000,
+            recentLedgerRows = 3,
+            pricingStatus = "Pricing: TSM unavailable; using fallback labels when needed.",
+        }
+    end
+    function ns.Database:BankerSummaryLines()
+        return {
+            "Requests: 2 pending / 1 ready",
+            "Missing item lines: 1",
+            "Resale rows: 2",
+            "Outstanding loans: 1g",
+            "Recent ledger rows: 3",
+            "Pricing: TSM unavailable; using fallback labels when needed.",
+        }
+    end
+    function ns.Database:AccountBankingSummaryRows()
+        return {
+            {
+                label = "Graham",
+                contributedCopper = 20000,
+                outstandingCopper = 10000,
+                availableCopper = 20000,
+                resaleCopper = 125,
+                fulfillmentCount = 1,
+            },
         }
     end
     function ns.Loans:BorrowCapForCharacter()
@@ -177,6 +211,26 @@ local function resetHarness()
             },
         }
     end
+    function ns.Requests:NeededSupplyRows()
+        return {
+            {
+                itemId = 4496,
+                name = "Small Brown Pouch",
+                required = 3,
+                available = 1,
+                missing = 2,
+                requests = 2,
+                craftHint = "tailor-made",
+                marketCopper = 1234,
+                marketLabel = "TSM DBMarket",
+            },
+        }
+    end
+    function ns.Requests:NeededSupplyLines()
+        return {
+            "Small Brown Pouch: requested 3 / available 1 / missing 2 / requests 2 (tailor-made; TSM DBMarket 1234c)",
+        }
+    end
 
     assert(loadfile("UI/Tab_Run.lua"))("WoWRoguelite", ns)
     ns.Tab_Run._testNS = ns
@@ -212,25 +266,26 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(left[6], "Lives remaining: n/a", "banker overview avoids runner life accounting")
 
     assertEqual(right[1], "|cffc0a060Requisitions Desk|r", "right pane starts with Requisitions Desk heading")
-    assertContains(right[2], "Who", "bank desk table includes requester header")
-    assertContains(right[2], "Account", "bank desk table includes account header")
-    assertContains(right[2], "Ready", "bank desk table includes readiness header")
-    assertContains(right[3], "Graham-Realm", "bank desk table lists active requester")
-    assertContains(right[3], "Graham", "bank desk table lists account")
-    assertContains(right[3], "missing", "bank desk table lists readiness state")
-    assertContains(right[4], "Havok-Realm", "bank desk table lists the next requester")
-    assertContains(right[5], "|cffc0a060Contribution Board|r", "right pane includes contribution board")
-    assertContains(right[6], "#", "contribution board uses leaderboard heading")
-    assertContains(right[6], "Character", "contribution board is grouped by character")
-    assertContains(right[6], "| G | Lv |", "contribution board uses compact separated generation and level columns")
-    assertContains(right[7], "Graham-Realm", "contribution board lists the contributor character")
-    assertContains(right[7], " | ", "contribution board row uses separators for proportional font alignment")
-    assertContains(right[7], "2", "contribution board lists contributor generation")
-    assertContains(right[7], "34", "contribution board lists contributor level")
-    assertContains(right[7], "20000c", "contribution board lists contributor amount")
-    assertContains(right[8], "Havok-Realm", "contribution board lists former local-account contributor by character")
-    assertNotContains(right[8], "Local Account", "contribution board should not render account labels")
     local allRight = table.concat(right, "\n")
+    assertContains(allRight, "|cffc0a060Banker Summary|r", "right pane includes compact banker summary")
+    assertContains(allRight, "Requests: 2 pending / 1 ready", "banker summary shows request readiness counts")
+    assertContains(allRight, "Missing item lines: 1", "banker summary shows missing item count")
+    assertContains(allRight, "Resale rows: 2", "banker summary shows active resale rows")
+    assertContains(allRight, "Outstanding loans: 1g", "banker summary shows outstanding loan total")
+    assertContains(allRight, "Pricing: TSM unavailable", "banker summary shows pricing source status")
+    assertContains(allRight, "Who", "bank desk table includes requester header")
+    assertContains(allRight, "Account", "bank desk table includes account header")
+    assertContains(allRight, "Ready", "bank desk table includes readiness header")
+    assertContains(allRight, "Graham-Realm", "bank desk table lists active requester")
+    assertContains(allRight, "Havok-Realm", "bank desk table lists the next requester")
+    assertContains(allRight, "|cffc0a060Needed Supplies|r", "right pane includes aggregate needed supplies")
+    assertContains(allRight, "Small Brown Pouch", "needed supplies lists aggregate starter-kit items")
+    assertContains(allRight, "|cffc0a060Account Summary|r", "right pane includes account-level banking summary")
+    assertContains(allRight, "Contrib", "account summary uses contribution column")
+    assertContains(allRight, "Debt", "account summary uses debt column")
+    assertContains(allRight, "Resale", "account summary uses resale column")
+    assertContains(allRight, "|cffc0a060Contribution Board|r", "right pane includes contribution board")
+    assertContains(allRight, "Character", "contribution board is grouped by character")
     assertContains(allRight, "|cffc0a060Loans Desk|r", "right pane includes loans desk")
     assertContains(allRight, "Account", "loans desk includes table header")
     assertContains(allRight, "Borrower", "loans desk includes borrower column")
@@ -243,6 +298,7 @@ local function testBankerOverviewReplacesRunSnapshotCopy()
     assertContains(allRight, "Time", "recent ledger uses a table header")
     assertContains(allRight, "Type", "recent ledger uses a type column")
     assertContains(allRight, "Amount", "recent ledger uses an amount column")
+    assertContains(allRight, "TSM", "recent ledger exposes resale price source labels")
 end
 
 local function testRunnerDashboardShowsLoanSummary()
@@ -298,6 +354,10 @@ local function testBankDeskActionButtonsAreDashboardOwned()
     f:close()
 
     assertContains(src, "ensureBankDeskButtons", "Bank Desk should own row-level action buttons")
+    assertContains(src, "createBankDeskTableRow", "Bank Desk should render fixed table columns")
+    assertContains(src, "button.who:SetPoint(\"LEFT\", button, \"LEFT\", 0, 0)", "Bank Desk Who column should have a fixed x position")
+    assertContains(src, "button.gold:SetJustifyH(\"RIGHT\")", "Bank Desk gold column should right-align")
+    assertContains(src, "button.items:SetJustifyH(\"RIGHT\")", "Bank Desk item count column should right-align")
     assertContains(src, "setBankDeskSection(self.bankDeskSection", "Bank Desk should render through selectable row controls")
     assertContains(src, "button.mailButton = createInlineIconButton(section, \"mail\", \"Interface\\\\Icons\\\\INV_Letter_15\")", "Bank Desk rows should include an inline mail icon action")
     assertContains(src, "button.doneButton = createInlineIconButton(section, \"done\", \"Interface\\\\RaidFrame\\\\ReadyCheck-Ready\")", "Bank Desk rows should include an inline fulfill checkmark action")
@@ -481,6 +541,17 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "Theme:Text(section, 11, Theme.c.fg2)", "Bank Desk section body text should be larger for readability")
     assertContains(src, "self.bankDeskSection", "Bank Desk should have its own right-side section")
     assertContains(src, "self.bankContributionSection", "Contribution Board should have its own right-side section")
+    assertContains(src, "self.bankSummarySection", "Banker Summary should have its own full-width section")
+    assertContains(src, "self.bankNeededSection", "Needed Supplies should have its own full-width section")
+    assertContains(src, "self.bankAccountSection", "Account Summary should have its own full-width section")
+    assertContains(src, "ensureAccountRows", "Account Summary should render with dedicated row frames")
+    assertContains(src, "setAccountSection(self.bankAccountSection", "Account Summary should use a real column renderer")
+    assertContains(src, "row.account:SetPoint(\"LEFT\", row, \"LEFT\", 0, 0)", "Account Summary account column should have a fixed x position")
+    assertContains(src, "row.contrib:SetJustifyH(\"RIGHT\")", "Account Summary contribution column should right-align")
+    assertContains(src, "row.debt:SetJustifyH(\"RIGHT\")", "Account Summary debt column should right-align")
+    assertContains(src, "row.avail:SetJustifyH(\"RIGHT\")", "Account Summary available column should right-align")
+    assertContains(src, "row.resale:SetJustifyH(\"RIGHT\")", "Account Summary resale column should right-align")
+    assertContains(src, "row.fulfill:SetJustifyH(\"RIGHT\")", "Account Summary fulfillment column should right-align")
     assertContains(src, "self.bankLoansSection", "Loans Desk should have its own right-side section")
     assertContains(src, "self.bankResaleSection", "Resale Desk should have its own right-side section")
     assertContains(src, "self.bankLedgerSection", "Recent ledger should have its own right-side section")
@@ -493,12 +564,19 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "row.share:SetJustifyH(\"RIGHT\")", "Contribution Board share column should right-align")
     assertContains(src, "buildBankSection(content, Theme, \"Resale Desk\")", "Resale Desk should have a strong section heading")
     assertContains(src, "buildBankSection(content, Theme, \"Loans Desk\")", "Loans Desk should have a strong section heading")
+    assertContains(src, "createLoanTableRow", "Loans Desk should render fixed table columns")
+    assertContains(src, "button.debt:SetJustifyH(\"RIGHT\")", "Loans Desk debt column should right-align")
+    assertContains(src, "button.avail:SetJustifyH(\"RIGHT\")", "Loans Desk available column should right-align")
     assertContains(src, "section.loanClearButtons", "Loans Desk should include row clear buttons")
-    assertContains(src, "button:SetPoint(\"LEFT\", fs, \"LEFT\", BANK_SECTION_WIDTH + BANK_CLEAR_BUTTON_RIGHT_INSET - 18, 0)", "Loans Desk row clear buttons should sit inside the section edge")
+    assertContains(src, "button:SetPoint(\"LEFT\", rowFrame, \"RIGHT\", BANK_ROW_ACTION_GAP, 0)", "Loans Desk row clear buttons should sit inside the section edge")
     assertContains(src, "owner:_ClearLoanRow(row.accountId)", "Loans Desk clear should target one account row")
     assertContains(src, "ns.Loans:ClearSimulatedLoansForAccount(accountId)", "Loans Desk clear should remove simulated loan receipts only for one account")
     assertContains(src, "setResaleSection(self.bankResaleSection", "Resale Desk should render through selectable row controls")
-    assertContains(src, "local ledgerTableHeader", "Recent Ledger should render as a compact table")
+    assertContains(src, "createResaleTableRow", "Resale Desk should render fixed table columns")
+    assertContains(src, "button.req:SetJustifyH(\"RIGHT\")", "Resale Desk requested quantity should right-align")
+    assertContains(src, "button.own:SetJustifyH(\"RIGHT\")", "Resale Desk owned quantity should right-align")
+    assertContains(src, "button.total:SetJustifyH(\"RIGHT\")", "Resale Desk total column should right-align")
+    assertContains(src, "Columns: Time | Type | Who | Account | Amount | Detail", "Recent Ledger fallback text should label columns with separators")
     assertContains(src, "resaleTableHeader", "Resale Desk should render as a compact table")
     assertContains(src, "\"Who\"", "Resale Desk table should expose requester names")
     assertContains(src, "Req", "Resale Desk table should expose requested quantity")
@@ -515,15 +593,21 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "local BANK_ROW_TARGET_WIDTH = BANK_SECTION_WIDTH - 196", "bank desk row actions should stay inside the scrollbar gutter")
     assertContains(src, "local BANK_CLEAR_BUTTON_RIGHT_INSET = -(BANK_SCROLLBAR_GUTTER + 8)", "clear button should share the bank dashboard gutter")
     assertContains(src, "button:SetSize(BANK_ROW_TARGET_WIDTH, 18)", "selected resale row highlight should leave room for requester names and inline action buttons")
-    assertContains(src, "fs:SetWidth(BANK_ROW_TARGET_WIDTH)", "bank desk row text should share the right-safe action width")
+    assertContains(src, "button:SetSize(BANK_ROW_TARGET_WIDTH, 18)", "bank desk row targets should share the right-safe action width")
     assertContains(src, "button:SetPoint(\"TOPRIGHT\", section, \"TOPRIGHT\", BANK_CLEAR_BUTTON_RIGHT_INSET, -8)", "Resale Desk clear all should sit inside the scrollbar gutter")
-    assertContains(src, "button:SetPoint(\"TOPLEFT\", fs, \"TOPLEFT\", -4, 3)", "selected resale row highlight should align to the visible text line")
+    assertContains(src, "button:SetPoint(\"TOPLEFT\", prev, \"BOTTOMLEFT\", 0, -4)", "selected resale row highlight should align to the visible table row")
     assertContains(src, "button.mailButton:SetPoint(\"LEFT\", button, \"RIGHT\", BANK_ROW_ACTION_GAP, 0)", "resale row actions should align vertically to the selected row")
     assertContains(src, "button.selection:Show()", "active resale row should show its full-line highlight")
     assertContains(src, "local keepScroll = self.scroll and self.scroll.GetVerticalScroll", "banker refresh should preserve scroll position")
     assertContains(src, "self.scroll:SetVerticalScroll(keepScroll)", "banker refresh should restore scroll after row selection")
     assertContains(src, "Tab:_SelectResaleRow", "Resale row targets should select the active resale row")
     assertContains(src, "buildLedgerSection(content, Theme)", "Recent Ledger should use its own specialized section")
+    assertContains(src, "createLedgerTableRow", "Recent Ledger should render fixed table columns")
+    assertContains(src, "LEDGER_COLUMNS", "Recent Ledger columns should be defined in one fixed column spec")
+    assertContains(src, "row.dividers", "Recent Ledger should draw visible separators between columns")
+    assertContains(src, "SetColorTexture", "Recent Ledger separators should be real UI textures, not spacing in formatted text")
+    assertNotContains(src, "local ledgerTableHeader = string.format", "Recent Ledger should not depend on formatted text spacing for its table")
+    assertContains(src, "row.amount:SetJustifyH(\"RIGHT\")", "Recent Ledger amount column should right-align")
     assertContains(src, "CreateFrame(\"EditBox\"", "Recent Ledger should include search input")
     assertContains(src, "ledger.searchBox:SetScript(\"OnTextChanged\"", "Recent Ledger search should refresh results")
     assertContains(src, "Theme:ScrollArea(ledger)", "Recent Ledger should have an inner scrollable surface")
@@ -539,12 +623,16 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "fs:SetWidth(BANK_LEDGER_CONTENT_WIDTH)", "ledger text should use the right-safe ledger content width")
     assertContains(src, "setLedgerSection(self.bankLedgerSection", "Recent Ledger should render through its scrollable section")
     assertContains(src, "appendRecentLedger(right, 50)", "Recent Ledger should search across more than the default visible rows")
+    assertContains(src, "appendBankerSummary(right)", "Banker Summary should be generated with the bank report lines")
+    assertContains(src, "appendNeededSupplies(right", "Needed Supplies should render aggregate pending request rows")
+    assertContains(src, "appendAccountSummary(right", "Account Summary should render account-level reporting rows")
     assertContains(src, "left:SetWidth(304)", "left snapshot should shrink to give the Bank Desk more room")
     assertContains(src, "local BANK_DASHBOARD_WIDTH = 760", "bank Dashboard should leave a visible gutter before the scrollbar")
     assertContains(src, "local BANK_TOP_SECTION_WIDTH = math.floor((BANK_SECTION_WIDTH - 10) / 2)", "top-row bank boxes should fit inside the dashboard gutter")
     assertContains(src, "self.leftPane:Hide()", "bank Dashboard should hide the left pane for a single-column layout")
     assertContains(src, "self.rightPane:SetPoint(\"TOPLEFT\", self.panel, \"TOPLEFT\", 20, -64)", "bank Dashboard should stretch the scroll column across the panel")
     assertContains(src, "self.bankSnapshotSection = buildBankSection(content, Theme, \"Bank Snapshot\")", "bank snapshot should render in the single scroll column")
+    assertContains(src, "self.bankSummarySection = buildBankSection(content, Theme, \"Banker Summary\")", "banker summary should render in the single scroll column")
     assertContains(src, "self.content:SetSize(BANK_DASHBOARD_WIDTH, 1)", "bank scroll content should reserve width for the inside scrollbar gutter")
     assertContains(src, "section:SetWidth(BANK_SECTION_WIDTH)", "bank sections should not draw under the main scrollbar")
 end

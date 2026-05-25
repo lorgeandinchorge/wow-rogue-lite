@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.3.7"
+ns.version     = "0.3.8"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -57,6 +57,13 @@ local function formatLoanGold(copper)
         return ns.Loans:FormatGold(copper or 0)
     end
     return tostring(math.floor((tonumber(copper) or 0) / 10000)) .. "g"
+end
+
+local function shortPriceLabel(source)
+    if ns.Pricing and ns.Pricing.ShortSourceLabel then
+        return ns.Pricing:ShortSourceLabel(source)
+    end
+    return source and tostring(source) or "fallback"
 end
 
 -- Central event frame. Individual modules register callbacks on ns:On(event, cb).
@@ -135,6 +142,30 @@ SlashCmdList["WRL"] = function(msg)
         ns.MainFrame:ShowTab("Rewards")
     elseif cmd == "dashboard" or cmd == "dash" then
         ns.MainFrame:ShowTab("Run")
+    elseif cmd == "bankreport" or cmd == "banksummary" then
+        if not (ns.Database and ns.Database.BankerSummaryLines) then
+            ns:Print("Banker summary is not ready yet.")
+            return
+        end
+        ns:Print("Banker Summary:")
+        for _, line in ipairs(ns.Database:BankerSummaryLines()) do
+            ns:Print("  %s", line)
+        end
+        if ns.MainFrame and ns.MainFrame.ShowTab then
+            ns.MainFrame:ShowTab("Run")
+        end
+    elseif cmd == "needed" or cmd == "supplies" then
+        if not (ns.Requests and ns.Requests.NeededSupplyLines) then
+            ns:Print("Needed supplies report is not ready yet.")
+            return
+        end
+        ns:Print("Needed Supplies:")
+        for _, line in ipairs(ns.Requests:NeededSupplyLines()) do
+            ns:Print("  %s", line)
+        end
+        if ns.MainFrame and ns.MainFrame.ShowTab then
+            ns.MainFrame:ShowTab("Run")
+        end
     elseif cmd == "account" then
         local label, characterKey = rest:match("^(%S+)%s+(.+)$")
         if not label or label == "" then
@@ -377,10 +408,12 @@ SlashCmdList["WRL"] = function(msg)
             else
                 ns:Print("Resale Desk:")
                 for _, row in ipairs(rows) do
-                    ns:Print("  %s x%d - %s each (%s total)",
+                    local source = shortPriceLabel(row.priceShortLabel or row.priceSource or row.priceLabel)
+                    ns:Print("  %s x%d - %s each [%s] (%s total)",
                         row.name or ("item:" .. tostring(row.itemId)),
                         row.count or 0,
                         ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(row.priceEach or 0) or tostring(row.priceEach or 0),
+                        source,
                         ns.Tiers and ns.Tiers.FormatMoney and ns.Tiers:FormatMoney(row.totalCopper or 0) or tostring(row.totalCopper or 0))
                 end
             end
@@ -534,6 +567,8 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl dashboard      - open the Dashboard tab")
         ns:Print("  /wrl request        - open the Rewards tab")
         ns:Print("  /wrl account L C-R  - assign Character-Realm to account label L")
+        ns:Print("  /wrl bankreport     - print banker summary lines")
+        ns:Print("  /wrl needed         - print aggregate needed supplies")
         ns:Print("  /wrl simrequest C-R IDS - simulate a pending bank request")
         ns:Print("  /wrl simresale IDS  - simulate resale stock, e.g. 769:4,723:2")
         ns:Print("  /wrl simloan C-R GOLD - simulate a manual loan")

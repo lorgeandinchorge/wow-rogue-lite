@@ -608,6 +608,85 @@ function R:ReadinessGoldLine(readiness, prefix)
         state)
 end
 
+function R:NeededSupplyRows()
+    local byId = {}
+    for _, req in ipairs(self:PendingRequests()) do
+        local readiness = self:FulfillmentReadiness(req)
+        for _, item in ipairs((readiness and readiness.items) or {}) do
+            local itemId = tonumber(item.id or item.itemId)
+            if itemId then
+                local row = byId[itemId]
+                if not row then
+                    row = {
+                        itemId = itemId,
+                        name = item.name or ("item:" .. tostring(itemId)),
+                        required = 0,
+                        available = 0,
+                        missing = 0,
+                        requests = 0,
+                        craftHint = item.craftHint,
+                        marketCopper = item.marketCopper,
+                        marketLabel = item.marketLabel,
+                    }
+                    byId[itemId] = row
+                end
+                row.required = row.required + math.max(0, math.floor(tonumber(item.required) or 0))
+                row.available = math.max(row.available or 0, math.max(0, math.floor(tonumber(item.available) or 0)))
+                row.requests = row.requests + 1
+                row.craftHint = row.craftHint or item.craftHint
+                row.marketCopper = row.marketCopper or item.marketCopper
+                row.marketLabel = row.marketLabel or item.marketLabel
+            end
+        end
+    end
+
+    local rows = {}
+    for _, row in pairs(byId) do
+        row.missing = math.max(0, (row.required or 0) - (row.available or 0))
+        rows[#rows + 1] = row
+    end
+    table.sort(rows, function(a, b)
+        local aTailor = a.craftHint == "tailor-made" and 1 or 0
+        local bTailor = b.craftHint == "tailor-made" and 1 or 0
+        if aTailor ~= bTailor then return aTailor > bTailor end
+        if (a.missing or 0) ~= (b.missing or 0) then return (a.missing or 0) > (b.missing or 0) end
+        return tostring(a.name) < tostring(b.name)
+    end)
+    return rows
+end
+
+function R:NeededSupplyLines(rows, opts)
+    rows = rows or self:NeededSupplyRows()
+    opts = opts or {}
+    local lines = {}
+    local maxRows = opts.maxRows or #rows
+    local prefix = opts.prefix or ""
+    for i, row in ipairs(rows) do
+        if i > maxRows then
+            lines[#lines + 1] = ("%s... and %d more needed item line(s)"):format(prefix, #rows - maxRows)
+            break
+        end
+        local hints = {}
+        if row.craftHint then hints[#hints + 1] = row.craftHint end
+        if row.marketCopper and row.marketLabel and ns.Tiers and ns.Tiers.FormatMoney then
+            hints[#hints + 1] = ("%s %s"):format(row.marketLabel, ns.Tiers:FormatMoney(row.marketCopper))
+        end
+        local hintText = #hints > 0 and (" (" .. table.concat(hints, "; ") .. ")") or ""
+        lines[#lines + 1] = ("%s%s: requested %d / available %d / missing %d / requests %d%s"):format(
+            prefix,
+            row.name or ("item:" .. tostring(row.itemId)),
+            row.required or 0,
+            row.available or 0,
+            row.missing or 0,
+            row.requests or 0,
+            hintText)
+    end
+    if #lines == 0 and not opts.skipEmpty then
+        lines[1] = prefix .. "No pending request supplies needed."
+    end
+    return lines
+end
+
 function R:PrintMissingForRequest(req, readiness)
     readiness = readiness or self:FulfillmentReadiness(req)
     local missingItems = readiness.missingItems or {}

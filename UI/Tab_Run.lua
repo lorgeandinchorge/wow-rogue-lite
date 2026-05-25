@@ -11,6 +11,14 @@ local BANK_ROW_ACTION_GAP = 10
 local BANK_ROW_TARGET_WIDTH = BANK_SECTION_WIDTH - 196
 local BANK_CLEAR_BUTTON_RIGHT_INSET = -(BANK_SCROLLBAR_GUTTER + 8)
 local BANK_LEDGER_CONTENT_WIDTH = BANK_SECTION_WIDTH - BANK_SCROLLBAR_GUTTER - 10
+local LEDGER_COLUMNS = {
+    { key = "time", label = "Time", x = 0, width = 72, justify = "LEFT" },
+    { key = "kind", label = "Type", x = 82, width = 64, justify = "LEFT" },
+    { key = "who", label = "Who", x = 156, width = 124, justify = "LEFT" },
+    { key = "account", label = "Account", x = 290, width = 96, justify = "LEFT" },
+    { key = "amount", label = "Amount", x = 396, width = 72, justify = "RIGHT" },
+    { key = "detail", label = "Detail", x = 482, width = 182, justify = "LEFT" },
+}
 local CHARACTER_RIGHT_WIDTH = 420
 
 local function shortName(full)
@@ -649,6 +657,61 @@ local function appendBankDeskTable(lines, maxRows, owner)
     end
 end
 
+local loanGold
+
+local function appendBankerSummary(lines)
+    lines[#lines + 1] = "|cffc0a060Banker Summary|r"
+    local summaryLines = ns.Database and ns.Database.BankerSummaryLines and ns.Database:BankerSummaryLines() or nil
+    if not summaryLines or #summaryLines == 0 then
+        lines[#lines + 1] = "Banker summary unavailable. The ledger has misplaced its spectacles."
+        return
+    end
+    for i = 1, math.min(6, #summaryLines) do
+        lines[#lines + 1] = summaryLines[i]
+    end
+end
+
+local function appendNeededSupplies(lines, maxRows)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "|cffc0a060Needed Supplies|r"
+    if not (ns.Requests and ns.Requests.NeededSupplyRows and ns.Requests.NeededSupplyLines) then
+        lines[#lines + 1] = "No aggregate supply report available."
+        return
+    end
+    local rows = ns.Requests:NeededSupplyRows()
+    local supplyLines = ns.Requests:NeededSupplyLines(rows, { maxRows = maxRows or 5 })
+    for _, line in ipairs(supplyLines) do
+        lines[#lines + 1] = line
+    end
+end
+
+local function appendAccountSummary(lines, maxRows)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "|cffc0a060Account Summary|r"
+    local rows = ns.Database and ns.Database.AccountBankingSummaryRows and ns.Database:AccountBankingSummaryRows() or {}
+    if #rows == 0 then
+        lines[#lines + 1] = "No account banking activity yet. The columns are waiting politely."
+        return
+    end
+    lines[#lines + 1] = string.format("%-14s %9s %8s %8s %8s %5s", "Account", "Contrib", "Debt", "Avail", "Resale", "Ful")
+    local limit = math.min(maxRows or 5, #rows)
+    for i = 1, limit do
+        local row = rows[i]
+        local account = row.label or "Unassigned"
+        if #account > 14 then account = account:sub(1, 11) .. "..." end
+        lines[#lines + 1] = string.format("%-14s %9s %8s %8s %8s %5s",
+            account,
+            ns.Tiers:FormatMoney(row.contributedCopper or 0),
+            loanGold(row.outstandingCopper or 0),
+            loanGold(row.availableCopper or 0),
+            ns.Tiers:FormatMoney(row.resaleCopper or 0),
+            tostring(row.fulfillmentCount or 0))
+    end
+    if #rows > limit then
+        lines[#lines + 1] = ("... and %d more account(s)"):format(#rows - limit)
+    end
+end
+
 local function appendContributionBoard(lines, maxAccounts, maxCharacters)
     lines[#lines + 1] = "|cffc0a060Contribution Board|r"
     local rows = ns.Database and ns.Database.CharacterContributionRows and ns.Database:CharacterContributionRows() or {}
@@ -671,7 +734,7 @@ local function appendContributionBoard(lines, maxAccounts, maxCharacters)
     end
 end
 
-local function loanGold(copper)
+function loanGold(copper)
     if ns.Loans and ns.Loans.FormatGold then
         return ns.Loans:FormatGold(copper or 0)
     end
@@ -726,7 +789,7 @@ local function appendResaleDesk(lines, maxRows, owner)
         local buyer = (order and order.buyer) or "Unknown"
         if #name > 20 then name = name:sub(1, 17) .. "..." end
         if #buyer > 18 then buyer = buyer:sub(1, 15) .. "..." end
-        local priceLabel = row.priceLabel or ""
+        local priceLabel = row.priceShortLabel or row.priceLabel or ""
         if priceLabel == "TSM DBMarket" then
             priceLabel = "TSM"
         elseif priceLabel == "double vendor" then
@@ -758,39 +821,7 @@ local function appendRecentLedger(lines, maxRows)
         lines[#lines + 1] = "No recent ledger activity. The ink is getting ideas."
         return
     end
-    local ledgerTableHeader = string.format("%-11s %-11s %-18s %-12s %8s %-18s", "Time", "Type", "Who", "Account", "Amount", "Detail")
-    lines[#lines + 1] = ledgerTableHeader
-    for _, row in ipairs(rows) do
-        local kind = row.kind or "contribution"
-        local who = row.characterKey or "Unknown"
-        local account = row.accountLabel or "Unassigned"
-        local amount = ns.Tiers:FormatMoney(row.amount or 0)
-        local detail = row.source or ""
-        if kind == "fulfillment" then
-            kind = "fulfill"
-            detail = row.method or "manual"
-        elseif kind == "resale" then
-            detail = ("%dx %s"):format(row.qty or 0, row.itemName or "catalog item")
-        elseif kind == "loan_borrow" then
-            kind = "loan"
-            amount = loanGold(row.amount or 0)
-            detail = row.source or "borrow"
-        elseif kind == "loan_repayment" then
-            kind = "repay"
-            amount = loanGold(row.amount or 0)
-            detail = row.source or "repayment"
-        end
-        if #who > 18 then who = who:sub(1, 15) .. "..." end
-        if #account > 12 then account = account:sub(1, 9) .. "..." end
-        if #detail > 18 then detail = detail:sub(1, 15) .. "..." end
-        lines[#lines + 1] = string.format("%-11s %-11s %-18s %-12s %8s %-18s",
-            fmtWhen(row.when),
-            kind,
-            who,
-            account,
-            amount,
-            detail)
-    end
+    lines[#lines + 1] = "Columns: Time | Type | Who | Account | Amount | Detail"
 end
 
 local function writeLines(target, lines)
@@ -814,6 +845,9 @@ end
 
 local function splitBankSections(lines)
     local desk = {}
+    local summary = {}
+    local needed = {}
+    local accounts = {}
     local contributions = {}
     local loans = {}
     local resale = {}
@@ -822,6 +856,12 @@ local function splitBankSections(lines)
     for i, line in ipairs(lines or {}) do
         if i == 1 then
             -- The framed section title owns this heading.
+        elseif line == "|cffc0a060Banker Summary|r" then
+            target = summary
+        elseif line == "|cffc0a060Needed Supplies|r" then
+            target = needed
+        elseif line == "|cffc0a060Account Summary|r" then
+            target = accounts
         elseif line == "|cffc0a060Contribution Board|r" then
             target = contributions
         elseif line == "|cffc0a060Loans Desk|r" then
@@ -842,7 +882,7 @@ local function splitBankSections(lines)
             target[#target + 1] = line
         end
     end
-    return desk, contributions, loans, resale, ledger
+    return desk, summary, needed, accounts, contributions, loans, resale, ledger
 end
 
 local setLedgerSection
@@ -1062,6 +1102,109 @@ local function setContributionSection(section, maxRows)
     return section:GetHeight()
 end
 
+local function createAccountTableRow(section, isHeader)
+    local row = CreateFrame("Frame", nil, section)
+    row:SetSize(BANK_SECTION_WIDTH - 24, 18)
+    local color = isHeader and ns.Theme.c.fg or ns.Theme.c.fg2
+    row.account = ns.Theme:Text(row, 10, color)
+    row.contrib = ns.Theme:Text(row, 10, color)
+    row.debt = ns.Theme:Text(row, 10, color)
+    row.avail = ns.Theme:Text(row, 10, color)
+    row.resale = ns.Theme:Text(row, 10, color)
+    row.fulfill = ns.Theme:Text(row, 10, color)
+
+    row.account:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.account:SetWidth(180)
+    row.account:SetJustifyH("LEFT")
+    row.contrib:SetPoint("LEFT", row, "LEFT", 188, 0)
+    row.contrib:SetWidth(84)
+    row.contrib:SetJustifyH("RIGHT")
+    row.debt:SetPoint("LEFT", row, "LEFT", 282, 0)
+    row.debt:SetWidth(72)
+    row.debt:SetJustifyH("RIGHT")
+    row.avail:SetPoint("LEFT", row, "LEFT", 364, 0)
+    row.avail:SetWidth(88)
+    row.avail:SetJustifyH("RIGHT")
+    row.resale:SetPoint("LEFT", row, "LEFT", 462, 0)
+    row.resale:SetWidth(82)
+    row.resale:SetJustifyH("RIGHT")
+    row.fulfill:SetPoint("LEFT", row, "LEFT", 554, 0)
+    row.fulfill:SetWidth(42)
+    row.fulfill:SetJustifyH("RIGHT")
+    return row
+end
+
+local function ensureAccountRows(section)
+    if section.accountHeader then return end
+    section.accountHeader = createAccountTableRow(section, true)
+    section.accountRows = {}
+    for i = 1, 5 do
+        section.accountRows[i] = createAccountTableRow(section, false)
+    end
+end
+
+local function setAccountRowText(row, account, contrib, debt, avail, resale, fulfill)
+    row.account:SetText(account or "")
+    row.contrib:SetText(contrib or "")
+    row.debt:SetText(debt or "")
+    row.avail:SetText(avail or "")
+    row.resale:SetText(resale or "")
+    row.fulfill:SetText(fulfill or "")
+end
+
+local function setAccountSection(section, maxRows)
+    if not section then return 0 end
+    ensureAccountRows(section)
+    for _, fs in ipairs(section.lines or {}) do fs:Hide() end
+
+    local rows = ns.Database and ns.Database.AccountBankingSummaryRows and ns.Database:AccountBankingSummaryRows() or {}
+    section.accountHeader:ClearAllPoints()
+    section.accountHeader:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 12, -8)
+
+    if #rows == 0 then
+        section.accountHeader:Hide()
+        for _, row in ipairs(section.accountRows or {}) do row:Hide() end
+        local empty = section.lines and section.lines[1]
+        if empty then
+            empty:ClearAllPoints()
+            empty:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 0, -8)
+            empty:SetText("No account banking activity yet. The columns are waiting politely.")
+            empty:Show()
+        end
+        section:SetHeight(72)
+        section:Show()
+        return section:GetHeight()
+    end
+
+    section.accountHeader:Show()
+    setAccountRowText(section.accountHeader, "Account", "Contrib", "Debt", "Avail", "Resale", "Ful")
+    local limit = math.min(maxRows or 5, #rows)
+    local prev = section.accountHeader
+    for i, rowFrame in ipairs(section.accountRows or {}) do
+        local row = rows[i]
+        if i <= limit and row then
+            local account = row.label or "Unassigned"
+            if #account > 20 then account = account:sub(1, 17) .. "..." end
+            rowFrame:ClearAllPoints()
+            rowFrame:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -4)
+            setAccountRowText(rowFrame,
+                account,
+                ns.Tiers:FormatMoney(row.contributedCopper or 0),
+                loanGold(row.outstandingCopper or 0),
+                loanGold(row.availableCopper or 0),
+                ns.Tiers:FormatMoney(row.resaleCopper or 0),
+                tostring(row.fulfillmentCount or 0))
+            rowFrame:Show()
+            prev = rowFrame
+        else
+            rowFrame:Hide()
+        end
+    end
+    section:SetHeight(math.max(72, 46 + (limit * 22)))
+    section:Show()
+    return section:GetHeight()
+end
+
 local function createInlineIconButton(section, label, texturePath, width)
     local action = CreateFrame("Button", nil, section)
     action:SetSize(width or 18, 18)
@@ -1081,11 +1224,58 @@ local function createInlineIconButton(section, label, texturePath, width)
     return action
 end
 
+local function hideBankSectionLines(section)
+    for _, fs in ipairs(section and section.lines or {}) do fs:Hide() end
+end
+
+local function createBankDeskTableRow(section, isHeader)
+    local button = CreateFrame("Button", nil, section)
+    button:SetSize(BANK_ROW_TARGET_WIDTH, 18)
+    local color = isHeader and ns.Theme.c.fg or ns.Theme.c.fg2
+    button.who = ns.Theme:Text(button, 10, color)
+    button.account = ns.Theme:Text(button, 10, color)
+    button.rewards = ns.Theme:Text(button, 10, color)
+    button.ready = ns.Theme:Text(button, 10, color)
+    button.gold = ns.Theme:Text(button, 10, color)
+    button.items = ns.Theme:Text(button, 10, color)
+
+    button.who:SetPoint("LEFT", button, "LEFT", 0, 0)
+    button.who:SetWidth(132)
+    button.who:SetJustifyH("LEFT")
+    button.account:SetPoint("LEFT", button, "LEFT", 138, 0)
+    button.account:SetWidth(116)
+    button.account:SetJustifyH("LEFT")
+    button.rewards:SetPoint("LEFT", button, "LEFT", 260, 0)
+    button.rewards:SetWidth(120)
+    button.rewards:SetJustifyH("LEFT")
+    button.ready:SetPoint("LEFT", button, "LEFT", 386, 0)
+    button.ready:SetWidth(58)
+    button.ready:SetJustifyH("LEFT")
+    button.gold:SetPoint("LEFT", button, "LEFT", 452, 0)
+    button.gold:SetWidth(82)
+    button.gold:SetJustifyH("RIGHT")
+    button.items:SetPoint("LEFT", button, "LEFT", 542, 0)
+    button.items:SetWidth(34)
+    button.items:SetJustifyH("RIGHT")
+    return button
+end
+
+local function setBankDeskRowText(button, who, account, rewards, ready, gold, items)
+    button.who:SetText(who or "")
+    button.account:SetText(account or "")
+    button.rewards:SetText(rewards or "")
+    button.ready:SetText(ready or "")
+    button.gold:SetText(gold or "")
+    button.items:SetText(items or "")
+end
+
 local function ensureBankDeskButtons(section)
+    if not section.bankDeskHeader then
+        section.bankDeskHeader = createBankDeskTableRow(section, true)
+    end
     section.bankDeskButtons = section.bankDeskButtons or {}
     for i = #section.bankDeskButtons + 1, 16 do
-        local button = CreateFrame("Button", nil, section)
-        button:SetSize(BANK_ROW_TARGET_WIDTH, 18)
+        local button = createBankDeskTableRow(section, false)
         button.selection = button:CreateTexture(nil, "BACKGROUND")
         button.selection:SetAllPoints(button)
         button.selection:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.18)
@@ -1098,21 +1288,51 @@ local function ensureBankDeskButtons(section)
 end
 
 local function setBankDeskSection(section, lines, rows, owner)
-    local height = setBankSection(section, lines)
-    if not section then return height end
+    if not section then return 0 end
     ensureBankDeskButtons(section)
+    hideBankSectionLines(section)
     rows = rows or {}
-    local shownRows = math.min(#rows, math.max(0, #(section.lines or {}) - 1))
+    section.bankDeskHeader:ClearAllPoints()
+    section.bankDeskHeader:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 12, -8)
+    if #rows == 0 then
+        section.bankDeskHeader:Hide()
+        local empty = section.lines and section.lines[1]
+        if empty then
+            empty:ClearAllPoints()
+            empty:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 0, -8)
+            empty:SetText(lines and lines[1] or "No pending bank requests. Suspiciously peaceful.")
+            empty:Show()
+        end
+        for _, button in ipairs(section.bankDeskButtons or {}) do
+            button:Hide()
+            if button.mailButton then button.mailButton:Hide() end
+            if button.doneButton then button.doneButton:Hide() end
+            if button.accountButton then button.accountButton:Hide() end
+        end
+        section:SetHeight(72)
+        section:Show()
+        return section:GetHeight()
+    end
+
+    section.bankDeskHeader:Show()
+    setBankDeskRowText(section.bankDeskHeader, "Who", "Account", "Rewards", "Ready", "Gold", "Items")
+    local shownRows = math.min(#rows, 8)
+    local prev = section.bankDeskHeader
     for i, button in ipairs(section.bankDeskButtons or {}) do
-        local fs = section.lines and section.lines[i + 1]
-        if i <= shownRows and fs then
+        if i <= shownRows then
             local rowIndex = i
             local req = rows[i]
             local selected = (owner.bankRequestIndex or 1) == i
-            fs:SetText(lines[i + 1] or "")
-            fs:SetWidth(BANK_ROW_TARGET_WIDTH)
+            local who = req and req.from or "Unknown"
+            local account = req and req.accountId and ns.Database and ns.Database.AccountLabel and ns.Database:AccountLabel(req.accountId) or "Unassigned"
+            local rewards = requestTierLabel(req)
+            local ready, gold, items = requestReadyLabel(req)
+            if #who > 18 then who = who:sub(1, 15) .. "..." end
+            if #account > 14 then account = account:sub(1, 11) .. "..." end
+            if #rewards > 16 then rewards = rewards:sub(1, 13) .. "..." end
             button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", fs, "TOPLEFT", -4, 3)
+            button:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -4)
+            setBankDeskRowText(button, who, account, rewards, ready, gold, items)
             if button.selection then
                 if selected then button.selection:Show() else button.selection:Hide() end
             end
@@ -1158,6 +1378,7 @@ local function setBankDeskSection(section, lines, rows, owner)
                 end
             end)
             if req and not req.accountId then button.accountButton:Show() else button.accountButton:Hide() end
+            prev = button
         else
             if button.selection then button.selection:Hide() end
             button:Hide()
@@ -1166,14 +1387,59 @@ local function setBankDeskSection(section, lines, rows, owner)
             if button.accountButton then button.accountButton:Hide() end
         end
     end
-    return height
+    section:SetHeight(math.max(72, 46 + (shownRows * 22)))
+    section:Show()
+    return section:GetHeight()
+end
+
+local function createResaleTableRow(section, isHeader)
+    local button = CreateFrame("Button", nil, section)
+    button:SetSize(BANK_ROW_TARGET_WIDTH, 18)
+    local color = isHeader and ns.Theme.c.fg or ns.Theme.c.fg2
+    button.item = ns.Theme:Text(button, 10, color)
+    button.who = ns.Theme:Text(button, 10, color)
+    button.req = ns.Theme:Text(button, 10, color)
+    button.own = ns.Theme:Text(button, 10, color)
+    button.each = ns.Theme:Text(button, 10, color)
+    button.total = ns.Theme:Text(button, 10, color)
+
+    button.item:SetPoint("LEFT", button, "LEFT", 0, 0)
+    button.item:SetWidth(150)
+    button.item:SetJustifyH("LEFT")
+    button.who:SetPoint("LEFT", button, "LEFT", 156, 0)
+    button.who:SetWidth(132)
+    button.who:SetJustifyH("LEFT")
+    button.req:SetPoint("LEFT", button, "LEFT", 296, 0)
+    button.req:SetWidth(32)
+    button.req:SetJustifyH("RIGHT")
+    button.own:SetPoint("LEFT", button, "LEFT", 336, 0)
+    button.own:SetWidth(32)
+    button.own:SetJustifyH("RIGHT")
+    button.each:SetPoint("LEFT", button, "LEFT", 376, 0)
+    button.each:SetWidth(106)
+    button.each:SetJustifyH("RIGHT")
+    button.total:SetPoint("LEFT", button, "LEFT", 490, 0)
+    button.total:SetWidth(86)
+    button.total:SetJustifyH("RIGHT")
+    return button
+end
+
+local function setResaleRowText(button, item, who, req, own, each, total)
+    button.item:SetText(item or "")
+    button.who:SetText(who or "")
+    button.req:SetText(req or "")
+    button.own:SetText(own or "")
+    button.each:SetText(each or "")
+    button.total:SetText(total or "")
 end
 
 local function ensureResaleButtons(section)
+    if not section.resaleHeader then
+        section.resaleHeader = createResaleTableRow(section, true)
+    end
     section.resaleButtons = section.resaleButtons or {}
     for i = #section.resaleButtons + 1, 16 do
-        local button = CreateFrame("Button", nil, section)
-        button:SetSize(BANK_ROW_TARGET_WIDTH, 18)
+        local button = createResaleTableRow(section, false)
         button.selection = button:CreateTexture(nil, "BACKGROUND")
         button.selection:SetAllPoints(button)
         button.selection:SetColorTexture(ns.Theme.c.gold[1], ns.Theme.c.gold[2], ns.Theme.c.gold[3], 0.18)
@@ -1186,9 +1452,9 @@ local function ensureResaleButtons(section)
 end
 
 local function setResaleSection(section, lines, rows, owner)
-    local height = setBankSection(section, lines)
-    if not section then return height end
+    if not section then return 0 end
     ensureResaleButtons(section)
+    hideBankSectionLines(section)
     if not section.clearResaleButton then
         local button = CreateFrame("Button", nil, section)
         button:SetSize(18, 18)
@@ -1206,17 +1472,62 @@ local function setResaleSection(section, lines, rows, owner)
     end
     section.clearResaleButton:Show()
     rows = rows or {}
-    local shownRows = math.min(#rows, math.max(0, #(section.lines or {}) - 1))
+    section.resaleHeader:ClearAllPoints()
+    section.resaleHeader:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 12, -8)
+    if #rows == 0 then
+        section.resaleHeader:Hide()
+        local empty = section.lines and section.lines[1]
+        if empty then
+            empty:ClearAllPoints()
+            empty:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 0, -8)
+            empty:SetText(lines and lines[1] or "No resale catalog goods found. The shelves are judging everyone equally.")
+            empty:Show()
+        end
+        for _, button in ipairs(section.resaleButtons or {}) do
+            button:Hide()
+            if button.mailButton then button.mailButton:Hide() end
+            if button.soldButton then button.soldButton:Hide() end
+            if button.cancelButton then button.cancelButton:Hide() end
+        end
+        section:SetHeight(72)
+        section:Show()
+        return section:GetHeight()
+    end
+
+    section.resaleHeader:Show()
+    setResaleRowText(section.resaleHeader, "Item", "Who", "Req", "Own", "Each", "Total")
+    local shownRows = math.min(#rows, 6)
+    local prev = section.resaleHeader
     for i, button in ipairs(section.resaleButtons or {}) do
-        local fs = section.lines and section.lines[i + 1]
-        if i <= shownRows and fs then
+        if i <= shownRows then
             local rowIndex = i
             local row = rows[i]
             local selected = (owner.bankResaleIndex or 1) == i
-            fs:SetText(lines[i + 1] or "")
-            fs:SetWidth(BANK_ROW_TARGET_WIDTH)
+            local order = owner and owner._BuildResaleOrder and owner:_BuildResaleOrder(row) or nil
+            local name = row.name or ("item:" .. tostring(row.itemId or "?"))
+            local buyer = (order and order.buyer) or "Unknown"
+            if #name > 20 then name = name:sub(1, 17) .. "..." end
+            if #buyer > 18 then buyer = buyer:sub(1, 15) .. "..." end
+            local priceLabel = row.priceShortLabel or row.priceLabel or ""
+            if priceLabel == "TSM DBMarket" then
+                priceLabel = "TSM"
+            elseif priceLabel == "double vendor" then
+                priceLabel = "vendor"
+            elseif priceLabel == "catalog fallback" then
+                priceLabel = "fallback"
+            elseif priceLabel ~= "" and #priceLabel > 8 then
+                priceLabel = priceLabel:sub(1, 8)
+            end
+            local eachText = ("%s %s"):format(ns.Tiers:FormatMoney(row.priceEach or 0), priceLabel):gsub("%s+$", "")
             button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", fs, "TOPLEFT", -4, 3)
+            button:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -4)
+            setResaleRowText(button,
+                name,
+                buyer,
+                tostring(order and order.qty or row.count or 0),
+                tostring(row.count or 0),
+                eachText,
+                ns.Tiers:FormatMoney((order and order.totalCopper) or row.totalCopper or 0))
             if button.selection then
                 if selected then button.selection:Show() else button.selection:Hide() end
             end
@@ -1246,6 +1557,7 @@ local function setResaleSection(section, lines, rows, owner)
                 owner:_CancelResaleRow(row)
             end)
             button.cancelButton:Show()
+            prev = button
         else
             if button.selection then button.selection:Hide() end
             button:Hide()
@@ -1254,18 +1566,116 @@ local function setResaleSection(section, lines, rows, owner)
             if button.cancelButton then button.cancelButton:Hide() end
         end
     end
-    return height
+    section:SetHeight(math.max(72, 46 + (shownRows * 22)))
+    section:Show()
+    return section:GetHeight()
+end
+
+local function createLoanTableRow(section, isHeader)
+    local button = CreateFrame("Frame", nil, section)
+    button:SetSize(BANK_SECTION_WIDTH - 82, 18)
+    local color = isHeader and ns.Theme.c.fg or ns.Theme.c.fg2
+    button.account = ns.Theme:Text(button, 10, color)
+    button.borrower = ns.Theme:Text(button, 10, color)
+    button.cap = ns.Theme:Text(button, 10, color)
+    button.debt = ns.Theme:Text(button, 10, color)
+    button.avail = ns.Theme:Text(button, 10, color)
+    button.latest = ns.Theme:Text(button, 10, color)
+
+    button.account:SetPoint("LEFT", button, "LEFT", 0, 0)
+    button.account:SetWidth(130)
+    button.account:SetJustifyH("LEFT")
+    button.borrower:SetPoint("LEFT", button, "LEFT", 138, 0)
+    button.borrower:SetWidth(150)
+    button.borrower:SetJustifyH("LEFT")
+    button.cap:SetPoint("LEFT", button, "LEFT", 296, 0)
+    button.cap:SetWidth(72)
+    button.cap:SetJustifyH("RIGHT")
+    button.debt:SetPoint("LEFT", button, "LEFT", 376, 0)
+    button.debt:SetWidth(72)
+    button.debt:SetJustifyH("RIGHT")
+    button.avail:SetPoint("LEFT", button, "LEFT", 456, 0)
+    button.avail:SetWidth(82)
+    button.avail:SetJustifyH("RIGHT")
+    button.latest:SetPoint("LEFT", button, "LEFT", 548, 0)
+    button.latest:SetWidth(70)
+    button.latest:SetJustifyH("LEFT")
+    return button
+end
+
+local function ensureLoanRows(section)
+    if section.loanHeader then return end
+    section.loanHeader = createLoanTableRow(section, true)
+    section.loanRows = {}
+    for i = 1, 5 do
+        section.loanRows[i] = createLoanTableRow(section, false)
+    end
+end
+
+local function setLoanRowText(row, account, borrower, cap, debt, avail, latest)
+    row.account:SetText(account or "")
+    row.borrower:SetText(borrower or "")
+    row.cap:SetText(cap or "")
+    row.debt:SetText(debt or "")
+    row.avail:SetText(avail or "")
+    row.latest:SetText(latest or "")
 end
 
 local function setLoansSection(section, lines, owner)
-    local height = setBankSection(section, lines)
-    if not section then return height end
+    if not section then return 0 end
+    ensureLoanRows(section)
+    hideBankSectionLines(section)
     if section.clearLoansButton then
         section.clearLoansButton:Hide()
     end
     section.loanClearButtons = section.loanClearButtons or {}
     local rows = ns.Loans and ns.Loans.AccountLoanRows and ns.Loans:AccountLoanRows() or {}
-    local visibleRows = math.min(#rows, math.max(0, #(section.lines or {}) - 1))
+    section.loanHeader:ClearAllPoints()
+    section.loanHeader:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 12, -8)
+
+    if #rows == 0 then
+        section.loanHeader:Hide()
+        for _, rowFrame in ipairs(section.loanRows or {}) do rowFrame:Hide() end
+        local empty = section.lines and section.lines[1]
+        if empty then
+            empty:ClearAllPoints()
+            empty:SetPoint("TOPLEFT", section.title, "BOTTOMLEFT", 0, -8)
+            empty:SetText(lines and lines[1] or "No active loans. The ledger is pretending to be relaxed.")
+            empty:Show()
+        end
+        for _, button in ipairs(section.loanClearButtons or {}) do button:Hide() end
+        section:SetHeight(72)
+        section:Show()
+        return section:GetHeight()
+    end
+
+    section.loanHeader:Show()
+    setLoanRowText(section.loanHeader, "Account", "Borrower", "Cap", "Debt", "Avail", "Latest")
+    local visibleRows = math.min(#rows, 5)
+    local prev = section.loanHeader
+    for i, rowFrame in ipairs(section.loanRows or {}) do
+        local row = rows[i]
+        if i <= visibleRows and row then
+            local account = row.label or "Unassigned"
+            local borrower = row.characterKey or "Unknown"
+            if #account > 16 then account = account:sub(1, 13) .. "..." end
+            if #borrower > 18 then borrower = borrower:sub(1, 15) .. "..." end
+            rowFrame:ClearAllPoints()
+            rowFrame:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -4)
+            setLoanRowText(rowFrame,
+                account,
+                borrower,
+                loanGold(row.capCopper or 0),
+                loanGold(row.outstandingCopper or 0),
+                loanGold(row.availableCopper or 0),
+                row.latestKind or "loan")
+            rowFrame:Show()
+            prev = rowFrame
+        else
+            rowFrame:Hide()
+        end
+    end
+
     for i = 1, math.max(#section.loanClearButtons, visibleRows) do
         local button = section.loanClearButtons[i]
         if not button then
@@ -1273,10 +1683,10 @@ local function setLoansSection(section, lines, owner)
             section.loanClearButtons[i] = button
         end
         local row = rows[i]
-        local fs = section.lines and section.lines[i + 1]
-        if row and row.hasSimulatedLoan and fs and fs:IsShown() then
+        local rowFrame = section.loanRows and section.loanRows[i]
+        if row and row.hasSimulatedLoan and rowFrame and rowFrame:IsShown() then
             button:ClearAllPoints()
-            button:SetPoint("LEFT", fs, "LEFT", BANK_SECTION_WIDTH + BANK_CLEAR_BUTTON_RIGHT_INSET - 18, 0)
+            button:SetPoint("LEFT", rowFrame, "RIGHT", BANK_ROW_ACTION_GAP, 0)
             button:SetScript("OnClick", function()
                 owner:_ClearLoanRow(row.accountId)
             end)
@@ -1285,7 +1695,9 @@ local function setLoansSection(section, lines, owner)
             button:Hide()
         end
     end
-    return height
+    section:SetHeight(math.max(72, 46 + (visibleRows * 22)))
+    section:Show()
+    return section:GetHeight()
 end
 
 local function ensureLedgerClearButton(section, owner)
@@ -1301,10 +1713,102 @@ local function ensureLedgerClearButton(section, owner)
     section.clearLedgerButton:Show()
 end
 
+local function createLedgerTableRow(section, isHeader)
+    local row = CreateFrame("Frame", nil, section.content or section)
+    row:SetSize(BANK_LEDGER_CONTENT_WIDTH, 18)
+    local color = isHeader and ns.Theme.c.fg or ns.Theme.c.fg2
+    row.dividers = {}
+    for i, col in ipairs(LEDGER_COLUMNS) do
+        local fs = ns.Theme:Text(row, 10, color)
+        fs:SetPoint("LEFT", row, "LEFT", col.x, 0)
+        fs:SetWidth(col.width)
+        fs:SetJustifyH(col.justify)
+        row[col.key] = fs
+        if i > 1 then
+            local divider = row:CreateTexture(nil, "ARTWORK")
+            divider:SetColorTexture(0.72, 0.48, 0.16, isHeader and 0.55 or 0.22)
+            divider:SetPoint("TOPLEFT", row, "TOPLEFT", col.x - 8, -1)
+            divider:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", col.x - 8, 1)
+            divider:SetWidth(1)
+            row.dividers[#row.dividers + 1] = divider
+        end
+    end
+    row.amount:SetJustifyH("RIGHT")
+    return row
+end
+
+local function ensureLedgerRows(section)
+    if section.ledgerHeader then return end
+    section.ledgerHeader = createLedgerTableRow(section, true)
+    section.ledgerRows = {}
+    for i = 1, 50 do
+        section.ledgerRows[i] = createLedgerTableRow(section, false)
+    end
+end
+
+local function setLedgerRowText(row, timeText, kind, who, account, amount, detail)
+    row.time:SetText(timeText or "")
+    row.kind:SetText(kind or "")
+    row.who:SetText(who or "")
+    row.account:SetText(account or "")
+    row.amount:SetText(amount or "")
+    row.detail:SetText(detail or "")
+end
+
+local function ledgerDisplayRow(row)
+    local kind = row.kind or "contribution"
+    local who = row.characterKey or "Unknown"
+    local account = row.accountLabel or "Unassigned"
+    local amount = ns.Tiers:FormatMoney(row.amount or 0)
+    local detail = row.source or ""
+    if kind == "fulfillment" then
+        kind = "fulfill"
+        detail = row.method or "manual"
+    elseif kind == "resale" then
+        local priceLabel = row.priceShortLabel or row.priceLabel or row.priceSource
+        if ns.Pricing and ns.Pricing.ShortSourceLabel then
+            priceLabel = ns.Pricing:ShortSourceLabel(priceLabel)
+        end
+        detail = ("%dx %s"):format(row.qty or 0, row.itemName or "catalog item")
+        if priceLabel and priceLabel ~= "" then
+            detail = ("%s %s"):format(detail, priceLabel)
+        end
+    elseif kind == "loan_borrow" then
+        kind = "loan"
+        amount = loanGold(row.amount or 0)
+        detail = row.source or "borrow"
+    elseif kind == "loan_repayment" then
+        kind = "repay"
+        amount = loanGold(row.amount or 0)
+        detail = row.source or "repayment"
+    end
+    if #who > 18 then who = who:sub(1, 15) .. "..." end
+    if #account > 12 then account = account:sub(1, 9) .. "..." end
+    if #detail > 24 then detail = detail:sub(1, 21) .. "..." end
+    local display = {
+        time = fmtWhen(row.when),
+        kind = kind,
+        who = who,
+        account = account,
+        amount = amount,
+        detail = detail,
+    }
+    display.search = table.concat({
+        display.time,
+        display.kind,
+        display.who,
+        display.account,
+        display.amount,
+        display.detail,
+    }, " "):lower()
+    return display
+end
+
 setLedgerSection = function(section, lines, owner)
     if not section then return 0 end
     section.owner = owner or section.owner
     ensureLedgerClearButton(section, section.owner)
+    ensureLedgerRows(section)
     section._allLines = lines or {}
     local query = ""
     if section.searchBox and section.searchBox.GetText then
@@ -1312,27 +1816,47 @@ setLedgerSection = function(section, lines, owner)
     end
 
     local filtered = {}
-    for _, line in ipairs(lines or {}) do
-        local plain = tostring(line or "")
-        if query == "" or plain:lower():find(query, 1, true) then
-            filtered[#filtered + 1] = plain
+    local rawRows = ns.Database and ns.Database.RecentBankLedgerRows and ns.Database:RecentBankLedgerRows(50) or {}
+    for _, row in ipairs(rawRows) do
+        local display = ledgerDisplayRow(row)
+        if query == "" or display.search:find(query, 1, true) then
+            filtered[#filtered + 1] = display
         end
-    end
-    if #filtered == 0 then
-        filtered[1] = query ~= "" and "No ledger entries match that search." or "No recent ledger activity. The ink is getting ideas."
     end
 
-    for i, fs in ipairs(section.ledgerLines or {}) do
-        local text = filtered[i]
-        if text and text ~= "" then
-            fs:SetText(text)
-            fs:Show()
-        else
-            fs:Hide()
+    if #filtered == 0 then
+        if section.ledgerHeader then section.ledgerHeader:Hide() end
+        for _, row in ipairs(section.ledgerRows or {}) do row:Hide() end
+        local empty = section.ledgerLines and section.ledgerLines[1]
+        if empty then
+            empty:ClearAllPoints()
+            empty:SetPoint("TOPLEFT", section.content, "TOPLEFT", 0, -2)
+            empty:SetText(query ~= "" and "No ledger entries match that search." or "No recent ledger activity. The ink is getting ideas.")
+            empty:Show()
+        end
+    else
+        for _, fs in ipairs(section.ledgerLines or {}) do fs:Hide() end
+        section.ledgerHeader:ClearAllPoints()
+        section.ledgerHeader:SetPoint("TOPLEFT", section.content, "TOPLEFT", 0, -2)
+        section.ledgerHeader:Show()
+        setLedgerRowText(section.ledgerHeader, "Time", "Type", "Who", "Account", "Amount", "Detail")
+        local prev = section.ledgerHeader
+        for i, rowFrame in ipairs(section.ledgerRows or {}) do
+            local row = filtered[i]
+            if row then
+                rowFrame:ClearAllPoints()
+                rowFrame:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -4)
+                setLedgerRowText(rowFrame, row.time, row.kind, row.who, row.account, row.amount, row.detail)
+                rowFrame:Show()
+                prev = rowFrame
+            else
+                rowFrame:Hide()
+            end
         end
     end
+
     if section.content then
-        section.content:SetHeight(math.max(1, (#filtered * 18) + 10))
+        section.content:SetHeight(math.max(1, ((#filtered + 1) * 22) + 10))
     end
     if section.scroll then
         section.scroll:SetVerticalScroll(0)
@@ -1375,6 +1899,9 @@ function Tab:_BuildBankerOverviewLines(key)
         "|cffc0a060Requisitions Desk|r",
     }
     appendBankDeskTable(right, 8, self)
+    appendBankerSummary(right)
+    appendNeededSupplies(right, 5)
+    appendAccountSummary(right, 5)
     appendContributionBoard(right, 5)
     appendLoansDesk(right, 5)
     appendResaleDesk(right, 6, self)
@@ -1658,6 +2185,12 @@ function Tab:Init(parent)
     self.bankSnapshotSection:Hide()
     self.bankDeskSection = buildBankSection(content, Theme, "Requisitions Desk")
     self.bankDeskSection:Hide()
+    self.bankSummarySection = buildBankSection(content, Theme, "Banker Summary")
+    self.bankSummarySection:Hide()
+    self.bankNeededSection = buildBankSection(content, Theme, "Needed Supplies")
+    self.bankNeededSection:Hide()
+    self.bankAccountSection = buildBankSection(content, Theme, "Account Summary")
+    self.bankAccountSection:Hide()
     self.bankContributionSection = buildBankSection(content, Theme, "Contribution Board")
     setBankSectionWidth(self.bankContributionSection, BANK_TOP_SECTION_WIDTH)
     self.bankContributionSection:Hide()
@@ -1705,6 +2238,9 @@ function Tab:Refresh()
         self.content:SetSize(CHARACTER_RIGHT_WIDTH, 1)
         if self.bankSnapshotSection then self.bankSnapshotSection:Hide() end
         if self.bankDeskSection then self.bankDeskSection:Hide() end
+        if self.bankSummarySection then self.bankSummarySection:Hide() end
+        if self.bankNeededSection then self.bankNeededSection:Hide() end
+        if self.bankAccountSection then self.bankAccountSection:Hide() end
         if self.bankContributionSection then self.bankContributionSection:Hide() end
         if self.bankLoansSection then self.bankLoansSection:Hide() end
         if self.bankResaleSection then self.bankResaleSection:Hide() end
@@ -1740,7 +2276,7 @@ function Tab:Refresh()
         local left, right = self:_BuildBankerOverviewLines(key)
         hideLines(self.leftLines)
         hideLines(self.rightLines)
-        local deskLines, contributionLines, loansLines, resaleLines, ledgerLines = splitBankSections(right)
+        local deskLines, summaryLines, neededLines, accountLines, contributionLines, loansLines, resaleLines, ledgerLines = splitBankSections(right)
         local snapshotH = setBankSection(self.bankSnapshotSection, left)
         self.bankContributionSection:ClearAllPoints()
         self.bankContributionSection:SetPoint("TOPLEFT", self.bankSnapshotSection, "TOPRIGHT", 10, 0)
@@ -1751,8 +2287,17 @@ function Tab:Refresh()
         local deskH = setBankDeskSection(self.bankDeskSection, deskLines, bankRows, self)
         self.bankDeskSection:ClearAllPoints()
         self.bankDeskSection:SetPoint("TOPLEFT", self.bankSnapshotSection, "BOTTOMLEFT", 0, -10)
+        self.bankSummarySection:ClearAllPoints()
+        self.bankSummarySection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        local summaryH = setBankSection(self.bankSummarySection, summaryLines)
+        self.bankNeededSection:ClearAllPoints()
+        self.bankNeededSection:SetPoint("TOPLEFT", self.bankSummarySection, "BOTTOMLEFT", 0, -10)
+        local neededH = setBankSection(self.bankNeededSection, neededLines)
+        self.bankAccountSection:ClearAllPoints()
+        self.bankAccountSection:SetPoint("TOPLEFT", self.bankNeededSection, "BOTTOMLEFT", 0, -10)
+        local accountH = setAccountSection(self.bankAccountSection, 5)
         self.bankLoansSection:ClearAllPoints()
-        self.bankLoansSection:SetPoint("TOPLEFT", self.bankDeskSection, "BOTTOMLEFT", 0, -10)
+        self.bankLoansSection:SetPoint("TOPLEFT", self.bankAccountSection, "BOTTOMLEFT", 0, -10)
         local loansH = setLoansSection(self.bankLoansSection, loansLines, self)
         self.bankResaleSection:ClearAllPoints()
         self.bankResaleSection:SetPoint("TOPLEFT", self.bankLoansSection, "BOTTOMLEFT", 0, -10)
@@ -1760,7 +2305,7 @@ function Tab:Refresh()
         self.bankLedgerSection:ClearAllPoints()
         self.bankLedgerSection:SetPoint("TOPLEFT", self.bankResaleSection, "BOTTOMLEFT", 0, -10)
         local ledgerH = setLedgerSection(self.bankLedgerSection, ledgerLines, self)
-        self.content:SetHeight(math.max(1, topH + deskH + loansH + resaleH + ledgerH + 66))
+        self.content:SetHeight(math.max(1, topH + deskH + summaryH + neededH + accountH + loansH + resaleH + ledgerH + 96))
         self.scroll:SetVerticalScroll(keepScroll)
         return
     end
@@ -1775,6 +2320,9 @@ function Tab:Refresh()
     self.content:SetSize(CHARACTER_RIGHT_WIDTH, 1)
     if self.bankSnapshotSection then self.bankSnapshotSection:Hide() end
     if self.bankDeskSection then self.bankDeskSection:Hide() end
+    if self.bankSummarySection then self.bankSummarySection:Hide() end
+    if self.bankNeededSection then self.bankNeededSection:Hide() end
+    if self.bankAccountSection then self.bankAccountSection:Hide() end
     if self.bankContributionSection then self.bankContributionSection:Hide() end
     if self.bankLoansSection then self.bankLoansSection:Hide() end
     if self.bankResaleSection then self.bankResaleSection:Hide() end
