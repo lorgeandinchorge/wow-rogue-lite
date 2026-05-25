@@ -58,6 +58,22 @@ local function testSettingsOwnsPricingSurface()
     assertContains(src, "pricing.resaleSource", "Settings should persist resale pricing source")
 end
 
+local function testSettingsOwnsCoreResetSurface()
+    local src = readFile("UI/SettingsPopup.lua")
+
+    assertContains(src, "Options", "Settings should expose an Options selector")
+    assertContains(src, "Resets", "Settings should expose a Resets selector")
+    assertContains(src, "Reset Achievements", "Settings should label the achievement reset")
+    assertContains(src, "Reset Legacy Progression", "Settings should label the legacy reset")
+    assertContains(src, "Reset Ledger & Economy", "Settings should label the ledger reset")
+    assertContains(src, "WRL_RESET_ACHIEVEMENTS_CONFIRM", "Settings should confirm achievement reset")
+    assertContains(src, "WRL_RESET_LEGACY_CONFIRM", "Settings should confirm legacy reset")
+    assertContains(src, "WRL_RESET_LEDGER_CONFIRM", "Settings should confirm ledger reset")
+    assertContains(src, "ResetAchievements", "Settings reset handler should use the database helper")
+    assertContains(src, "ResetLegacyProgression", "Settings reset handler should use the database helper")
+    assertContains(src, "ResetLedgerEconomy", "Settings reset handler should use the database helper")
+end
+
 local function testOldRulesTabNoLongerLoads()
     local toc = readFile("WoWRoguelite.toc")
 
@@ -75,6 +91,7 @@ testRulesMoveOutOfMainTabs()
 testSettingsOwnsRulesProfilesSurface()
 testSettingsOwnsRunModifiersSurface()
 testSettingsOwnsPricingSurface()
+testSettingsOwnsCoreResetSurface()
 testOldRulesTabNoLongerLoads()
 testInterfaceOptionsPointsRulesToSettings()
 

@@ -41,6 +41,26 @@ local function legendTierUnlocked()
     return cur and cur.id and cur.id >= 5
 end
 
+local function isPlayableRunContext(ctx)
+    if not ctx then return false end
+    local key = ctx.key or currentKey()
+    local rec = ctx.rec or (key and ns.Database:GetCharacter(key)) or nil
+    if not isRunCharacterKey(key) then return false end
+    if ns.Run and ns.Run.IsPlayable then
+        return ns.Run:IsPlayable(rec or key)
+    end
+    local state = rec and rec.status
+    return state == nil or state == "fresh" or state == "active" or state == "alive"
+end
+
+local function canEvaluateDefinition(def, ctx)
+    if not def or not ctx then return false end
+    if ctx.event == "death_final" then
+        return def.id == "first_final_death"
+    end
+    return isPlayableRunContext(ctx)
+end
+
 local ACHIEVEMENTS = {
     {
         id = "first_final_death",
@@ -90,7 +110,8 @@ local ACHIEVEMENTS = {
         name = "First Tithe",
         description = "Contribute at least 10g lifetime to your legacy bank.",
         hidden = false,
-        criteria = function()
+        criteria = function(ctx)
+            if ctx.event ~= "contribution" then return false end
             return lifetimeAtLeast(100000)
         end,
     },
@@ -99,7 +120,8 @@ local ACHIEVEMENTS = {
         name = "Major Patron",
         description = "Contribute at least 100g lifetime to your legacy bank.",
         hidden = false,
-        criteria = function()
+        criteria = function(ctx)
+            if ctx.event ~= "contribution" then return false end
             return lifetimeAtLeast(1000000)
         end,
     },
@@ -128,7 +150,8 @@ local ACHIEVEMENTS = {
         name = "Bloodline Legend",
         description = "Unlock the Legend tier through lifetime contributions.",
         hidden = true,
-        criteria = function()
+        criteria = function(ctx)
+            if ctx.event ~= "contribution" then return false end
             return legendTierUnlocked()
         end,
     },
@@ -226,7 +249,7 @@ function A:Evaluate(event, ctx)
     ctx.rec = ctx.rec or (ctx.key and ns.Database:GetCharacter(ctx.key)) or nil
 
     for _, def in ipairs(ACHIEVEMENTS) do
-        if not self:IsEarned(def.id) then
+        if not self:IsEarned(def.id) and canEvaluateDefinition(def, ctx) then
             local ok, passed = pcall(def.criteria, ctx)
             if ok and passed then
                 local entry = ns.Database:EarnAchievement(def.id, ctx.key)

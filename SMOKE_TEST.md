@@ -104,6 +104,9 @@ If you only have 10 to 15 minutes, please do this section.
 - [ ] Open gear Settings and find **Run Modifiers**.
   Expected: boons and burdens appear there, not inside the Rewards tab.
 
+- [ ] In gear Settings, switch from **Options** to **Resets**.
+  Expected: separate confirmed reset controls appear for achievements, legacy progression, and ledger/economy data.
+
 - [ ] If rewards are unlocked, choose one from the Rewards dropdown and click **Prepare Mail** at a mailbox.
   Expected: the request mail is prepared cleanly and final Send remains manual.
 
@@ -188,6 +191,7 @@ If you want to go deeper, these are the main areas to cover.
 - [ ] The gear Settings popup reflects the selected profile.
 - [ ] Individual rule toggles behave sensibly.
 - [ ] Rule warnings are understandable when triggered.
+- [ ] The Settings **Resets** surface is visible and each reset action asks for confirmation before clearing data.
 
 ### D. Rewards And Progression
 

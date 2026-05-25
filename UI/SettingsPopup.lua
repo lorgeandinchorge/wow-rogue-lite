@@ -119,6 +119,30 @@ local function buildSectionHeader(parent, Theme, text, y)
     return label, y + 22
 end
 
+local function buildResetRow(parent, Theme, title, detail, buttonText, onClick)
+    local r = CreateFrame("Frame", nil, parent)
+    r:SetHeight(78)
+    Theme:Fill(r, Theme.c.bg1, false)
+
+    r.title = Theme:Text(r, 12, Theme.c.goldH)
+    r.title:SetPoint("TOPLEFT", 12, -10)
+    r.title:SetWidth(360)
+    r.title:SetJustifyH("LEFT")
+    r.title:SetText(title or "")
+
+    r.detail = Theme:Text(r, 10, Theme.c.fg2)
+    r.detail:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -6)
+    r.detail:SetWidth(420)
+    r.detail:SetJustifyH("LEFT")
+    r.detail:SetText(detail or "")
+
+    r.button = Theme:Button(r, buttonText or "Reset", 150, 22)
+    r.button:SetPoint("RIGHT", -12, 0)
+    r.button:SetScript("OnClick", onClick)
+
+    return r
+end
+
 local function buildRuleRow(parent, Theme)
     local r = CreateFrame("Button", nil, parent)
     r:SetHeight(RULE_ROW_H)
@@ -268,6 +292,84 @@ function Popup:RefreshModifierRows()
     end
 end
 
+function Popup:RegisterResetPopups()
+    if not StaticPopupDialogs then return end
+
+    StaticPopupDialogs["WRL_RESET_ACHIEVEMENTS_CONFIRM"] = StaticPopupDialogs["WRL_RESET_ACHIEVEMENTS_CONFIRM"] or {
+        text = "Reset all earned achievements?\n\nThe achievement ledger will be emptied. Contributions, legacy unlocks, memorials, and receipts stay in their drawers.",
+        button1 = "Reset",
+        button2 = "Cancel",
+        OnAccept = function() Popup:RunReset("achievements") end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+
+    StaticPopupDialogs["WRL_RESET_LEGACY_CONFIRM"] = StaticPopupDialogs["WRL_RESET_LEGACY_CONFIRM"] or {
+        text = "Reset legacy progression?\n\nLegacy unlocks and spent budget will be cleared. Contribution receipts and lifetime contributed copper stay on the books.",
+        button1 = "Reset",
+        button2 = "Cancel",
+        OnAccept = function() Popup:RunReset("legacy") end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+
+    StaticPopupDialogs["WRL_RESET_LEDGER_CONFIRM"] = StaticPopupDialogs["WRL_RESET_LEDGER_CONFIRM"] or {
+        text = "Reset ledger and economy data?\n\nContribution totals, contribution receipts, fulfillment receipts, resale receipts, loan receipts, and dependent legacy progress will be cleared. Characters, requests, memorials, and settings stay put.",
+        button1 = "Reset",
+        button2 = "Cancel",
+        OnAccept = function() Popup:RunReset("ledger") end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+end
+
+function Popup:SetPage(page)
+    self.page = page == "resets" and "resets" or "options"
+    if self.optionsScroll then
+        if self.page == "options" then self.optionsScroll:Show() else self.optionsScroll:Hide() end
+    end
+    if self.resetsScroll then
+        if self.page == "resets" then self.resetsScroll:Show() else self.resetsScroll:Hide() end
+    end
+
+    local Theme = ns.Theme
+    setProfileButtonLook(self.optionsTab, self.page == "options", Theme)
+    setProfileButtonLook(self.resetsTab, self.page == "resets", Theme)
+end
+
+function Popup:ConfirmReset(kind)
+    self:RegisterResetPopups()
+    local popupName
+    if kind == "achievements" then popupName = "WRL_RESET_ACHIEVEMENTS_CONFIRM"
+    elseif kind == "legacy" then popupName = "WRL_RESET_LEGACY_CONFIRM"
+    elseif kind == "ledger" then popupName = "WRL_RESET_LEDGER_CONFIRM" end
+
+    if popupName and StaticPopup_Show then
+        StaticPopup_Show(popupName)
+    else
+        self:RunReset(kind)
+    end
+end
+
+function Popup:RunReset(kind)
+    if not ns.Database then return end
+    if kind == "achievements" and ns.Database.ResetAchievements then
+        ns.Database:ResetAchievements()
+        ns:Print("Achievements reset. The trophy shelf is empty; the paperwork survived.")
+    elseif kind == "legacy" and ns.Database.ResetLegacyProgression then
+        ns.Database:ResetLegacyProgression()
+        ns:Print("Legacy progression reset. Contributions remain recorded; unlocks are back in the vault.")
+    elseif kind == "ledger" and ns.Database.ResetLedgerEconomy then
+        ns.Database:ResetLedgerEconomy()
+        ns:Print("Ledger and economy reset. The vault ledger has been sternly introduced to a fresh page.")
+    end
+    self:Refresh()
+    if ns.MainFrame then ns.MainFrame:RefreshCurrentTab() end
+end
+
 function Popup:Init()
     if self.frame then return end
     local Theme = ns.Theme
@@ -300,12 +402,29 @@ function Popup:Init()
     close:SetPoint("TOPRIGHT", -12, -12)
     close:SetScript("OnClick", function() f:Hide() end)
 
+    self.optionsTab = Theme:Button(f, "Options", 96, 22)
+    self.optionsTab:SetPoint("TOPLEFT", 20, -62)
+    self.optionsTab:SetScript("OnClick", function() Popup:SetPage("options") end)
+    self.resetsTab = Theme:Button(f, "Resets", 96, 22)
+    self.resetsTab:SetPoint("LEFT", self.optionsTab, "RIGHT", 8, 0)
+    self.resetsTab:SetScript("OnClick", function() Popup:SetPage("resets") end)
+
     local scroll, content = Theme:ScrollArea(f)
-    scroll:SetPoint("TOPLEFT", 20, -68)
+    scroll:SetPoint("TOPLEFT", 20, -96)
     scroll:SetPoint("BOTTOMRIGHT", -38, 18)
     content:SetSize(640, 1)
     self.scroll = scroll
+    self.optionsScroll = scroll
     self.content = content
+    self.optionsContent = content
+
+    local resetsScroll, resetsContent = Theme:ScrollArea(f)
+    resetsScroll:SetPoint("TOPLEFT", 20, -96)
+    resetsScroll:SetPoint("BOTTOMRIGHT", -38, 18)
+    resetsContent:SetSize(640, 1)
+    resetsScroll:Hide()
+    self.resetsScroll = resetsScroll
+    self.resetsContent = resetsContent
 
     local y = 0
     self.themeLabel, y = buildSectionHeader(content, Theme, "UI Theme", y)
@@ -487,14 +606,63 @@ function Popup:Init()
     self._scrollContentHeight = y + 16
     content:SetHeight(math.max(POPUP_H - 90, self._scrollContentHeight))
 
+    local resetY = 0
+    self.resetsLabel, resetY = buildSectionHeader(resetsContent, Theme, "Resets", resetY)
+    self.resetsHint = Theme:Text(resetsContent, 10, Theme.c.fg2)
+    self.resetsHint:SetPoint("TOPLEFT", 0, -resetY)
+    self.resetsHint:SetWidth(620)
+    self.resetsHint:SetJustifyH("LEFT")
+    self.resetsHint:SetText("Each drawer resets independently. Characters, memorials, requests, settings, themes, pricing, and rule profiles are not reset here.")
+    resetY = resetY + 34
+
+    self.resetAchievementsRow = buildResetRow(
+        resetsContent,
+        Theme,
+        "Reset Achievements",
+        "Clears earned achievements only. Contributions, legacy progress, receipts, and memorials remain.",
+        "Reset Achievements",
+        function() Popup:ConfirmReset("achievements") end
+    )
+    self.resetAchievementsRow:SetPoint("TOPLEFT", 0, -resetY)
+    self.resetAchievementsRow:SetPoint("RIGHT", resetsContent, "RIGHT", -16, 0)
+    resetY = resetY + 86
+
+    self.resetLegacyRow = buildResetRow(
+        resetsContent,
+        Theme,
+        "Reset Legacy Progression",
+        "Clears legacy unlocks and spent budget. Contribution totals and receipts remain available.",
+        "Reset Legacy Progression",
+        function() Popup:ConfirmReset("legacy") end
+    )
+    self.resetLegacyRow:SetPoint("TOPLEFT", 0, -resetY)
+    self.resetLegacyRow:SetPoint("RIGHT", resetsContent, "RIGHT", -16, 0)
+    resetY = resetY + 86
+
+    self.resetLedgerRow = buildResetRow(
+        resetsContent,
+        Theme,
+        "Reset Ledger & Economy",
+        "Clears contribution totals, contribution/fulfillment/resale/loan receipts, character contribution totals, and dependent legacy progress.",
+        "Reset Ledger & Economy",
+        function() Popup:ConfirmReset("ledger") end
+    )
+    self.resetLedgerRow:SetPoint("TOPLEFT", 0, -resetY)
+    self.resetLedgerRow:SetPoint("RIGHT", resetsContent, "RIGHT", -16, 0)
+    resetY = resetY + 96
+    resetsContent:SetHeight(math.max(POPUP_H - 90, resetY))
+
     self.frame = f
     f:Hide()
+    self:RegisterResetPopups()
+    self:SetPage("options")
     self:Refresh()
 end
 
 function Popup:Refresh()
     if not self.frame then return end
     local Theme = ns.Theme
+    self:SetPage(self.page or "options")
 
     if UIDropDownMenu_Initialize then
         UIDropDownMenu_Initialize(self.themeDropdown, function(_, level)

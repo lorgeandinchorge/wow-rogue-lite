@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.8 - Banker Reporting Polish. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, and bank reporting are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, aggregate needed-supplies reporting, optional TSM DBMarket hints, tailor-made starter bag labels, manual resale tracking, debt-first repayment accounting, account summaries, right-safe dashboard controls, and clear-confirmation flows.
+> **Status:** v0.3.8a - Achievement Lockout and Reset Hotfix. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, and Settings reset controls are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, aggregate needed-supplies reporting, optional TSM DBMarket hints, tailor-made starter bag labels, manual resale tracking, debt-first repayment accounting, account summaries, right-safe dashboard controls, and clear-confirmation flows.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.8 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.8a loaded.` in chat.
 
 ### Quick start
 
@@ -50,6 +50,8 @@ The **Rewards** tab is intentionally request-only for run characters: choose one
 ### Profiles, rules, and run modifiers
 
 Built-in profiles cover the common shapes of run: **Casual Roguelite**, **Banked Hardcore**, **Solo Self Found**, **Ironman**. Apply one with `/wrl profile <id>` or via the gear → Settings popup. Individual rule toggles and the per-run **boon / burden** modifiers live in the same Settings popup; rule taints and warnings are logged per character and viewable with `/wrl rules log`.
+
+Settings also includes a **Resets** surface for confirmed account-section resets: achievements only, legacy progression only, or ledger/economy data. These resets are separate so testers can restart one drawer of progression without wiping characters, requests, memorials, UI settings, pricing preferences, or rule profiles.
 
 ### Legacy unlocks
 

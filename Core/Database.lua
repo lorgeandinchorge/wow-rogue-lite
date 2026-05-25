@@ -893,6 +893,33 @@ function D:EarnAchievement(id, characterKey)
     return entry
 end
 
+function D:ResetAchievements()
+    WRL_DB.achievements = {}
+    return true
+end
+
+function D:ResetLegacyProgression()
+    WRL_DB.legacyUnlocks = {}
+    WRL_DB.legacySpent = 0
+    return true
+end
+
+function D:ResetLedgerEconomy()
+    WRL_DB.totalContributed = 0
+    WRL_DB.contributionReceipts = {}
+    WRL_DB.fulfillmentReceipts = {}
+    WRL_DB.resaleReceipts = {}
+    WRL_DB.loanReceipts = {}
+    self:ResetLegacyProgression()
+
+    for _, rec in pairs(WRL_DB.characters or {}) do
+        if rec then
+            rec.contributed = 0
+        end
+    end
+    return true
+end
+
 -- Memorials are keyed by character uid so each generation of a name gets its
 -- own memorial and old entries are never overwritten by a new character rolled
 -- on the same slot.  The entry itself always carries characterKey as a field

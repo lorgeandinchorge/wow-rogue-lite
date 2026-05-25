@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.3.8a
+
+- Prevent dead, contribution-pending, retired, or archived run characters from earning normal achievements after the run is over.
+- Keep the final-death achievement eligible during the final-death transition.
+- Add a Settings **Resets** surface with separate confirmed resets for achievements, legacy progression, and ledger/economy data.
+- Add regression coverage for achievement eligibility, reset helper behavior, and Settings reset wiring.
+
 ## v0.3.8
 
 - Add a compact **Banker Summary** to the bank Dashboard with pending/ready request counts, missing item lines, resale row count, outstanding loan total, recent ledger count, and pricing-source status.

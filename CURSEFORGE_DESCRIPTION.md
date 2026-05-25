@@ -30,14 +30,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.8 - Banker Reporting Polish
+### Latest Update: v0.3.8a - Achievement Lockout And Reset Hotfix
 
-- The bank Dashboard now includes a compact Banker Summary, aggregate Needed Supplies, and account-level banking report.
-- Needed Supplies groups pending request items by item, including requested, available, missing, request count, tailor-made hints, and optional TSM DBMarket hints.
-- Account Summary combines contribution totals, active debt, borrow room, resale purchases, and fulfillment counts.
-- Resale rows and ledgers now use compact price-source labels like TSM, vendor, fallback, or unpriced while keeping TradeSkillMaster optional.
-- Recent Ledger columns now use fixed UI columns with visible separators for easier in-game scanning.
-- `/wrl bankreport` and `/wrl needed` provide chat fallback reports for banker status and missing supplies.
+- Dead, contribution-pending, retired, and archived run characters can no longer earn normal achievements after the run is over.
+- Final death still awards the final-death achievement at the correct transition.
+- Settings now includes a Resets surface with separate confirmed resets for achievements, legacy progression, and ledger/economy data.
+- The resets are intentionally separate from characters, memorials, request queues, UI settings, pricing preferences, and rule profiles.
 
 ### Bank And Run Structure
 
@@ -62,6 +60,8 @@ The bank Dashboard is the main work surface for final fulfillment: Requisitions 
 ### Profiles, Rules, And Run Modifiers
 
 Choose from built-in profiles like Casual Roguelite, Banked Hardcore, Solo Self Found, and Ironman. You can also customize individual rule toggles and set boons and burdens from Settings under Run Modifiers.
+
+Settings also includes confirmed resets for core account sections: achievements, legacy progression, and ledger/economy data.
 
 ### Export And Audit Tools
 
