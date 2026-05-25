@@ -937,7 +937,7 @@ local function buildLedgerSection(content, Theme)
 
     ledger.searchBox = CreateFrame("EditBox", nil, ledger, "InputBoxTemplate")
     ledger.searchBox:SetSize(180, 18)
-    ledger.searchBox:SetPoint("TOPLEFT", ledger.title, "BOTTOMLEFT", 0, -8)
+    ledger.searchBox:SetPoint("LEFT", ledger.title, "RIGHT", 14, 0)
     ledger.searchBox:SetAutoFocus(false)
     ledger.searchBox:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "")
     ledger.searchBox:SetTextInsets(4, 4, 0, 0)
@@ -955,7 +955,7 @@ local function buildLedgerSection(content, Theme)
     searchHint:SetText("Search")
 
     local ledgerScroll, ledgerContent = Theme:ScrollArea(ledger)
-    ledgerScroll:SetPoint("TOPLEFT", ledger.searchBox, "BOTTOMLEFT", 0, -8)
+    ledgerScroll:SetPoint("TOPLEFT", ledger.title, "BOTTOMLEFT", 0, -10)
     ledgerScroll:SetPoint("BOTTOMRIGHT", ledger, "BOTTOMRIGHT", -BANK_SCROLLBAR_GUTTER, 10)
     ledgerContent:SetSize(BANK_LEDGER_CONTENT_WIDTH, 1)
     ledger.scroll = ledgerScroll
@@ -1131,6 +1131,14 @@ local function createAccountTableRow(section, isHeader)
     row.fulfill:SetPoint("LEFT", row, "LEFT", 554, 0)
     row.fulfill:SetWidth(42)
     row.fulfill:SetJustifyH("RIGHT")
+    if not isHeader then
+        row.assignButton = ns.Theme:Button(row, "Assign", 46, 16)
+        row.assignButton:SetPoint("LEFT", row.fulfill, "RIGHT", 12, 0)
+        row.assignButton:Hide()
+        row.renameButton = ns.Theme:Button(row, "Rename", 52, 16)
+        row.renameButton:SetPoint("LEFT", row.fulfill, "RIGHT", 12, 0)
+        row.renameButton:Hide()
+    end
     return row
 end
 
@@ -1152,7 +1160,7 @@ local function setAccountRowText(row, account, contrib, debt, avail, resale, ful
     row.fulfill:SetText(fulfill or "")
 end
 
-local function setAccountSection(section, maxRows)
+local function setAccountSection(section, maxRows, owner)
     if not section then return 0 end
     ensureAccountRows(section)
     for _, fs in ipairs(section.lines or {}) do fs:Hide() end
@@ -1194,9 +1202,31 @@ local function setAccountSection(section, maxRows)
                 loanGold(row.availableCopper or 0),
                 ns.Tiers:FormatMoney(row.resaleCopper or 0),
                 tostring(row.fulfillmentCount or 0))
+            if rowFrame.assignButton then
+                if owner and row.isUnassigned then
+                    rowFrame.assignButton:SetScript("OnClick", function()
+                        owner:PromptAssignAccountRow(row)
+                    end)
+                    rowFrame.assignButton:Show()
+                else
+                    rowFrame.assignButton:Hide()
+                end
+            end
+            if rowFrame.renameButton then
+                if owner and row.isLocalAccount then
+                    rowFrame.renameButton:SetScript("OnClick", function()
+                        owner:PromptRenameLocalAccount(row.accountId)
+                    end)
+                    rowFrame.renameButton:Show()
+                else
+                    rowFrame.renameButton:Hide()
+                end
+            end
             rowFrame:Show()
             prev = rowFrame
         else
+            if rowFrame.assignButton then rowFrame.assignButton:Hide() end
+            if rowFrame.renameButton then rowFrame.renameButton:Hide() end
             rowFrame:Hide()
         end
     end
@@ -1952,6 +1982,117 @@ function Tab:_BuildCharacterOverviewLines(key, rec)
     return right
 end
 
+function Tab:_AssignAccount(characterKey, label)
+    if not characterKey or characterKey == "" or not label or label == "" then return nil end
+    if not ns.Database or not ns.Database.AssignCharacterToAccountLabel then return nil end
+    local account = ns.Database:AssignCharacterToAccountLabel(characterKey, label)
+    for _, r in ipairs(WRL_DB.requests or {}) do
+        if r.from == characterKey then r.accountId = account and account.id or r.accountId end
+    end
+    ns:Print("Assigned %s to account %s.", characterKey, account and account.label or label)
+    if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then ns.MainFrame:RefreshCurrentTab() end
+    return account
+end
+
+function Tab:_AssignAccountFromText(text)
+    text = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local characterKey, label = text:match("^(%S+)%s+(.+)$")
+    label = label and label:gsub("^%s+", ""):gsub("%s+$", "")
+    if not characterKey or not label or label == "" then
+        ns:Print("Assign account with |cffffff00Character-Realm Account Label|r.")
+        return nil
+    end
+    return self:_AssignAccount(characterKey, label)
+end
+
+function Tab:PromptAssignAccountRow(row)
+    local characters = row and row.characters or {}
+    if row and row.isUnassigned and #characters == 1 and characters[1].characterKey then
+        self:PromptAssignAccount({ from = characters[1].characterKey })
+        return
+    end
+    self:PromptAssignAccountEntry()
+end
+
+function Tab:PromptAssignAccountEntry()
+    if not StaticPopupDialogs or not StaticPopup_Show then
+        ns:Print("Assign account with |cffffff00Character-Realm Account Label|r.")
+        return
+    end
+    StaticPopupDialogs["WRL_ACCOUNT_LABEL_ENTRY"] = StaticPopupDialogs["WRL_ACCOUNT_LABEL_ENTRY"] or {
+        text = "Assign character to account. Enter Character-Realm Account Label:",
+        button1 = "Assign",
+        button2 = "Cancel",
+        hasEditBox = 1,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        OnAccept = function(popup)
+            local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+            Tab:_AssignAccountFromText(editBox and editBox:GetText() or "")
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local popup = editBox:GetParent()
+            StaticPopupDialogs["WRL_ACCOUNT_LABEL_ENTRY"].OnAccept(popup)
+            popup:Hide()
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            editBox:GetParent():Hide()
+        end,
+    }
+    StaticPopup_Show("WRL_ACCOUNT_LABEL_ENTRY")
+end
+
+function Tab:_RenameAccount(accountId, label)
+    if not accountId or accountId == "" or not label or label == "" then return nil end
+    if not ns.Database or not ns.Database.RenameAccount then return nil end
+    local account = ns.Database:RenameAccount(accountId, label)
+    if account then
+        ns:Print("Renamed account %s to %s.", accountId, account.label or label)
+        if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then ns.MainFrame:RefreshCurrentTab() end
+    end
+    return account
+end
+
+function Tab:PromptRenameLocalAccount(accountId)
+    accountId = accountId or "acct-local"
+    if not StaticPopupDialogs or not StaticPopup_Show then
+        ns:Print("Rename local account with a new account label.")
+        return
+    end
+    StaticPopupDialogs["WRL_RENAME_LOCAL_ACCOUNT"] = StaticPopupDialogs["WRL_RENAME_LOCAL_ACCOUNT"] or {
+        text = "Rename Local Account:",
+        button1 = "Rename",
+        button2 = "Cancel",
+        hasEditBox = 1,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        OnAccept = function(popup, data)
+            local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+            Tab:_RenameAccount(data or "acct-local", editBox and editBox:GetText() or "")
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local popup = editBox:GetParent()
+            StaticPopupDialogs["WRL_RENAME_LOCAL_ACCOUNT"].OnAccept(popup, popup.data)
+            popup:Hide()
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            editBox:GetParent():Hide()
+        end,
+    }
+    local popup = StaticPopup_Show("WRL_RENAME_LOCAL_ACCOUNT", nil, nil, accountId)
+    if popup then
+        popup.data = accountId
+        local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
+        local current = ns.Database and ns.Database.AccountLabel and ns.Database:AccountLabel(accountId) or ""
+        if editBox and current and current ~= "Unassigned" then
+            editBox:SetText(current)
+            if editBox.HighlightText then editBox:HighlightText() end
+        end
+    end
+end
+
 function Tab:PromptAssignAccount(req)
     if not req or not req.from then return end
     if not StaticPopupDialogs or not StaticPopup_Show then
@@ -1969,14 +2110,7 @@ function Tab:PromptAssignAccount(req)
         OnAccept = function(popup, characterKey)
             local editBox = popup.editBox or _G[popup:GetName() .. "EditBox"]
             local label = editBox and editBox:GetText() or ""
-            if label and label ~= "" and ns.Database and ns.Database.AssignCharacterToAccountLabel then
-                local account = ns.Database:AssignCharacterToAccountLabel(characterKey, label)
-                for _, r in ipairs(WRL_DB.requests or {}) do
-                    if r.from == characterKey then r.accountId = account and account.id or r.accountId end
-                end
-                ns:Print("Assigned %s to account %s.", characterKey, account and account.label or label)
-                if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then ns.MainFrame:RefreshCurrentTab() end
-            end
+            Tab:_AssignAccount(characterKey, label)
         end,
         EditBoxOnEnterPressed = function(editBox)
             local popup = editBox:GetParent()
@@ -2295,7 +2429,7 @@ function Tab:Refresh()
         local neededH = setBankSection(self.bankNeededSection, neededLines)
         self.bankAccountSection:ClearAllPoints()
         self.bankAccountSection:SetPoint("TOPLEFT", self.bankNeededSection, "BOTTOMLEFT", 0, -10)
-        local accountH = setAccountSection(self.bankAccountSection, 5)
+        local accountH = setAccountSection(self.bankAccountSection, 5, self)
         self.bankLoansSection:ClearAllPoints()
         self.bankLoansSection:SetPoint("TOPLEFT", self.bankAccountSection, "BOTTOMLEFT", 0, -10)
         local loansH = setLoansSection(self.bankLoansSection, loansLines, self)

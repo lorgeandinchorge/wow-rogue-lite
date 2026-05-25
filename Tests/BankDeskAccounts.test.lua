@@ -249,6 +249,47 @@ local function testAccountBankingSummaryRowsIncludeDebtAndActivity()
     assertEqual(rows[1].fulfillmentCount, 1, "summary includes fulfillment count")
 end
 
+local function testAccountBankingSummaryRowsExposeAssignmentContext()
+    local ns = resetHarness()
+    WRL_DB.characters["Havok-Realm"] = { key = "Havok-Realm", contributed = 0, history = {} }
+    WRL_DB.characters["Graham-Realm"] = { key = "Graham-Realm", contributed = 0, history = {} }
+    WRL_DB.contributionReceipts = {
+        { characterKey = "Havok-Realm", amount = 100, when = 100 },
+    }
+    WRL_DB.resaleReceipts = {
+        { buyer = "Graham-Realm", totalCopper = 250, when = 101 },
+    }
+    WRL_DB.fulfillmentReceipts = {
+        { requester = "Havok-Realm", gold = 50, when = 102 },
+    }
+
+    local rows = ns.Database:AccountBankingSummaryRows()
+
+    assertEqual(rows[1].accountId, "unassigned", "unassigned activity is grouped into the synthetic account row")
+    assertEqual(rows[1].isUnassigned, true, "unassigned row is flagged for row-level assignment")
+    assertEqual(rows[1].characters[1].characterKey, "Graham-Realm", "unassigned summary exposes first source character")
+    assertEqual(rows[1].characters[2].characterKey, "Havok-Realm", "unassigned summary exposes second source character")
+end
+
+local function testRenamingDefaultAccountKeepsLinksAndUpdatesLabels()
+    local ns = resetHarness()
+    WRL_DB.characters["Runner-Realm"] = { key = "Runner-Realm", contributed = 0, history = {} }
+    ns.Database:LinkCharacterToAccount("Runner-Realm", "acct-local")
+    WRL_DB.contributionReceipts = {
+        { characterKey = "Runner-Realm", accountId = "acct-local", amount = 200, when = 100 },
+    }
+
+    local account = ns.Database:RenameAccount("acct-local", "Main Roster")
+    local summary = ns.Database:AccountBankingSummaryRows()
+    local ledger = ns.Database:RecentBankLedgerRows(1)
+
+    assertEqual(account.id, "acct-local", "renaming local account keeps the default account id")
+    assertEqual(ns.Database:AccountIdForCharacter("Runner-Realm"), "acct-local", "renaming local account does not move links")
+    assertEqual(summary[1].label, "Main Roster", "account summary uses the renamed local account label")
+    assertEqual(summary[1].isLocalAccount, true, "local account row is flagged for row-level rename")
+    assertEqual(ledger[1].accountLabel, "Main Roster", "recent ledger uses the renamed local account label")
+end
+
 testMigrationCreatesDefaultAccountAndLinksLocalCharacters()
 testManualAccountLabelsCanBeCreatedAndLinked()
 testContributionsRecordAndSummarizeByAccount()
@@ -260,5 +301,7 @@ testAssigningAccountMovesExistingLoanReceipts()
 testRecentLedgerIncludesLoanActivity()
 testRequestsStoreAssignedOrUnassignedAccount()
 testAccountBankingSummaryRowsIncludeDebtAndActivity()
+testAccountBankingSummaryRowsExposeAssignmentContext()
+testRenamingDefaultAccountKeepsLinksAndUpdatesLabels()
 
 print("BankDeskAccounts.test.lua: ok")

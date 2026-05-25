@@ -471,6 +471,16 @@ function D:AccountLabelForCharacter(characterKey)
     return account and account.label or "Unassigned"
 end
 
+function D:RenameAccount(accountId, label)
+    self:EnsureDefaultAccount()
+    local account = accountId and WRL_DB.accounts and WRL_DB.accounts[accountId]
+    if not account then return nil end
+    label = tostring(label or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if label == "" then return account end
+    account.label = label
+    return account
+end
+
 function D:AssignCharacterToAccountLabel(characterKey, label)
     if not characterKey or characterKey == "" then return nil end
     local account = self:CreateAccount(label)
@@ -678,10 +688,20 @@ function D:AccountBankingSummaryRows()
                 resaleCopper = 0,
                 resaleCount = 0,
                 fulfillmentCount = 0,
+                charactersByKey = {},
+                characters = {},
             }
             rowsById[accountId] = row
         end
         return row
+    end
+
+    local function rememberCharacter(row, characterKey)
+        if not row or not characterKey or characterKey == "" then return end
+        if not row.charactersByKey[characterKey] then
+            row.charactersByKey[characterKey] = true
+            row.characters[#row.characters + 1] = { characterKey = characterKey }
+        end
     end
 
     for _, account in pairs(WRL_DB.accounts or {}) do
@@ -690,12 +710,15 @@ function D:AccountBankingSummaryRows()
     for _, receipt in ipairs(WRL_DB.contributionReceipts or {}) do
         local amount = math.max(0, math.floor(tonumber(receipt.amount or receipt.copper) or 0))
         local accountId = receipt.accountId or self:AccountIdForCharacter(receipt.characterKey)
-        ensureRow(accountId).contributedCopper = ensureRow(accountId).contributedCopper + amount
+        local row = ensureRow(accountId)
+        row.contributedCopper = row.contributedCopper + amount
+        rememberCharacter(row, receipt.characterKey)
     end
     for _, loan in ipairs(WRL_DB.loanReceipts or {}) do
         local amount = math.max(0, math.floor(tonumber(loan.amount) or 0))
         local accountId = loan.accountId or self:AccountIdForCharacter(loan.characterKey)
         local row = ensureRow(accountId)
+        rememberCharacter(row, loan.characterKey)
         if loan.kind == "repayment" then
             row.repaidCopper = row.repaidCopper + amount
         else
@@ -705,16 +728,25 @@ function D:AccountBankingSummaryRows()
     for _, resale in ipairs(WRL_DB.resaleReceipts or {}) do
         local accountId = self:AccountIdForCharacter(resale.buyer)
         local row = ensureRow(accountId)
+        rememberCharacter(row, resale.buyer)
         row.resaleCopper = row.resaleCopper + math.max(0, math.floor(tonumber(resale.totalCopper) or 0))
         row.resaleCount = row.resaleCount + 1
     end
     for _, fulfillment in ipairs(WRL_DB.fulfillmentReceipts or {}) do
         local accountId = fulfillment.accountId or self:AccountIdForCharacter(fulfillment.requester)
-        ensureRow(accountId).fulfillmentCount = ensureRow(accountId).fulfillmentCount + 1
+        local row = ensureRow(accountId)
+        row.fulfillmentCount = row.fulfillmentCount + 1
+        rememberCharacter(row, fulfillment.requester)
     end
 
     local rows = {}
     for accountId, row in pairs(rowsById) do
+        row.charactersByKey = nil
+        table.sort(row.characters, function(a, b)
+            return tostring(a.characterKey) < tostring(b.characterKey)
+        end)
+        row.isUnassigned = accountId == "unassigned"
+        row.isLocalAccount = accountId == "acct-local"
         row.outstandingCopper = math.max(0, (row.borrowedCopper or 0) - (row.repaidCopper or 0))
         if ns.Loans and ns.Loans.BorrowCapForAccount then
             local cap = ns.Loans:BorrowCapForAccount(accountId)

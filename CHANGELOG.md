@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.3.8b
+
+- Move Account Summary assignment actions onto the relevant rows so Unassigned rows open targeted assignment when there is one obvious character.
+- Add a Local Account rename action that updates the default account label without moving linked characters.
+- Keep account assignment and rename changes reflected in Account Summary and Recent Ledger while preserving receipt backfill behavior.
+
 ## v0.3.8a
 
 - Prevent dead, contribution-pending, retired, or archived run characters from earning normal achievements after the run is over.

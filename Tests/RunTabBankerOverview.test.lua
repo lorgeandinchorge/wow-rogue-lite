@@ -119,6 +119,33 @@ local function resetHarness()
     function ns.Database:AccountBankingSummaryRows()
         return {
             {
+                accountId = "acct-local",
+                isLocalAccount = true,
+                characters = {
+                    { characterKey = "Havok-Realm" },
+                },
+                label = "Local Account",
+                contributedCopper = 819,
+                outstandingCopper = 0,
+                availableCopper = 0,
+                resaleCopper = 400,
+                fulfillmentCount = 8,
+            },
+            {
+                accountId = "unassigned",
+                isUnassigned = true,
+                characters = {
+                    { characterKey = "Tester-Realm" },
+                },
+                label = "Unassigned",
+                contributedCopper = 0,
+                outstandingCopper = 0,
+                availableCopper = 0,
+                resaleCopper = 775,
+                fulfillmentCount = 0,
+            },
+            {
+                accountId = "acct-graham",
                 label = "Graham",
                 contributedCopper = 20000,
                 outstandingCopper = 10000,
@@ -341,11 +368,65 @@ local function testContributionBoardShowsLocalAccountContributionsByCharacter()
 
     local _, right = tab:_BuildBankerOverviewLines("Bank-Realm")
     local text = table.concat(right, "\n")
+    local contributionText = text:match("|cffc0a060Contribution Board|r(.-)|cffc0a060Loans Desk|r") or text
 
     assertContains(text, "|cffc0a060Contribution Board|r", "contribution board still renders")
-    assertContains(text, "Havok-Realm", "default-account contributions render as character rows")
-    assertContains(text, "819c", "default-account contributions keep their amount")
-    assertNotContains(text, "Local Account", "contribution board should not show account labels")
+    assertContains(contributionText, "Havok-Realm", "default-account contributions render as character rows")
+    assertContains(contributionText, "819c", "default-account contributions keep their amount")
+    assertNotContains(contributionText, "Local Account", "contribution board should not show account labels")
+end
+
+local function testAccountAssignmentTextAssignsCharacterAndRequest()
+    local tab = resetHarness()
+    WRL_DB.requests = {
+        { id = "req-1", from = "Havok-Realm", status = "pending", tierIds = { 201 }, when = 102 },
+    }
+    tab._testNS.Database.AssignCharacterToAccountLabel = function(_, characterKey, label)
+        tab._assignedAccount = { characterKey = characterKey, label = label }
+        return { id = "acct-havok", label = label }
+    end
+
+    local account = tab:_AssignAccountFromText("Havok-Realm Havok")
+
+    assertEqual(account.id, "acct-havok", "assignment text creates/links the named account")
+    assertEqual(tab._assignedAccount.characterKey, "Havok-Realm", "assignment text preserves the character key")
+    assertEqual(tab._assignedAccount.label, "Havok", "assignment text preserves the account label")
+    assertEqual(WRL_DB.requests[1].accountId, "acct-havok", "assignment updates matching pending requests")
+end
+
+local function testAccountSummaryRowAssignmentTargetsSingleUnassignedCharacter()
+    local tab = resetHarness()
+    local prompted = nil
+    tab.PromptAssignAccount = function(_, req)
+        prompted = req
+    end
+
+    tab:PromptAssignAccountRow({
+        isUnassigned = true,
+        characters = {
+            { characterKey = "Tester-Realm" },
+        },
+    })
+
+    assertEqual(prompted.from, "Tester-Realm", "single unassigned character opens targeted assignment prompt")
+end
+
+local function testAccountSummaryRowAssignmentFallsBackForMultipleCharacters()
+    local tab = resetHarness()
+    local manual = false
+    tab.PromptAssignAccountEntry = function()
+        manual = true
+    end
+
+    tab:PromptAssignAccountRow({
+        isUnassigned = true,
+        characters = {
+            { characterKey = "Tester-Realm" },
+            { characterKey = "Alt-Realm" },
+        },
+    })
+
+    assertEqual(manual, true, "multi-character unassigned row opens manual assignment prompt")
 end
 
 local function testBankDeskActionButtonsAreDashboardOwned()
@@ -545,6 +626,11 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "self.bankNeededSection", "Needed Supplies should have its own full-width section")
     assertContains(src, "self.bankAccountSection", "Account Summary should have its own full-width section")
     assertContains(src, "ensureAccountRows", "Account Summary should render with dedicated row frames")
+    assertNotContains(src, "section.assignAccountButton", "Account Summary should not expose a blind header assignment button")
+    assertContains(src, "row.assignButton", "Account Summary unassigned rows should expose row-level assignment")
+    assertContains(src, "owner:PromptAssignAccountRow(row)", "Account Summary assign button should target its row")
+    assertContains(src, "row.renameButton", "Account Summary local account rows should expose row-level rename")
+    assertContains(src, "owner:PromptRenameLocalAccount(row.accountId)", "Account Summary rename button should target the local account row")
     assertContains(src, "setAccountSection(self.bankAccountSection", "Account Summary should use a real column renderer")
     assertContains(src, "row.account:SetPoint(\"LEFT\", row, \"LEFT\", 0, 0)", "Account Summary account column should have a fixed x position")
     assertContains(src, "row.contrib:SetJustifyH(\"RIGHT\")", "Account Summary contribution column should right-align")
@@ -612,6 +698,7 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "ledger.searchBox:SetScript(\"OnTextChanged\"", "Recent Ledger search should refresh results")
     assertContains(src, "Theme:ScrollArea(ledger)", "Recent Ledger should have an inner scrollable surface")
     assertContains(src, "ledger.searchBox:SetSize(180, 18)", "Recent Ledger search box should stay compact")
+    assertContains(src, "ledger.searchBox:SetPoint(\"LEFT\", ledger.title, \"RIGHT\", 14, 0)", "Recent Ledger search should sit on the title row")
     assertContains(src, "section.clearLedgerButton", "Recent Ledger should include a clear button")
     assertContains(src, "owner:ConfirmClearRecentLedger()", "Recent Ledger clear button should ask before hiding the ledger feed")
     assertContains(src, "StaticPopupDialogs[\"WRL_CLEAR_RECENT_LEDGER\"]", "Recent Ledger clear should use a confirmation popup")
@@ -641,6 +728,9 @@ testBankerOverviewReplacesRunSnapshotCopy()
 testRunnerDashboardShowsLoanSummary()
 testContributionActionOnlyShowsForPendingContributionRuns()
 testContributionBoardShowsLocalAccountContributionsByCharacter()
+testAccountAssignmentTextAssignsCharacterAndRequest()
+testAccountSummaryRowAssignmentTargetsSingleUnassignedCharacter()
+testAccountSummaryRowAssignmentFallsBackForMultipleCharacters()
 testBankDeskActionButtonsAreDashboardOwned()
 testBankDeskCanSelectResaleRowsByClickTarget()
 testSelectedResaleOrderDefaultsToRequesterAndFullRow()
