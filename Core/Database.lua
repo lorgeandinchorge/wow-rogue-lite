@@ -52,7 +52,7 @@ local function defaults()
         settings             = {}, -- account-wide settings; owned by Core/Settings.lua
         memorials            = {}, -- [uid] = memorial entry; owned by Core/Death.lua
         achievements         = {}, -- [achievementId] = { when, characterKey }; owned by Core/Achievements.lua
-        legacyUnlocks        = {}, -- [storage|stipend|fate] = purchased rank count
+        legacyUnlocks        = {}, -- [storage|stipend|alchemy|fate] = purchased rank count
         legacySpent          = 0,  -- copper spent from lifetime contribution budget
         accounts             = {}, -- [accountId] = { id, label, createdAt }
         accountLinks         = {}, -- [Character-Realm] = accountId

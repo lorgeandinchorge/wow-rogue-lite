@@ -37,7 +37,15 @@ local function testTocLoadsLegacyPanel()
     assertNotContains(toc, "UI/Tab_Tiers.lua", "TOC should stop loading the old Tiers tab")
 end
 
+local function testLegacyPanelSupportsFourUnlockTracks()
+    local src = readFile("UI/Tab_Legacy.lua")
+
+    assertContains(src, "local TRACK_COLS = 2", "Legacy unlocks should wrap four tracks into a visible grid")
+    assertContains(src, "track._gridIndex", "Legacy tab should position tracks from their order")
+end
+
 testMainFrameUsesSingleLegacyTab()
 testTocLoadsLegacyPanel()
+testLegacyPanelSupportsFourUnlockTracks()
 
 print("LegacyTabWiring.test.lua: ok")

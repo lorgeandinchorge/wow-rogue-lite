@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.3.8a - Achievement Lockout and Reset Hotfix. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, and Settings reset controls are in place. Bank Dashboard fulfillment is assisted with ready/missing item lines, aggregate needed-supplies reporting, optional TSM DBMarket hints, tailor-made starter bag labels, manual resale tracking, debt-first repayment accounting, account summaries, right-safe dashboard controls, and clear-confirmation flows.
+> **Status:** v0.4.0 - Legacy And Achievements Pass Begins. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, and Settings reset controls are in place. The Legacy tab now includes refreshed Stipend values, an Alchemist's Table potion track, and a two-column unlock layout.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -14,7 +14,7 @@ A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**.
 
 ### Core loop
 
-One character is your bank. Every other character is a run. When a run dies for good, its carried gold (and the value it could have vendored) flows back to the bank and becomes part of your lifetime contribution total. That total turns into spendable legacy budget you allocate into permanent unlock tracks — **Storage** (better starter bags), **Stipend** (starter gold), and **Fate** (extra lives) — that new runs can request as starter kits.
+One character is your bank. Every other character is a run. When a run dies for good, its carried gold (and the value it could have vendored) flows back to the bank and becomes part of your lifetime contribution total. That total turns into spendable legacy budget you allocate into permanent unlock tracks — **Storage** (better starter bags), **Stipend** (starter gold), **Alchemist's Table** (healing potions), and **Fate** (extra lives) — that new runs can request as starter kits.
 
 The bank itself is infrastructure, not a run. It can freely handle storage, mail, trading, the auction house, travel, and reward fulfillment.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.3.8a loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.0 loaded.` in chat.
 
 ### Quick start
 
@@ -39,7 +39,7 @@ For Requisitions Desk testing, `/wrl simrequest Tester-Realm 101` creates a loca
 
 ### How a run works
 
-**On a run character.** Open `/wrl` → **Legacy** to review lifetime contributions and spend available legacy budget into Storage, Stipend, and Fate. Open `/wrl` → **Rewards**, choose an unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually. The Dashboard also shows your current loan cap, outstanding debt, and remaining borrow room.
+**On a run character.** Open `/wrl` → **Legacy** to review lifetime contributions and spend available legacy budget into Storage, Stipend, Alchemist's Table, and Fate. Open `/wrl` → **Rewards**, choose an unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually. The Dashboard also shows your current loan cap, outstanding debt, and remaining borrow room.
 
 **On your bank character.** Open `/wrl` → **Dashboard** to use the Requisitions Desk: active request readiness, Banker Summary, aggregate Needed Supplies, account summaries, character contribution rows, loan balances, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. Use **Record Loan** or `/wrl loan borrow Character-Realm GOLD` after manually handing out gold; the addon records the paperwork but does not move gold. Use **Next Resale Item** and **Record 1 Sold** to manually record curated resale goods like Chunk of Boar Meat or Goretusk Liver. Resale pricing defaults to Auto: TSM DBMarket when available, then double vendor, then catalog fallback, and rows label the source as TSM, vendor, fallback, or unpriced; change it under gear **Settings** -> **Pricing**. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
 
@@ -59,15 +59,16 @@ Lifetime contributions become spendable legacy budget. Spending budget does not 
 
 | Track   | Costs                         | Grants                                  |
 | ------- | ----------------------------- | --------------------------------------- |
-| Storage | 3g, 10g, 25g, 75g, 250g, 750g | Better starter bags and storage support |
-| Stipend | 3g, 10g, 25g, 75g, 250g, 750g | Starter gold at each purchased rank     |
-| Fate    | 25g, 750g                     | +1 extra life at ranks 3 and 6          |
+| Storage           | 3g, 10g, 25g, 75g, 250g, 750g | Better starter bags and storage support |
+| Stipend           | 3g, 10g, 25g, 75g, 250g, 750g | Starter gold grants of 1g, 5g, 10g, 25g, 100g, and 350g |
+| Alchemist's Table | 3g, 10g, 25g, 75g, 250g, 750g | Two healing potions per rank, from Minor through Super |
+| Fate              | 25g, 750g                     | +1 extra life at ranks 3 and 6          |
 
 You can buy two ranks of Storage, come back for Stipend rank one, then later keep filling out every track. Eventually everything can be unlocked.
 
 ### Loans prototype
 
-Loans are banker-operated and manual. The addon records who borrowed, which linked account owns the debt, and how much cap remains; it does not mail or trade gold. The account borrow cap is based on the highest purchased Legacy rank across Storage, Stipend, and Fate: `floor(rank * 3 / 2)` gold, so rank 1 allows 1g and rank 2 allows 3g. Fate uses its purchased rank for this calculation.
+Loans are banker-operated and manual. The addon records who borrowed, which linked account owns the debt, and how much cap remains; it does not mail or trade gold. The account borrow cap is based on the highest purchased Legacy rank across the unlock tracks: `floor(rank * 3 / 2)` gold, so rank 1 allows 1g and rank 2 allows 3g. Fate uses its purchased rank for this calculation.
 
 When a character with outstanding account debt contributes money, the addon applies that credit to loan repayment first. Only money above the remaining debt becomes normal contribution progress.
 

@@ -1,13 +1,13 @@
 -- Core/LegacyUnlocks.lua
 -- Account-wide spendable legacy progression. Lifetime contributions create a
--- budget; players spend that budget into Storage, Stipend, and Fate tracks.
+-- budget; players spend that budget into Storage, Stipend, Alchemy, and Fate tracks.
 
 local ADDON_NAME, ns = ...
 local L = ns:NewModule("LegacyUnlocks")
 
 local function g(gold) return gold * 10000 end
 
-local TRACK_ORDER = { "storage", "stipend", "fate" }
+local TRACK_ORDER = { "storage", "stipend", "alchemy", "fate" }
 
 local TRACK_DEFS = {
     storage = {
@@ -34,6 +34,19 @@ local TRACK_DEFS = {
             { rank = 4, nodeId = 204, cost = g(75),  bundleId = "stipend_4", name = "Campaign Fund" },
             { rank = 5, nodeId = 205, cost = g(250), bundleId = "stipend_5", name = "Epic Reserve" },
             { rank = 6, nodeId = 206, cost = g(750), bundleId = "stipend_6", name = "Legacy Treasury" },
+        },
+    },
+    alchemy = {
+        id = "alchemy",
+        name = "Alchemist's Table",
+        blurb = "Healing potions prepared for each fresh attempt.",
+        nodes = {
+            { rank = 1, nodeId = 401, cost = g(3),   bundleId = "alchemy_1", name = "Minor Draughts" },
+            { rank = 2, nodeId = 402, cost = g(10),  bundleId = "alchemy_2", name = "Lesser Draughts" },
+            { rank = 3, nodeId = 403, cost = g(25),  bundleId = "alchemy_3", name = "Healing Draughts" },
+            { rank = 4, nodeId = 404, cost = g(75),  bundleId = "alchemy_4", name = "Greater Draughts" },
+            { rank = 5, nodeId = 405, cost = g(250), bundleId = "alchemy_5", name = "Superior Draughts" },
+            { rank = 6, nodeId = 406, cost = g(750), bundleId = "alchemy_6", name = "Super Draughts" },
         },
     },
     fate = {

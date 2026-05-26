@@ -63,6 +63,7 @@ local function testDefaultsStartUnspent()
 
     assertEqual(ns.LegacyUnlocks:GetRank("storage"), 0, "storage starts locked")
     assertEqual(ns.LegacyUnlocks:GetRank("stipend"), 0, "stipend starts locked")
+    assertEqual(ns.LegacyUnlocks:GetRank("alchemy"), 0, "alchemy starts locked")
     assertEqual(ns.LegacyUnlocks:GetRank("fate"), 0, "fate starts locked")
     assertEqual(ns.LegacyUnlocks:Spent(), 0, "legacy spent starts at zero")
     assertEqual(ns.LegacyUnlocks:AvailableBudget(), 0, "available budget starts at zero")
@@ -120,9 +121,78 @@ local function testActiveNodeIdsAndRewardsReflectUnlockedTracks()
     assertEqual(nodeIds[4], 301, "fate node 1 fourth")
 
     local bundle = ns.Rewards:BuildRewardForTierIds(nodeIds, "Runner-Realm")
-    assertEqual(bundle.gold, 30000, "stipend rank 1 grants 3g")
+    assertEqual(bundle.gold, 10000, "stipend rank 1 grants 1g")
     assertEqual(bundle.extraLives, 1, "fate rank 1 grants one life")
     assertEqual(#bundle.items, 2, "storage ranks merge two bag item types")
+end
+
+local function testStipendBundlesMatchLegacyPassValues()
+    local ns = resetHarness()
+    local expected = {
+        stipend_1 = 10000,
+        stipend_2 = 50000,
+        stipend_3 = 100000,
+        stipend_4 = 250000,
+        stipend_5 = 1000000,
+        stipend_6 = 3500000,
+    }
+
+    for bundleId, expectedGold in pairs(expected) do
+        local bundle = ns.Rewards:GetBundle(bundleId)
+        assertEqual(bundle.gold, expectedGold, bundleId .. " gold matches 0.4 stipend values")
+        assertEqual(#bundle.items, 0, bundleId .. " remains gold-only")
+        assertEqual(bundle.extraLives, 0, bundleId .. " does not grant lives")
+    end
+end
+
+local function testAlchemistsTableUnlocksPotionRanks()
+    local ns = resetHarness()
+    WRL_DB.totalContributed = 130000
+
+    local track = ns.LegacyUnlocks:TrackDef("alchemy")
+    assertTrue(track, "alchemy track exists")
+    assertEqual(track.name, "Alchemist's Table", "alchemy track has user-facing name")
+    assertEqual(ns.LegacyUnlocks:MaxRank("alchemy"), 6, "alchemy has six ranks")
+
+    assertTrue(ns.LegacyUnlocks:Unlock("alchemy"), "alchemy rank 1 unlocks")
+    assertTrue(ns.LegacyUnlocks:Unlock("alchemy"), "alchemy rank 2 unlocks")
+    assertEqual(ns.LegacyUnlocks:GetRank("alchemy"), 2, "alchemy rank increments independently")
+    assertEqual(ns.LegacyUnlocks:Spent(), 130000, "alchemy uses the standard rank cost ladder")
+
+    local nodeIds = ns.LegacyUnlocks:ActiveNodeIds()
+    assertEqual(nodeIds[1], 401, "alchemy rank 1 node is active")
+    assertEqual(nodeIds[2], 402, "alchemy rank 2 node is active")
+
+    local bundle = ns.Rewards:BuildRewardForTierIds(nodeIds, "Runner-Realm")
+    assertEqual(#bundle.items, 2, "two potion types are merged from two ranks")
+    assertEqual(bundle.items[1].id, 118, "rank 1 grants Minor Healing Potion")
+    assertEqual(bundle.items[1].qty, 2, "rank 1 grants two potions")
+    assertEqual(bundle.items[2].id, 858, "rank 2 grants Lesser Healing Potion")
+    assertEqual(bundle.items[2].qty, 2, "rank 2 grants two potions")
+    assertEqual(bundle.gold, 0, "alchemy grants no gold")
+    assertEqual(bundle.extraLives, 0, "alchemy grants no lives")
+end
+
+local function testAlchemistsTableBundlesUsePotionProgression()
+    local ns = resetHarness()
+    local expected = {
+        { id = "alchemy_1", itemId = 118,   note = "Minor Healing Potion" },
+        { id = "alchemy_2", itemId = 858,   note = "Lesser Healing Potion" },
+        { id = "alchemy_3", itemId = 929,   note = "Healing Potion" },
+        { id = "alchemy_4", itemId = 1710,  note = "Greater Healing Potion" },
+        { id = "alchemy_5", itemId = 3928,  note = "Superior Healing Potion" },
+        { id = "alchemy_6", itemId = 22829, note = "Super Healing Potion" },
+    }
+
+    for _, spec in ipairs(expected) do
+        local bundle = ns.Rewards:GetBundle(spec.id)
+        assertEqual(#bundle.items, 1, spec.id .. " has one potion item")
+        assertEqual(bundle.items[1].id, spec.itemId, spec.id .. " item id matches potion ladder")
+        assertEqual(bundle.items[1].qty, 2, spec.id .. " grants two potions")
+        assertEqual(bundle.items[1].note, spec.note, spec.id .. " note names the potion")
+        assertEqual(bundle.gold, 0, spec.id .. " grants no gold")
+        assertEqual(bundle.extraLives, 0, spec.id .. " grants no lives")
+    end
 end
 
 local function testResetUnlocksRefundsBudget()
@@ -152,6 +222,9 @@ testDefaultsStartUnspent()
 testUnlockSpendsBudgetAndRequiresSequentialRanks()
 testCanGoBackToAnotherTrackWhenBudgetArrives()
 testActiveNodeIdsAndRewardsReflectUnlockedTracks()
+testStipendBundlesMatchLegacyPassValues()
+testAlchemistsTableUnlocksPotionRanks()
+testAlchemistsTableBundlesUsePotionProgression()
 testResetUnlocksRefundsBudget()
 testFateMilestonesUseRankThreeAndSixCosts()
 

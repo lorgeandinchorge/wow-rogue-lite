@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.4.0
+
+- Start the Legacy and Achievements pass with a refreshed Legacy economy surface.
+- Rebalance Stipend rewards to the new 1g, 5g, 10g, 25g, 100g, and 350g grant ladder while preserving existing unlock costs.
+- Add the **Alchemist's Table** Legacy track, granting two healing potions per rank from Minor Healing Potion through Super Healing Potion.
+- Wrap the Legacy unlock section into a two-column grid so Storage, Stipend, Alchemist's Table, and Fate all remain visible.
+- Add regression coverage for Stipend values, Alchemist's Table potion rewards, and the four-track Legacy layout.
+
 ## v0.3.8b
 
 - Move Account Summary assignment actions onto the relevant rows so Unassigned rows open targeted assignment when there is one obvious character.

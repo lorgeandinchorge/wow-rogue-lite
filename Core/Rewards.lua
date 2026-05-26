@@ -10,6 +10,7 @@
 --   allowPotionRewards  (bool) – default true; set false to strip potions
 --
 -- Item IDs (BC-era):
+--   Minor Healing Pot   = 118
 --   Linen Bag           = 4496   (6-slot)
 --   Small Silk Pack     = 4245   (10-slot)
 --   Mageweave Bag       = 10050  (12-slot)
@@ -17,6 +18,7 @@
 --   Netherweave Bag     = 21841  (16-slot)
 --   Lesser Healing Pot  = 858
 --   Healing Potion      = 929
+--   Greater Healing Pot = 1710
 --   Superior Healing Pot= 3928
 --   Super Healing Potion= 22829
 --
@@ -84,37 +86,85 @@ local BUNDLE_DEFS = {
     {
         id = "stipend_1",
         items = {},
-        gold = g(3),
+        gold = g(1),
         extraLives = 0,
     },
     {
         id = "stipend_2",
         items = {},
-        gold = g(10),
+        gold = g(5),
         extraLives = 0,
     },
     {
         id = "stipend_3",
         items = {},
-        gold = g(25),
+        gold = g(10),
         extraLives = 0,
     },
     {
         id = "stipend_4",
         items = {},
-        gold = g(75),
+        gold = g(25),
         extraLives = 0,
     },
     {
         id = "stipend_5",
         items = {},
-        gold = g(250),
+        gold = g(100),
         extraLives = 0,
     },
     {
         id = "stipend_6",
         items = {},
-        gold = g(750),
+        gold = g(350),
+        extraLives = 0,
+    },
+    {
+        id = "alchemy_1",
+        items = {
+            { id = 118, qty = 2, note = "Minor Healing Potion" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "alchemy_2",
+        items = {
+            { id = 858, qty = 2, note = "Lesser Healing Potion" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "alchemy_3",
+        items = {
+            { id = 929, qty = 2, note = "Healing Potion" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "alchemy_4",
+        items = {
+            { id = 1710, qty = 2, note = "Greater Healing Potion" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "alchemy_5",
+        items = {
+            { id = 3928, qty = 2, note = "Superior Healing Potion" },
+        },
+        gold = 0,
+        extraLives = 0,
+    },
+    {
+        id = "alchemy_6",
+        items = {
+            { id = 22829, qty = 2, note = "Super Healing Potion" },
+        },
+        gold = 0,
         extraLives = 0,
     },
     {

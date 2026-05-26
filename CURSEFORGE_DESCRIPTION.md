@@ -13,7 +13,7 @@ It is part hardcore challenge, part account progression, and part self-made meta
 - Final death retires a run.
 - Retired runs contribute value back into the account.
 - Lifetime contributions become spendable legacy budget.
-- New runs can request unlocked Storage, Stipend, and Fate rewards from the bank.
+- New runs can request unlocked Storage, Stipend, Alchemist's Table, and Fate rewards from the bank.
 
 ## What The Addon Tracks
 
@@ -30,12 +30,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.3.8a - Achievement Lockout And Reset Hotfix
+### Latest Update: v0.4.0 - Legacy And Achievements Pass Begins
 
-- Dead, contribution-pending, retired, and archived run characters can no longer earn normal achievements after the run is over.
-- Final death still awards the final-death achievement at the correct transition.
-- Settings now includes a Resets surface with separate confirmed resets for achievements, legacy progression, and ledger/economy data.
-- The resets are intentionally separate from characters, memorials, request queues, UI settings, pricing preferences, and rule profiles.
+- Stipend rewards now use the refreshed 1g, 5g, 10g, 25g, 100g, and 350g grant ladder.
+- Alchemist's Table adds a new Legacy potion track with two healing potions per rank.
+- The Legacy unlock surface now wraps into a two-column layout so all four tracks stay visible.
+- Regression coverage now locks down Stipend values, potion rewards, and the four-track Legacy layout.
 
 ### Bank And Run Structure
 
@@ -75,6 +75,7 @@ You are not just deleting characters and starting over. You are building a linea
 
 - Storage: better bags
 - Stipend: starter gold
+- Alchemist's Table: healing potions
 - Fate: rare extra lives
 
 Each death still matters, but it also helps push the account forward.

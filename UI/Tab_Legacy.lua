@@ -6,8 +6,10 @@ local Tab = ns:NewModule("Tab_Legacy")
 
 local NODE_H = 74
 local ROW_H = 54
-local TRACK_W = 224
-local TRACK_GAP = 14
+local TRACK_W = 340
+local TRACK_GAP = 18
+local TRACK_COLS = 2
+local TRACK_ROW_GAP = 22
 
 local CLASS_ICON_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 local CLASS_ICON_TCOORDS = {
@@ -244,13 +246,18 @@ function Tab:Init(parent)
     self.unlockTitle:SetText("Permanent Unlocks")
 
     self.tracks = {}
-    local x = 0
+    local index = 1
     if ns.LegacyUnlocks and ns.LegacyUnlocks.TrackOrder then
         for _, trackId in ipairs(ns.LegacyUnlocks:TrackOrder()) do
             local track = buildTrack(content, Theme)
-            track:SetPoint("TOPLEFT", content, "TOPLEFT", x, -24)
+            track._gridIndex = index
+            local col = (index - 1) % TRACK_COLS
+            local rowBand = math.floor((index - 1) / TRACK_COLS)
+            local x = col * (TRACK_W + TRACK_GAP)
+            local y = 24 + rowBand * (44 + (NODE_H + 6) * 6 + TRACK_ROW_GAP)
+            track:SetPoint("TOPLEFT", content, "TOPLEFT", x, -y)
             self.tracks[trackId] = track
-            x = x + TRACK_W + TRACK_GAP
+            index = index + 1
         end
     end
 
@@ -285,6 +292,15 @@ function Tab:_RefreshUnlocks(startY)
         local def = L:TrackDef(trackId)
         local track = self.tracks[trackId]
         if def and track then
+            local gridIndex = track._gridIndex or 1
+            local col = (gridIndex - 1) % TRACK_COLS
+            local rowBand = math.floor((gridIndex - 1) / TRACK_COLS)
+            local x = col * (TRACK_W + TRACK_GAP)
+            local baseY = startY + 24 + rowBand * (44 + (NODE_H + 6) * 6 + TRACK_ROW_GAP)
+
+            track:ClearAllPoints()
+            track:SetPoint("TOPLEFT", self.content, "TOPLEFT", x, -baseY)
+
             local rank = L:GetRank(trackId)
             local maxRank = L:MaxRank(trackId)
             track.title:SetText(def.name)
@@ -367,7 +383,7 @@ function Tab:_RefreshUnlocks(startY)
             for i = visualRows + 1, #track.rows do track.rows[i]:Hide() end
             for i = visualRows + 1, #track.spacers do track.spacers[i]:Hide() end
             track:SetHeight(y)
-            if startY + 24 + y > maxY then maxY = startY + 24 + y end
+            if baseY + y > maxY then maxY = baseY + y end
         end
     end
 
