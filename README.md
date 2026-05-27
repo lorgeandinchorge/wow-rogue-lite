@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.4.0 - Legacy And Achievements Pass Begins. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, and Settings reset controls are in place. The Legacy tab now includes refreshed Stipend values, an Alchemist's Table potion track, and a two-column unlock layout.
+> **Status:** v0.4.0a - Legacy Unlock Readability Hotfix. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, and Settings reset controls are in place. The Legacy tab now includes refreshed Stipend values, an Alchemist's Table potion track, side-by-side vertical unlock ladders, and an Unlocks available progress readout.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.0 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.0a loaded.` in chat.
 
 ### Quick start
 
@@ -64,7 +64,7 @@ Lifetime contributions become spendable legacy budget. Spending budget does not 
 | Alchemist's Table | 3g, 10g, 25g, 75g, 250g, 750g | Two healing potions per rank, from Minor through Super |
 | Fate              | 25g, 750g                     | +1 extra life at ranks 3 and 6          |
 
-You can buy two ranks of Storage, come back for Stipend rank one, then later keep filling out every track. Eventually everything can be unlocked.
+You can buy two ranks of Storage, come back for Stipend rank one, then later keep filling out every track. Eventually everything can be unlocked. The Legacy tab shows Storage, Stipend, Alchemist's Table, and Fate side by side with vertical rank ladders plus an **Unlocks available: X / Y** summary.
 
 ### Loans prototype
 

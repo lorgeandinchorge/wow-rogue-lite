@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.4.0a
+
+- Polish the Legacy permanent-unlock surface so Storage, Stipend, Alchemist's Table, and Fate line up side by side with vertical square-tile progress ladders.
+- Add a simple **Unlocks available: X / Y** readout under Permanent Unlocks for quick progress scanning.
+- Move detailed reward previews into tile tooltips to keep the main Legacy view readable.
+- Add regression coverage for the side-by-side vertical unlock layout and availability summary.
+
 ## v0.4.0
 
 - Start the Legacy and Achievements pass with a refreshed Legacy economy surface.

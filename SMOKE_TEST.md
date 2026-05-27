@@ -99,7 +99,7 @@ If you only have 10 to 15 minutes, please do this section.
   Expected: it clearly explains this is where starter reward request mail is prepared.
 
 - [ ] Open the Legacy tab and unlock an affordable Storage, Stipend, Alchemist's Table, or Fate node if budget is available.
-  Expected: available budget decreases, the node becomes unlocked, and the UI refreshes cleanly.
+  Expected: available budget decreases, the node becomes unlocked, **Unlocks available** increments, and the UI refreshes cleanly.
 
 - [ ] Open gear Settings and find **Run Modifiers**.
   Expected: boons and burdens appear there, not inside the Rewards tab.
@@ -196,8 +196,9 @@ If you want to go deeper, these are the main areas to cover.
 ### D. Rewards And Progression
 
 - [ ] Lifetime, spent, and available budget look correct.
-- [ ] Storage, Stipend, Alchemist's Table, and Fate track states look correct.
-- [ ] Reward previews make sense.
+- [ ] Storage, Stipend, Alchemist's Table, and Fate line up side by side with vertical unlock ladders.
+- [ ] The **Unlocks available: X / Y** summary matches purchased unlocks.
+- [ ] Reward previews make sense in tile tooltips.
 - [ ] Claimed or locked rewards are shown clearly.
 - [ ] Repeat-claim behavior matches the UI.
 

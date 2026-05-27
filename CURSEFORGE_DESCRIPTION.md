@@ -30,12 +30,12 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.0 - Legacy And Achievements Pass Begins
+### Latest Update: v0.4.0a - Legacy Unlock Readability Hotfix
 
-- Stipend rewards now use the refreshed 1g, 5g, 10g, 25g, 100g, and 350g grant ladder.
-- Alchemist's Table adds a new Legacy potion track with two healing potions per rank.
-- The Legacy unlock surface now wraps into a two-column layout so all four tracks stay visible.
-- Regression coverage now locks down Stipend values, potion rewards, and the four-track Legacy layout.
+- Storage, Stipend, Alchemist's Table, and Fate now line up side by side with vertical square-tile unlock ladders.
+- Permanent Unlocks now shows a simple **Unlocks available: X / Y** progress readout.
+- Reward details live in tile tooltips so the main Legacy view stays readable.
+- Regression coverage now locks down the side-by-side vertical layout and availability summary.
 
 ### Bank And Run Structure
 

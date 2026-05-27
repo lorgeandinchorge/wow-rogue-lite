@@ -40,7 +40,10 @@ end
 local function testLegacyPanelSupportsFourUnlockTracks()
     local src = readFile("UI/Tab_Legacy.lua")
 
-    assertContains(src, "local TRACK_COLS = 2", "Legacy unlocks should wrap four tracks into a visible grid")
+    assertContains(src, "local TRACK_COLS = 4", "Legacy unlock tracks should line up side by side")
+    assertContains(src, "local TILE_COLS = 1", "Legacy unlock tracks should render a vertical square-tile stack per track")
+    assertContains(src, "buildTile", "Legacy unlock ranks should use compact tiles instead of tall rows")
+    assertContains(src, "Unlocks available: %d / %d", "Legacy tab should show a simple available unlock count")
     assertContains(src, "track._gridIndex", "Legacy tab should position tracks from their order")
 end
 

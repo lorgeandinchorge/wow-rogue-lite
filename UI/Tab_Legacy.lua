@@ -4,12 +4,14 @@
 local ADDON_NAME, ns = ...
 local Tab = ns:NewModule("Tab_Legacy")
 
-local NODE_H = 74
+local TILE_W = 132
+local TILE_H = 88
+local TILE_GAP = 8
+local TILE_COLS = 1
 local ROW_H = 54
-local TRACK_W = 340
+local TRACK_W = 162
 local TRACK_GAP = 18
-local TRACK_COLS = 2
-local TRACK_ROW_GAP = 22
+local TRACK_COLS = 4
 
 local CLASS_ICON_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 local CLASS_ICON_TCOORDS = {
@@ -69,12 +71,35 @@ local function nodeRewardSummary(node)
     return table.concat(parts, "  -  ")
 end
 
+local function tileTitle(node)
+    local rankText = node.milestone and ("T" .. tostring(node.milestone)) or ("R" .. tostring(node.rank or "?"))
+    return ("%s\n%s"):format(rankText, node.name or "Unlock")
+end
+
+local function unlockAvailability(L)
+    local unlocked = 0
+    local total = 0
+    if not L or not L.TrackOrder then return unlocked, total end
+
+    for _, trackId in ipairs(L:TrackOrder()) do
+        local def = L:TrackDef(trackId)
+        local nodes = def and def.nodes or {}
+        total = total + #nodes
+        if L.GetRank then
+            unlocked = unlocked + math.min(L:GetRank(trackId) or 0, #nodes)
+        end
+    end
+
+    return unlocked, total
+end
+
 local function buildTrack(parent, Theme)
     local f = CreateFrame("Frame", nil, parent)
     f:SetWidth(TRACK_W)
 
     f.title = Theme:Text(f, 14, Theme.c.goldH)
     f.title:SetPoint("TOPLEFT", 0, 0)
+    f.title:SetWidth(TRACK_W - 38)
 
     f.rank = Theme:Text(f, 10, Theme.c.gold)
     f.rank:SetPoint("TOPRIGHT", 0, -2)
@@ -90,32 +115,29 @@ local function buildTrack(parent, Theme)
     return f
 end
 
-local function buildNode(parent, Theme)
+local function buildTile(parent, Theme)
     local r = CreateFrame("Button", nil, parent)
-    r:SetHeight(NODE_H)
+    r:SetSize(TILE_W, TILE_H)
     Theme:Fill(r, Theme.c.bg1, false)
 
     r.dot = r:CreateTexture(nil, "ARTWORK")
-    r.dot:SetSize(10, 10)
-    r.dot:SetPoint("TOPLEFT", 10, -12)
+    r.dot:SetSize(8, 8)
+    r.dot:SetPoint("TOPLEFT", 9, -9)
 
-    r.title = Theme:Text(r, 12, Theme.c.fg)
-    r.title:SetPoint("TOPLEFT", r.dot, "TOPRIGHT", 8, 1)
-    r.title:SetWidth(TRACK_W - 98)
+    r.title = Theme:Text(r, 11, Theme.c.fg)
+    r.title:SetPoint("TOPLEFT", 9, -22)
+    r.title:SetWidth(TILE_W - 18)
     r.title:SetJustifyH("LEFT")
 
     r.cost = Theme:Text(r, 10, Theme.c.gold)
-    r.cost:SetPoint("TOPRIGHT", -10, -12)
-    r.cost:SetJustifyH("RIGHT")
-
-    r.reward = Theme:Text(r, 10, Theme.c.fg2)
-    r.reward:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -5)
-    r.reward:SetWidth(TRACK_W - 28)
-    r.reward:SetJustifyH("LEFT")
+    r.cost:SetPoint("BOTTOMLEFT", 9, 20)
+    r.cost:SetWidth(TILE_W - 18)
+    r.cost:SetJustifyH("LEFT")
 
     r.state = Theme:Text(r, 9, Theme.c.fg2)
-    r.state:SetPoint("BOTTOMRIGHT", -10, 8)
-    r.state:SetJustifyH("RIGHT")
+    r.state:SetPoint("BOTTOMLEFT", 9, 7)
+    r.state:SetWidth(TILE_W - 18)
+    r.state:SetJustifyH("LEFT")
 
     r:SetScript("OnClick", function(row)
         if not row._affordable or not row._trackId then return end
@@ -133,15 +155,28 @@ local function buildNode(parent, Theme)
         end
     end)
 
+    r:SetScript("OnEnter", function(row)
+        if not GameTooltip or not row._node then return end
+        GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(row._node.name or "Legacy Unlock")
+        GameTooltip:AddLine(nodeRewardSummary(row._node), 0.85, 0.78, 0.62, true)
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function()
+        if GameTooltip then GameTooltip:Hide() end
+    end)
+
     return r
 end
 
 local function buildSpacer(parent, Theme)
     local r = CreateFrame("Frame", nil, parent)
-    r:SetHeight(NODE_H)
+    r:SetSize(TILE_W, TILE_H)
 
-    r.label = Theme:Text(r, 10, Theme.c.fg2)
+    r.label = Theme:Text(r, 9, Theme.c.fg2)
     r.label:SetPoint("CENTER", r, "CENTER", 0, 0)
+    r.label:SetWidth(TILE_W - 12)
+    r.label:SetJustifyH("CENTER")
     r.label:SetAlpha(0.45)
 
     return r
@@ -245,6 +280,11 @@ function Tab:Init(parent)
     self.unlockTitle:SetPoint("TOPLEFT", 0, 0)
     self.unlockTitle:SetText("Permanent Unlocks")
 
+    self.unlockAvailability = Theme:Text(content, 10, Theme.c.fg2)
+    self.unlockAvailability:SetPoint("TOPLEFT", self.unlockTitle, "BOTTOMLEFT", 0, -4)
+    self.unlockAvailability:SetWidth(320)
+    self.unlockAvailability:SetJustifyH("LEFT")
+
     self.tracks = {}
     local index = 1
     if ns.LegacyUnlocks and ns.LegacyUnlocks.TrackOrder then
@@ -254,7 +294,7 @@ function Tab:Init(parent)
             local col = (index - 1) % TRACK_COLS
             local rowBand = math.floor((index - 1) / TRACK_COLS)
             local x = col * (TRACK_W + TRACK_GAP)
-            local y = 24 + rowBand * (44 + (NODE_H + 6) * 6 + TRACK_ROW_GAP)
+            local y = 24 + rowBand * (48 + (TILE_H + TILE_GAP) * 6 + TRACK_GAP)
             track:SetPoint("TOPLEFT", content, "TOPLEFT", x, -y)
             self.tracks[trackId] = track
             index = index + 1
@@ -287,7 +327,12 @@ function Tab:_RefreshUnlocks(startY)
     local L = ns.LegacyUnlocks
     if not L then return startY end
 
-    local maxY = startY + 24
+    local unlockedCount, totalCount = unlockAvailability(L)
+    if self.unlockAvailability then
+        self.unlockAvailability:SetText(("Unlocks available: %d / %d"):format(unlockedCount, totalCount))
+    end
+
+    local maxY = startY + 42
     for _, trackId in ipairs(L:TrackOrder()) do
         local def = L:TrackDef(trackId)
         local track = self.tracks[trackId]
@@ -296,7 +341,7 @@ function Tab:_RefreshUnlocks(startY)
             local col = (gridIndex - 1) % TRACK_COLS
             local rowBand = math.floor((gridIndex - 1) / TRACK_COLS)
             local x = col * (TRACK_W + TRACK_GAP)
-            local baseY = startY + 24 + rowBand * (44 + (NODE_H + 6) * 6 + TRACK_ROW_GAP)
+            local baseY = startY + 42 + rowBand * (48 + (TILE_H + TILE_GAP) * 6 + TRACK_GAP)
 
             track:ClearAllPoints()
             track:SetPoint("TOPLEFT", self.content, "TOPLEFT", x, -baseY)
@@ -307,13 +352,17 @@ function Tab:_RefreshUnlocks(startY)
             track.rank:SetText(("%d / %d"):format(rank, maxRank))
             track.blurb:SetText(def.blurb or "")
 
-            local y = 44
+            local y = 48
             local nodeIndex = 1
             local visualRows = trackId == "fate" and 6 or #(def.nodes or {})
             for visualRank = 1, visualRows do
                 local node = (def.nodes or {})[nodeIndex]
                 local nodeVisualRank = node and (node.milestone or node.rank) or nil
                 local hasNode = node and nodeVisualRank == visualRank
+                local tileCol = (visualRank - 1) % TILE_COLS
+                local tileRow = math.floor((visualRank - 1) / TILE_COLS)
+                local tileX = tileCol * (TILE_W + TILE_GAP)
+                local tileY = y + tileRow * (TILE_H + TILE_GAP)
 
                 if not hasNode then
                     if not track.spacers[visualRank] then
@@ -321,16 +370,14 @@ function Tab:_RefreshUnlocks(startY)
                     end
                     local spacer = track.spacers[visualRank]
                     spacer:ClearAllPoints()
-                    spacer:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -y)
-                    spacer:SetPoint("RIGHT", track, "RIGHT", 0, 0)
-                    spacer.label:SetText(("Rank %d - No Fate unlock"):format(visualRank))
+                    spacer:SetPoint("TOPLEFT", track, "TOPLEFT", tileX, -tileY)
+                    spacer.label:SetText(("Rank %d\nNo unlock"):format(visualRank))
                     spacer:Show()
                     if track.rows[visualRank] then track.rows[visualRank]:Hide() end
-                    y = y + NODE_H + 6
                 else
                     if track.spacers[visualRank] then track.spacers[visualRank]:Hide() end
                     if not track.rows[visualRank] then
-                        track.rows[visualRank] = buildNode(track, Theme)
+                        track.rows[visualRank] = buildTile(track, Theme)
                     end
 
                     local row = track.rows[visualRank]
@@ -343,8 +390,7 @@ function Tab:_RefreshUnlocks(startY)
                     row._trackName = def.name
                     row._affordable = affordable
                     row:ClearAllPoints()
-                    row:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -y)
-                    row:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+                    row:SetPoint("TOPLEFT", track, "TOPLEFT", tileX, -tileY)
                     row:Show()
 
                     if unlocked then
@@ -355,12 +401,12 @@ function Tab:_RefreshUnlocks(startY)
                     elseif affordable then
                         row:SetAlpha(1)
                         row.dot:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 1)
-                        row.state:SetText("CLICK TO UNLOCK")
+                        row.state:SetText("UNLOCK")
                         setTextColor(row.state, Theme.c.gold, 1)
                     elseif nextAvailable then
                         row:SetAlpha(0.78)
                         row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.65)
-                        row.state:SetText("NEED BUDGET")
+                        row.state:SetText("NEED GOLD")
                         setTextColor(row.state, Theme.c.fg2, 0.85)
                     else
                         row:SetAlpha(0.45)
@@ -369,19 +415,16 @@ function Tab:_RefreshUnlocks(startY)
                         setTextColor(row.state, Theme.c.fg2, 0.75)
                     end
 
-                    row.title:SetText((node.milestone and ("Tier %d - %s") or ("Rank %d - %s"))
-                        :format(node.milestone or node.rank, node.name or "Unlock"))
+                    row.title:SetText(tileTitle(node))
                     row.cost:SetText(money(node.cost or 0))
-                    row.reward:SetText(nodeRewardSummary(node))
                     setTextColor(row.title, unlocked and Theme.c.fg or Theme.c.fg2, unlocked and 1 or 0.95)
-                    setTextColor(row.reward, Theme.c.fg2, unlocked and 1 or 0.82)
 
                     nodeIndex = nodeIndex + 1
-                    y = y + NODE_H + 6
                 end
             end
             for i = visualRows + 1, #track.rows do track.rows[i]:Hide() end
             for i = visualRows + 1, #track.spacers do track.spacers[i]:Hide() end
+            y = y + math.ceil(visualRows / TILE_COLS) * (TILE_H + TILE_GAP)
             track:SetHeight(y)
             if baseY + y > maxY then maxY = baseY + y end
         end
