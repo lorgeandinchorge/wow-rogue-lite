@@ -122,7 +122,7 @@ local BUNDLE_DEFS = {
     {
         id = "alchemy_1",
         items = {
-            { id = 118, qty = 2, note = "Minor Healing Potion" },
+            { id = 118, qty = 5, note = "Minor Healing Potion" },
         },
         gold = 0,
         extraLives = 0,
@@ -130,7 +130,7 @@ local BUNDLE_DEFS = {
     {
         id = "alchemy_2",
         items = {
-            { id = 858, qty = 2, note = "Lesser Healing Potion" },
+            { id = 858, qty = 5, note = "Lesser Healing Potion" },
         },
         gold = 0,
         extraLives = 0,
@@ -138,7 +138,7 @@ local BUNDLE_DEFS = {
     {
         id = "alchemy_3",
         items = {
-            { id = 929, qty = 2, note = "Healing Potion" },
+            { id = 929, qty = 5, note = "Healing Potion" },
         },
         gold = 0,
         extraLives = 0,
@@ -146,7 +146,7 @@ local BUNDLE_DEFS = {
     {
         id = "alchemy_4",
         items = {
-            { id = 1710, qty = 2, note = "Greater Healing Potion" },
+            { id = 1710, qty = 5, note = "Greater Healing Potion" },
         },
         gold = 0,
         extraLives = 0,
@@ -154,7 +154,7 @@ local BUNDLE_DEFS = {
     {
         id = "alchemy_5",
         items = {
-            { id = 3928, qty = 2, note = "Superior Healing Potion" },
+            { id = 3928, qty = 5, note = "Superior Healing Potion" },
         },
         gold = 0,
         extraLives = 0,
@@ -162,7 +162,7 @@ local BUNDLE_DEFS = {
     {
         id = "alchemy_6",
         items = {
-            { id = 22829, qty = 2, note = "Super Healing Potion" },
+            { id = 22829, qty = 5, note = "Super Healing Potion" },
         },
         gold = 0,
         extraLives = 0,

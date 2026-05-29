@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.4.0b
+
+- Continue the 0.4 Legacy Revamp with talent-style circular unlock nodes, connector lines, and an **Available Legacy Rewards** summary.
+- Rename Legacy tracks to Storage Vault, Starter Stipend, Alchemist's Table, and Fate Loom, with two-word rank titles across the board.
+- Increase Alchemist's Table potion grants to five potions per unlocked rank.
+- Add selectable death sounds under Settings, defaulting to Dark Souls, with Off and Random options.
+- Expand achievements with 10-level milestones through 70, death-decade milestones, `Insert Coin` for the first extra life used, and death-count milestones for 1, 10, 50, and 100 deaths.
+
 ## v0.4.0a
 
 - Polish the Legacy permanent-unlock surface so Storage, Stipend, Alchemist's Table, and Fate line up side by side with vertical square-tile progress ladders.

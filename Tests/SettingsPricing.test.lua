@@ -43,6 +43,14 @@ local function testSettingsDefaultIncludesAutoResalePricing()
     assertEqual(ns.Settings:Get("pricing.resaleSource"), "auto", "resale pricing defaults to auto")
 end
 
+local function testSettingsDefaultIncludesDarkSoulsDeathSound()
+    local ns = resetHarness()
+
+    ns.Settings:Init()
+
+    assertEqual(ns.Settings:Get("deathSound"), "dark_souls", "death sound defaults to Dark Souls")
+end
+
 local function testSettingsUINamesPricingControls()
     local src = readFile("UI/SettingsPopup.lua")
 
@@ -52,7 +60,18 @@ local function testSettingsUINamesPricingControls()
     assertContains(src, "pricing.resaleSource", "Settings should persist resale pricing preference")
 end
 
+local function testSettingsUINamesDeathSoundControls()
+    local src = readFile("UI/SettingsPopup.lua")
+
+    assertContains(src, "Death Sound", "Settings should include death sound section")
+    assertContains(src, "WRL_SettingsDeathSoundDropdown", "Settings should create death sound dropdown")
+    assertContains(src, "deathSound", "Settings should persist death sound preference")
+    assertContains(src, "DeathSoundOptions", "Settings should use death module sound options")
+end
+
 testSettingsDefaultIncludesAutoResalePricing()
+testSettingsDefaultIncludesDarkSoulsDeathSound()
 testSettingsUINamesPricingControls()
+testSettingsUINamesDeathSoundControls()
 
 print("SettingsPricing.test.lua: ok")

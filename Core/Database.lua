@@ -52,6 +52,7 @@ local function defaults()
         settings             = {}, -- account-wide settings; owned by Core/Settings.lua
         memorials            = {}, -- [uid] = memorial entry; owned by Core/Death.lua
         achievements         = {}, -- [achievementId] = { when, characterKey }; owned by Core/Achievements.lua
+        deathCount           = 0,  -- account-wide soft + final deaths; owned by Core/Death.lua
         legacyUnlocks        = {}, -- [storage|stipend|alchemy|fate] = purchased rank count
         legacySpent          = 0,  -- copper spent from lifetime contribution budget
         accounts             = {}, -- [accountId] = { id, label, createdAt }
@@ -94,6 +95,7 @@ local function newCharRecord(key)
         livesRemaining = 1,          -- future: higher tiers grant +1
         retiredAt      = nil,
         deathLog       = {},         -- { { when, level, zone, subzone } }
+        deathCount     = 0,          -- soft + final deaths for achievement milestones
         claimedTiers     = {},         -- [tierId] = { when, requestId, fulfilledBy, method }
         runSettings      = {},         -- per-run setting overrides; owned by Core/Settings.lua
         ruleLog          = {},         -- rule event log; owned by Core/Rules.lua
@@ -180,6 +182,7 @@ function D:Init()
     end
 
     WRL_DB.achievements = WRL_DB.achievements or {}
+    WRL_DB.deathCount = math.max(0, math.floor(WRL_DB.deathCount or 0))
     WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
     WRL_DB.loanReceipts = WRL_DB.loanReceipts or {}
     WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
@@ -216,6 +219,7 @@ function D:Init()
         if rec.visitedInstances == nil then rec.visitedInstances = {} end
         if rec.boons            == nil then rec.boons            = {} end
         if rec.burdens          == nil then rec.burdens          = {} end
+        if rec.deathCount       == nil then rec.deathCount       = #(rec.deathLog or {}) end
         if not WRL_DB.accountLinks[rec.key or storageKey] then
             WRL_DB.accountLinks[rec.key or storageKey] = "acct-local"
         end

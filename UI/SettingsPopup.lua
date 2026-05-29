@@ -18,6 +18,12 @@ local DEATH_LABELS = {
     guild = "Guild",
 }
 
+local DEATH_SOUND_FALLBACKS = {
+    { id = "off", label = "Off" },
+    { id = "random", label = "Random" },
+    { id = "dark_souls", label = "Dark Souls" },
+}
+
 local RESALE_PRICING_FALLBACKS = {
     {
         id = "auto",
@@ -61,6 +67,23 @@ local function resalePricingNote(source)
         if item.id == source then return item.note end
     end
     return RESALE_PRICING_FALLBACKS[1].note
+end
+
+local function deathSoundOptions()
+    if ns.Death and ns.Death.DeathSoundOptions then
+        return ns.Death:DeathSoundOptions()
+    end
+    return DEATH_SOUND_FALLBACKS
+end
+
+local function deathSoundLabel(soundId)
+    if ns.Death and ns.Death.DeathSoundLabel then
+        return ns.Death:DeathSoundLabel(soundId)
+    end
+    for _, item in ipairs(DEATH_SOUND_FALLBACKS) do
+        if item.id == soundId then return item.label end
+    end
+    return "Dark Souls"
 end
 
 local function setTextColor(fs, color, alpha)
@@ -462,6 +485,17 @@ function Popup:Init()
     self.optSoftDeaths:SetPoint("RIGHT", content, "RIGHT", 0, 0)
     y = y + 46
 
+    self.deathSoundLabel, y = buildSectionHeader(content, Theme, "Death Sound", y)
+    local deathSoundDd = CreateFrame("Frame", "WRL_SettingsDeathSoundDropdown", content, "UIDropDownMenuTemplate")
+    deathSoundDd:SetPoint("TOPLEFT", self.deathSoundLabel, "BOTTOMLEFT", -16, -2)
+    dropdownSetWidth(deathSoundDd, 196)
+    self.deathSoundDropdown = deathSoundDd
+    self.deathSoundNote = Theme:Text(content, 10, Theme.c.fg2)
+    self.deathSoundNote:SetPoint("TOPLEFT", 220, -y)
+    self.deathSoundNote:SetWidth(400)
+    self.deathSoundNote:SetJustifyH("LEFT")
+    y = y + 48
+
     self.optionsLabel, y = buildSectionHeader(content, Theme, "Account Options", y)
     self.optBank = buildToggle(content, Theme, "Allow bank starter rewards", function()
         ns.Settings:Set("allowBankRewards", not (ns.Settings:Get("allowBankRewards", true) == true))
@@ -728,6 +762,24 @@ function Popup:Refresh()
     end
 
     if UIDropDownMenu_Initialize then
+        UIDropDownMenu_Initialize(self.deathSoundDropdown, function(_, level)
+            local cur = ns.Settings:Get("deathSound", "dark_souls")
+            for _, item in ipairs(deathSoundOptions()) do
+                local soundId = item.id
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = item.label
+                info.value = soundId
+                info.checked = cur == soundId
+                info.func = function()
+                    ns.Settings:Set("deathSound", soundId)
+                    Popup:Refresh()
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
+        end)
+    end
+
+    if UIDropDownMenu_Initialize then
         UIDropDownMenu_Initialize(self.resalePricingDropdown, function(_, level)
             local cur = ns.Settings:Get("pricing.resaleSource", "auto")
             for _, item in ipairs(resalePricingOptions()) do
@@ -756,6 +808,12 @@ function Popup:Refresh()
 
     local death = ns.Settings:Get("announceDeaths", "local")
     dropdownSetText(self.deathDropdown, DEATH_LABELS[death] or tostring(death))
+
+    local deathSound = ns.Settings:Get("deathSound", "dark_souls")
+    dropdownSetText(self.deathSoundDropdown, deathSoundLabel(deathSound))
+    if self.deathSoundNote then
+        self.deathSoundNote:SetText("Plays when a run dies, including extra-life deaths.")
+    end
 
     local selectedFont = ns.Theme:GetSelectedFontProfileId()
     dropdownSetText(self.fontDropdown, ns.Theme:FontProfileLabel(selectedFont))
@@ -862,6 +920,7 @@ function Popup:RefreshTheme()
     if self.themeLabel then setTextColor(self.themeLabel, Theme.c.goldH, 1) end
     if self.fontLabel then setTextColor(self.fontLabel, Theme.c.goldH, 1) end
     if self.deathLabel then setTextColor(self.deathLabel, Theme.c.goldH, 1) end
+    if self.deathSoundLabel then setTextColor(self.deathSoundLabel, Theme.c.goldH, 1) end
     if self.optionsLabel then setTextColor(self.optionsLabel, Theme.c.goldH, 1) end
     if self.modifiersLabel then setTextColor(self.modifiersLabel, Theme.c.goldH, 1) end
     if self.boonsHeader then setTextColor(self.boonsHeader, Theme.c.gold, 1) end

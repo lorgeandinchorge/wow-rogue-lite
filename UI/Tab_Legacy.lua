@@ -4,14 +4,20 @@
 local ADDON_NAME, ns = ...
 local Tab = ns:NewModule("Tab_Legacy")
 
-local TILE_W = 132
-local TILE_H = 88
-local TILE_GAP = 8
-local TILE_COLS = 1
+local TALENT_NODE_SIZE = 38
+local TALENT_ROW_GAP = 58
+local TALENT_LABEL_W = 108
 local ROW_H = 54
 local TRACK_W = 162
 local TRACK_GAP = 18
 local TRACK_COLS = 4
+
+local TRACK_ICON_TEX = {
+    storage = "Interface\\Icons\\INV_Misc_Bag_08",
+    stipend = "Interface\\Icons\\INV_Misc_Coin_01",
+    alchemy = "Interface\\Icons\\INV_Potion_49",
+    fate = "Interface\\Icons\\Spell_Nature_WispSplode",
+}
 
 local CLASS_ICON_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 local CLASS_ICON_TCOORDS = {
@@ -71,9 +77,9 @@ local function nodeRewardSummary(node)
     return table.concat(parts, "  -  ")
 end
 
-local function tileTitle(node)
-    local rankText = node.milestone and ("T" .. tostring(node.milestone)) or ("R" .. tostring(node.rank or "?"))
-    return ("%s\n%s"):format(rankText, node.name or "Unlock")
+local function applyTalentIcon(tex, trackId)
+    tex:SetTexture(TRACK_ICON_TEX[trackId] or "Interface\\Icons\\INV_Misc_QuestionMark")
+    tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 end
 
 local function unlockAvailability(L)
@@ -110,33 +116,51 @@ local function buildTrack(parent, Theme)
     f.blurb:SetWidth(TRACK_W)
     f.blurb:SetJustifyH("LEFT")
 
-    f.rows = {}
+    f.nodes = {}
+    f.connectors = {}
     f.spacers = {}
     return f
 end
 
-local function buildTile(parent, Theme)
-    local r = CreateFrame("Button", nil, parent)
-    r:SetSize(TILE_W, TILE_H)
-    Theme:Fill(r, Theme.c.bg1, false)
+local function buildTalentConnector(parent)
+    local line = parent:CreateTexture(nil, "BORDER")
+    line:SetTexture("Interface\\Buttons\\WHITE8X8")
+    line:SetWidth(3)
+    return line
+end
 
-    r.dot = r:CreateTexture(nil, "ARTWORK")
-    r.dot:SetSize(8, 8)
-    r.dot:SetPoint("TOPLEFT", 9, -9)
+local function buildTalentNode(parent, Theme)
+    local r = CreateFrame("Button", nil, parent)
+    r:SetSize(TRACK_W, TALENT_NODE_SIZE)
+
+    r.nodeBg = r:CreateTexture(nil, "BORDER")
+    r.nodeBg:SetSize(TALENT_NODE_SIZE, TALENT_NODE_SIZE)
+    r.nodeBg:SetPoint("LEFT", 0, 0)
+    r.nodeBg:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+
+    r.nodeGlow = r:CreateTexture(nil, "ARTWORK")
+    r.nodeGlow:SetSize(TALENT_NODE_SIZE - 8, TALENT_NODE_SIZE - 8)
+    r.nodeGlow:SetPoint("CENTER", r.nodeBg, "CENTER")
+    r.nodeGlow:SetTexture("Interface\\Buttons\\WHITE8X8")
+
+    r.icon = r:CreateTexture(nil, "OVERLAY")
+    r.icon:SetSize(TALENT_NODE_SIZE - 14, TALENT_NODE_SIZE - 14)
+    r.icon:SetPoint("CENTER", r.nodeBg, "CENTER", 0, 0)
 
     r.title = Theme:Text(r, 11, Theme.c.fg)
-    r.title:SetPoint("TOPLEFT", 9, -22)
-    r.title:SetWidth(TILE_W - 18)
+    r.title:SetPoint("TOPLEFT", r.nodeBg, "TOPRIGHT", 8, -1)
+    r.title:SetWidth(TALENT_LABEL_W)
     r.title:SetJustifyH("LEFT")
+    r.title:SetWordWrap(false)
 
     r.cost = Theme:Text(r, 10, Theme.c.gold)
-    r.cost:SetPoint("BOTTOMLEFT", 9, 20)
-    r.cost:SetWidth(TILE_W - 18)
+    r.cost:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -2)
+    r.cost:SetWidth(TALENT_LABEL_W)
     r.cost:SetJustifyH("LEFT")
 
     r.state = Theme:Text(r, 9, Theme.c.fg2)
-    r.state:SetPoint("BOTTOMLEFT", 9, 7)
-    r.state:SetWidth(TILE_W - 18)
+    r.state:SetPoint("TOPLEFT", r.cost, "BOTTOMLEFT", 0, -2)
+    r.state:SetWidth(TALENT_LABEL_W)
     r.state:SetJustifyH("LEFT")
 
     r:SetScript("OnClick", function(row)
@@ -171,12 +195,12 @@ end
 
 local function buildSpacer(parent, Theme)
     local r = CreateFrame("Frame", nil, parent)
-    r:SetSize(TILE_W, TILE_H)
+    r:SetSize(TRACK_W, TALENT_NODE_SIZE)
 
     r.label = Theme:Text(r, 9, Theme.c.fg2)
-    r.label:SetPoint("CENTER", r, "CENTER", 0, 0)
-    r.label:SetWidth(TILE_W - 12)
-    r.label:SetJustifyH("CENTER")
+    r.label:SetPoint("LEFT", TALENT_NODE_SIZE + 8, 0)
+    r.label:SetWidth(TALENT_LABEL_W)
+    r.label:SetJustifyH("LEFT")
     r.label:SetAlpha(0.45)
 
     return r
@@ -294,12 +318,18 @@ function Tab:Init(parent)
             local col = (index - 1) % TRACK_COLS
             local rowBand = math.floor((index - 1) / TRACK_COLS)
             local x = col * (TRACK_W + TRACK_GAP)
-            local y = 24 + rowBand * (48 + (TILE_H + TILE_GAP) * 6 + TRACK_GAP)
+            local y = 24 + rowBand * (48 + TALENT_ROW_GAP * 6 + TRACK_GAP)
             track:SetPoint("TOPLEFT", content, "TOPLEFT", x, -y)
             self.tracks[trackId] = track
             index = index + 1
         end
     end
+
+    self.availableTitle = Theme:Text(content, 12, Theme.c.goldH)
+    self.availableTitle:SetText("Available Legacy Rewards")
+    self.availableHint = Theme:Text(content, 10, Theme.c.fg2)
+    self.availableHint:SetText("Starter supplies currently unlocked for new runs.")
+    self.availableRows = {}
 
     self.rosterTitle = Theme:Text(content, 12, Theme.c.goldH)
     self.rosterHint = Theme:Text(content, 10, Theme.c.fg2)
@@ -341,7 +371,7 @@ function Tab:_RefreshUnlocks(startY)
             local col = (gridIndex - 1) % TRACK_COLS
             local rowBand = math.floor((gridIndex - 1) / TRACK_COLS)
             local x = col * (TRACK_W + TRACK_GAP)
-            local baseY = startY + 42 + rowBand * (48 + (TILE_H + TILE_GAP) * 6 + TRACK_GAP)
+            local baseY = startY + 42 + rowBand * (48 + TALENT_ROW_GAP * 6 + TRACK_GAP)
 
             track:ClearAllPoints()
             track:SetPoint("TOPLEFT", self.content, "TOPLEFT", x, -baseY)
@@ -359,10 +389,20 @@ function Tab:_RefreshUnlocks(startY)
                 local node = (def.nodes or {})[nodeIndex]
                 local nodeVisualRank = node and (node.milestone or node.rank) or nil
                 local hasNode = node and nodeVisualRank == visualRank
-                local tileCol = (visualRank - 1) % TILE_COLS
-                local tileRow = math.floor((visualRank - 1) / TILE_COLS)
-                local tileX = tileCol * (TILE_W + TILE_GAP)
-                local tileY = y + tileRow * (TILE_H + TILE_GAP)
+                local nodeX = 0
+                local nodeY = y + (visualRank - 1) * TALENT_ROW_GAP
+
+                if visualRank > 1 then
+                    if not track.connectors[visualRank - 1] then
+                        track.connectors[visualRank - 1] = buildTalentConnector(track)
+                    end
+                    local connector = track.connectors[visualRank - 1]
+                    connector:ClearAllPoints()
+                    connector:SetPoint("TOP", track, "TOPLEFT", nodeX + (TALENT_NODE_SIZE / 2), -(nodeY - TALENT_ROW_GAP + TALENT_NODE_SIZE))
+                    connector:SetHeight(TALENT_ROW_GAP - TALENT_NODE_SIZE)
+                    connector:SetVertexColor(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.45)
+                    connector:Show()
+                end
 
                 if not hasNode then
                     if not track.spacers[visualRank] then
@@ -370,17 +410,17 @@ function Tab:_RefreshUnlocks(startY)
                     end
                     local spacer = track.spacers[visualRank]
                     spacer:ClearAllPoints()
-                    spacer:SetPoint("TOPLEFT", track, "TOPLEFT", tileX, -tileY)
-                    spacer.label:SetText(("Rank %d\nNo unlock"):format(visualRank))
+                    spacer:SetPoint("TOPLEFT", track, "TOPLEFT", nodeX, -nodeY)
+                    spacer.label:SetText(("Rank %d: no unlock"):format(visualRank))
                     spacer:Show()
-                    if track.rows[visualRank] then track.rows[visualRank]:Hide() end
+                    if track.nodes[visualRank] then track.nodes[visualRank]:Hide() end
                 else
                     if track.spacers[visualRank] then track.spacers[visualRank]:Hide() end
-                    if not track.rows[visualRank] then
-                        track.rows[visualRank] = buildTile(track, Theme)
+                    if not track.nodes[visualRank] then
+                        track.nodes[visualRank] = buildTalentNode(track, Theme)
                     end
 
-                    local row = track.rows[visualRank]
+                    local row = track.nodes[visualRank]
                     local unlocked = nodeIndex <= rank
                     local nextAvailable = nodeIndex == rank + 1
                     local affordable = nextAvailable and L:AvailableBudget() >= (node.cost or 0)
@@ -390,47 +430,111 @@ function Tab:_RefreshUnlocks(startY)
                     row._trackName = def.name
                     row._affordable = affordable
                     row:ClearAllPoints()
-                    row:SetPoint("TOPLEFT", track, "TOPLEFT", tileX, -tileY)
+                    row:SetPoint("TOPLEFT", track, "TOPLEFT", nodeX, -nodeY)
                     row:Show()
+                    applyTalentIcon(row.icon, trackId)
 
                     if unlocked then
                         row:SetAlpha(1)
-                        row.dot:SetColorTexture(Theme.c.green[1], Theme.c.green[2], Theme.c.green[3], 1)
+                        row.nodeGlow:SetVertexColor(Theme.c.green[1], Theme.c.green[2], Theme.c.green[3], 0.95)
                         row.state:SetText("UNLOCKED")
                         setTextColor(row.state, Theme.c.green, 1)
                     elseif affordable then
                         row:SetAlpha(1)
-                        row.dot:SetColorTexture(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 1)
+                        row.nodeGlow:SetVertexColor(Theme.c.gold[1], Theme.c.gold[2], Theme.c.gold[3], 0.95)
                         row.state:SetText("UNLOCK")
                         setTextColor(row.state, Theme.c.gold, 1)
                     elseif nextAvailable then
                         row:SetAlpha(0.78)
-                        row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.65)
+                        row.nodeGlow:SetVertexColor(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.65)
                         row.state:SetText("NEED GOLD")
                         setTextColor(row.state, Theme.c.fg2, 0.85)
                     else
                         row:SetAlpha(0.45)
-                        row.dot:SetColorTexture(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.45)
+                        row.nodeGlow:SetVertexColor(Theme.c.fg2[1], Theme.c.fg2[2], Theme.c.fg2[3], 0.45)
                         row.state:SetText("LOCKED")
                         setTextColor(row.state, Theme.c.fg2, 0.75)
                     end
 
-                    row.title:SetText(tileTitle(node))
+                    row.title:SetText(node.name or "Unlock")
                     row.cost:SetText(money(node.cost or 0))
                     setTextColor(row.title, unlocked and Theme.c.fg or Theme.c.fg2, unlocked and 1 or 0.95)
 
                     nodeIndex = nodeIndex + 1
                 end
             end
-            for i = visualRows + 1, #track.rows do track.rows[i]:Hide() end
+            for i = visualRows + 1, #track.nodes do track.nodes[i]:Hide() end
             for i = visualRows + 1, #track.spacers do track.spacers[i]:Hide() end
-            y = y + math.ceil(visualRows / TILE_COLS) * (TILE_H + TILE_GAP)
+            for i = visualRows, #track.connectors do
+                if track.connectors[i] then track.connectors[i]:Hide() end
+            end
+            y = y + visualRows * TALENT_ROW_GAP
             track:SetHeight(y)
             if baseY + y > maxY then maxY = baseY + y end
         end
     end
 
     return maxY
+end
+
+local function rewardSummaryLines()
+    local L = ns.LegacyUnlocks
+    local R = ns.Rewards
+    if not (L and R and L.ActiveNodeIds and R.BuildRewardForTierIds) then
+        return { "No legacy rewards available yet." }
+    end
+
+    local nodeIds = L:ActiveNodeIds()
+    if #nodeIds == 0 then
+        return { "No legacy rewards available yet." }
+    end
+
+    local bundle = R:BuildRewardForTierIds(nodeIds, ns.UnitKey and ns:UnitKey() or nil)
+    local lines = {}
+    for _, it in ipairs(bundle.items or {}) do
+        lines[#lines + 1] = ("%dx %s"):format(it.qty or 1, it.note or ("item:" .. tostring(it.id)))
+    end
+    if (bundle.gold or 0) > 0 then
+        lines[#lines + 1] = ("Starter gold: %s"):format(money(bundle.gold))
+    end
+    if (bundle.extraLives or 0) > 0 then
+        lines[#lines + 1] = ("Extra lives: +%d"):format(bundle.extraLives)
+    end
+    if #lines == 0 then
+        lines[#lines + 1] = "No legacy rewards available yet."
+    end
+    return lines
+end
+
+local function refreshAvailableRewards(self, startY)
+    local Theme = ns.Theme
+    self.availableTitle:ClearAllPoints()
+    self.availableTitle:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -startY)
+    self.availableTitle:SetText("Available Legacy Rewards")
+
+    self.availableHint:ClearAllPoints()
+    self.availableHint:SetPoint("TOPLEFT", self.availableTitle, "BOTTOMLEFT", 0, -4)
+
+    local lines = rewardSummaryLines()
+    local y = startY + 42
+    for i = #self.availableRows + 1, #lines do
+        local fs = Theme:Text(self.content, 11, Theme.c.fg)
+        fs:SetWidth(640)
+        fs:SetJustifyH("LEFT")
+        self.availableRows[i] = fs
+    end
+    for i = #lines + 1, #self.availableRows do
+        self.availableRows[i]:Hide()
+    end
+    for i, line in ipairs(lines) do
+        local fs = self.availableRows[i]
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPLEFT", self.content, "TOPLEFT", 12, -y)
+        fs:SetText(line)
+        fs:Show()
+        y = y + 18
+    end
+    return y + 18
 end
 
 function Tab:_Roster()
@@ -585,7 +689,8 @@ function Tab:Refresh()
     self.summary:SetText(("Lifetime contributed: %s   |   Legacy spent: %s   |   Available: %s")
         :format(money(total), money(spent), money(available)))
 
-    local afterUnlocks = self:_RefreshUnlocks(0)
+    local afterRewards = refreshAvailableRewards(self, 0)
+    local afterUnlocks = self:_RefreshUnlocks(afterRewards + 28)
     local finalY = self:_RefreshRoster(afterUnlocks + 28)
 
     self.content:SetHeight(math.max(420, finalY + 8))

@@ -121,10 +121,49 @@ local function testActiveContributionCanEarnLifetimeAchievements()
     assertTrue(WRL_DB.achievements.first_legend_tier_unlock, "active contribution can earn legend tier")
 end
 
+local function testLevelAchievementsReachEveryTenThroughSeventy()
+    local ns = resetHarness("active")
+    WRL_DB.characters["Runner-Realm"].levelCurrent = 70
+
+    ns.Achievements:OnLevelUp(70)
+
+    for level = 10, 70, 10 do
+        assertTrue(WRL_DB.achievements["reach_level_" .. tostring(level)], "level " .. tostring(level) .. " achievement awards")
+    end
+end
+
+local function testSoftDeathAwardsDeathDecadeAndCountAchievements()
+    local ns = resetHarness("active")
+    WRL_DB.characters["Runner-Realm"].levelCurrent = 27
+    WRL_DB.characters["Runner-Realm"].deathCount = 1
+    WRL_DB.deathCount = 1
+
+    ns.Achievements:OnDeath("soft", "Runner-Realm", WRL_DB.characters["Runner-Realm"])
+
+    assertTrue(WRL_DB.achievements.death_decade_20, "soft death in 20s awards death decade")
+    assertTrue(WRL_DB.achievements.death_count_1, "first death count achievement awards")
+    assertNil(WRL_DB.achievements.death_decade_30, "soft death in 20s does not award 30s death decade")
+end
+
+local function testDeathCountAchievementsUseRunDeathCounter()
+    local ns = resetHarness("active")
+    WRL_DB.characters["Runner-Realm"].levelCurrent = 44
+    WRL_DB.deathCount = 50
+
+    ns.Achievements:OnDeath("soft", "Runner-Realm", WRL_DB.characters["Runner-Realm"])
+
+    assertTrue(WRL_DB.achievements.death_count_50, "50th death achievement awards")
+    assertTrue(WRL_DB.achievements.death_decade_40, "death in 40s achievement awards")
+    assertNil(WRL_DB.achievements.death_count_100, "100 deaths achievement waits for threshold")
+end
+
 testPendingContributionCharacterCannotEarnLevelOrCleanPathAchievements()
 testRetiredCharacterCannotEarnBackfillAchievements()
 testFinalDeathAchievementStillAwardsAfterRunStops()
 testDeadContributionDoesNotEarnLifetimeAchievements()
 testActiveContributionCanEarnLifetimeAchievements()
+testLevelAchievementsReachEveryTenThroughSeventy()
+testSoftDeathAwardsDeathDecadeAndCountAchievements()
+testDeathCountAchievementsUseRunDeathCounter()
 
 print("AchievementEligibility.test.lua: ok")

@@ -30,12 +30,13 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.0a - Legacy Unlock Readability Hotfix
+### Latest Update: v0.4.0b - Legacy Revamp Completion
 
-- Storage, Stipend, Alchemist's Table, and Fate now line up side by side with vertical square-tile unlock ladders.
-- Permanent Unlocks now shows a simple **Unlocks available: X / Y** progress readout.
-- Reward details live in tile tooltips so the main Legacy view stays readable.
-- Regression coverage now locks down the side-by-side vertical layout and availability summary.
+- Legacy unlocks now use a talent-board style layout with connected unlock nodes and clearer owned, available, and locked states.
+- **Available Legacy Rewards** summarizes your currently unlocked starter-kit pieces: bags, gold, potions, and extra lives.
+- Alchemist's Table rewards now grant potions in multiples of five.
+- Death sounds are selectable under Settings, with Dark Souls as the default plus Off and Random options.
+- Achievement coverage now includes 10-level milestones, death-decade milestones, Insert Coin, and total-death milestones.
 
 ### Bank And Run Structure
 

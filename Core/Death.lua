@@ -38,6 +38,22 @@
 local ADDON_NAME, ns = ...
 local D = ns:NewModule("Death")
 
+local SOUND_ROOT = "Interface\\AddOns\\WoWRoguelite\\sounds\\"
+local DEATH_SOUND_OPTIONS = {
+    { id = "off", label = "Off" },
+    { id = "random", label = "Random" },
+    { id = "dark_souls", label = "Dark Souls", file = "dark-souls-you-died-sound-effect_hm5sYFG.mp3" },
+    { id = "dark_souls_alt", label = "Dark Souls Alt", file = "dark-souls-you-died-sound-effect_hm5sYFG (1).mp3" },
+    { id = "gta_wasted", label = "GTA Wasted", file = "gta-v-wasted-death-sound.mp3" },
+    { id = "half_life", label = "Half-Life 2", file = "half-life-2-death-sound.mp3" },
+    { id = "lego_yoda", label = "Lego Yoda", file = "lego-yoda-death-sound-effect.mp3" },
+    { id = "super_mario", label = "Super Mario", file = "super-mario-death-sound-sound-effect.mp3" },
+}
+local deathSoundById = {}
+for _, option in ipairs(DEATH_SOUND_OPTIONS) do
+    deathSoundById[option.id] = option
+end
+
 -- ── Death-context state ───────────────────────────────────────────────────────
 -- Populated by COMBAT_LOG_EVENT_UNFILTERED and CHAT_MSG_* handlers.
 -- Snapshot is captured on final death, then reset.
@@ -57,6 +73,41 @@ local D_ctx = {
 -- Prevents one corpse-state from burning multiple extra lives if
 -- PLAYER_DEAD fires more than once before the revive event.
 local deathCycleOpen = false
+
+function D:DeathSoundOptions()
+    return DEATH_SOUND_OPTIONS
+end
+
+function D:DeathSoundLabel(soundId)
+    local option = deathSoundById[soundId or ""]
+    return option and option.label or deathSoundById.dark_souls.label
+end
+
+function D:DeathSoundPath(soundId)
+    local option = deathSoundById[soundId or ""]
+    if not option or not option.file then return nil end
+    return SOUND_ROOT .. option.file
+end
+
+function D:PlayDeathSound()
+    if not PlaySoundFile then return false end
+    local selected = ns.Settings and ns.Settings:Get("deathSound", "dark_souls") or "dark_souls"
+    if selected == "off" then return false end
+
+    local option = deathSoundById[selected] or deathSoundById.dark_souls
+    if selected == "random" then
+        local playable = {}
+        for _, item in ipairs(DEATH_SOUND_OPTIONS) do
+            if item.file then playable[#playable + 1] = item end
+        end
+        option = playable[math.random(#playable)]
+    end
+
+    local path = option and option.file and (SOUND_ROOT .. option.file) or nil
+    if not path then return false end
+    PlaySoundFile(path, "Master")
+    return true
+end
 
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -707,11 +758,18 @@ function D:ProcessCurrentDeath(reason)
     -- PLAYER_ALIVE in the same corpse-state, do not consume another life.
     if deathCycleOpen and (rec.livesRemaining or 0) > 0 then return end
 
+    self:PlayDeathSound()
+    rec.deathCount = math.max(rec.deathCount or 0, type(rec.deathLog) == "table" and #rec.deathLog or 0) + 1
+    WRL_DB.deathCount = math.max(0, math.floor(WRL_DB.deathCount or 0)) + 1
+
     if rec.livesRemaining > 0 then
         rec.livesRemaining = rec.livesRemaining - 1
     end
     if rec.livesRemaining >= 1 then
         deathCycleOpen = true   -- mark this corpse-cycle as consuming a life
+        if ns.Achievements and ns.Achievements.OnDeath then
+            ns.Achievements:OnDeath("soft", ns:UnitKey(), rec)
+        end
         if ns.Achievements and ns.Achievements.OnExtraLifeUsed then
             ns.Achievements:OnExtraLifeUsed(ns:UnitKey(), rec)
         end

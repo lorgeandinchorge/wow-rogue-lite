@@ -99,10 +99,13 @@ If you only have 10 to 15 minutes, please do this section.
   Expected: it clearly explains this is where starter reward request mail is prepared.
 
 - [ ] Open the Legacy tab and unlock an affordable Storage, Stipend, Alchemist's Table, or Fate node if budget is available.
-  Expected: available budget decreases, the node becomes unlocked, **Unlocks available** increments, and the UI refreshes cleanly.
+  Expected: available budget decreases, the node becomes unlocked, **Unlocks available** increments, **Available Legacy Rewards** updates near the top of the page, and the UI refreshes cleanly.
 
 - [ ] Open gear Settings and find **Run Modifiers**.
   Expected: boons and burdens appear there, not inside the Rewards tab.
+
+- [ ] Open gear Settings and find **Death Sound**.
+  Expected: Dark Souls, Random, Off, and the shipped sound choices appear without errors.
 
 - [ ] In gear Settings, switch from **Options** to **Resets**.
   Expected: separate confirmed reset controls appear for achievements, legacy progression, and ledger/economy data.

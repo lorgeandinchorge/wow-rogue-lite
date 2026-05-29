@@ -166,9 +166,9 @@ local function testAlchemistsTableUnlocksPotionRanks()
     local bundle = ns.Rewards:BuildRewardForTierIds(nodeIds, "Runner-Realm")
     assertEqual(#bundle.items, 2, "two potion types are merged from two ranks")
     assertEqual(bundle.items[1].id, 118, "rank 1 grants Minor Healing Potion")
-    assertEqual(bundle.items[1].qty, 2, "rank 1 grants two potions")
+    assertEqual(bundle.items[1].qty, 5, "rank 1 grants five potions")
     assertEqual(bundle.items[2].id, 858, "rank 2 grants Lesser Healing Potion")
-    assertEqual(bundle.items[2].qty, 2, "rank 2 grants two potions")
+    assertEqual(bundle.items[2].qty, 5, "rank 2 grants five potions")
     assertEqual(bundle.gold, 0, "alchemy grants no gold")
     assertEqual(bundle.extraLives, 0, "alchemy grants no lives")
 end
@@ -188,10 +188,30 @@ local function testAlchemistsTableBundlesUsePotionProgression()
         local bundle = ns.Rewards:GetBundle(spec.id)
         assertEqual(#bundle.items, 1, spec.id .. " has one potion item")
         assertEqual(bundle.items[1].id, spec.itemId, spec.id .. " item id matches potion ladder")
-        assertEqual(bundle.items[1].qty, 2, spec.id .. " grants two potions")
+        assertEqual(bundle.items[1].qty, 5, spec.id .. " grants five potions")
         assertEqual(bundle.items[1].note, spec.note, spec.id .. " note names the potion")
         assertEqual(bundle.gold, 0, spec.id .. " grants no gold")
         assertEqual(bundle.extraLives, 0, spec.id .. " grants no lives")
+    end
+end
+
+local function testLegacyTracksAndNodesUseTwoWordTitles()
+    local ns = resetHarness()
+    local expectedTracks = {
+        storage = "Storage Vault",
+        stipend = "Starter Stipend",
+        alchemy = "Alchemist's Table",
+        fate = "Fate Loom",
+    }
+
+    for trackId, expectedName in pairs(expectedTracks) do
+        local track = ns.LegacyUnlocks:TrackDef(trackId)
+        assertEqual(track.name, expectedName, trackId .. " track uses approved two-word title")
+        for _, node in ipairs(track.nodes or {}) do
+            local wordCount = 0
+            for _ in tostring(node.name or ""):gmatch("%S+") do wordCount = wordCount + 1 end
+            assertEqual(wordCount, 2, node.name .. " is a two-word rank title")
+        end
     end
 end
 
@@ -225,6 +245,7 @@ testActiveNodeIdsAndRewardsReflectUnlockedTracks()
 testStipendBundlesMatchLegacyPassValues()
 testAlchemistsTableUnlocksPotionRanks()
 testAlchemistsTableBundlesUsePotionProgression()
+testLegacyTracksAndNodesUseTwoWordTitles()
 testResetUnlocksRefundsBudget()
 testFateMilestonesUseRankThreeAndSixCosts()
 

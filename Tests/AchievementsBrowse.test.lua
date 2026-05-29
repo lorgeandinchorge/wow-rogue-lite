@@ -44,7 +44,7 @@ local function testBrowseModelCountsVisibleAndSortsEarnedNewestFirst()
     local browse = ns.Achievements:Browse()
 
     assertEqual(browse.earnedCount, 3, "earned count uses achievement ledger")
-    assertEqual(browse.visibleCount, 9, "visible count includes earned hidden achievements")
+    assertEqual(browse.visibleCount, 25, "visible count includes expanded 0.4 achievement set")
     assertEqual(browse.earned[1].id, "reach_level_10", "newest earned achievement appears first")
     assertEqual(browse.earned[2].id, "first_legend_tier_unlock", "earned hidden achievement appears after newer visible earned")
     assertEqual(browse.earned[3].id, "first_final_death", "oldest earned achievement appears last")
@@ -59,14 +59,28 @@ local function testBrowseModelKeepsLockedHiddenAchievementsOut()
     local browse = ns.Achievements:Browse()
 
     assertEqual(browse.earnedCount, 2, "earned count updates after removing hidden achievement")
-    assertEqual(browse.visibleCount, 8, "locked hidden achievement does not count as visible")
+    assertEqual(browse.visibleCount, 24, "locked hidden achievement does not count as visible")
     for _, row in ipairs(browse.locked) do
         assertTrue(row.id ~= "first_legend_tier_unlock", "locked hidden achievement is not listed")
         assertTrue(row.requirement and row.requirement ~= "", "locked visible rows expose a requirement")
     end
 end
 
+local function testBrowseModelIncludesExpandedDeathAndLevelAchievements()
+    local ns = resetHarness()
+    local byId = {}
+    for _, def in ipairs(ns.Achievements:Definitions()) do
+        byId[def.id] = def
+    end
+
+    assertEqual(byId.reach_level_70.name, "Outland Survivor", "level 70 achievement has title")
+    assertEqual(byId.death_decade_20.name, "Twenties Trouble", "death in 20s achievement has funny title")
+    assertEqual(byId.first_extra_life_used.name, "Insert Coin", "extra life achievement uses requested title")
+    assertEqual(byId.death_count_100.name, "Graveyard Regular", "100 deaths achievement has funny title")
+end
+
 testBrowseModelCountsVisibleAndSortsEarnedNewestFirst()
 testBrowseModelKeepsLockedHiddenAchievementsOut()
+testBrowseModelIncludesExpandedDeathAndLevelAchievements()
 
 print("AchievementsBrowse.test.lua: ok")

@@ -41,14 +41,37 @@ local function testLegacyPanelSupportsFourUnlockTracks()
     local src = readFile("UI/Tab_Legacy.lua")
 
     assertContains(src, "local TRACK_COLS = 4", "Legacy unlock tracks should line up side by side")
-    assertContains(src, "local TILE_COLS = 1", "Legacy unlock tracks should render a vertical square-tile stack per track")
-    assertContains(src, "buildTile", "Legacy unlock ranks should use compact tiles instead of tall rows")
+    assertContains(src, "buildTalentNode", "Legacy unlock ranks should render as talent-style nodes")
+    assertContains(src, "buildTalentConnector", "Legacy unlock tracks should draw connector lines between nodes")
+    assertContains(src, "TALENT_NODE_SIZE", "Legacy talent nodes should have a stable circular size")
+    assertContains(src, "TRACK_ICON_TEX", "Legacy talent nodes should use track-specific icon textures")
+    assertContains(src, "applyTalentIcon", "Legacy talent nodes should paint the track icon instead of rank text")
     assertContains(src, "Unlocks available: %d / %d", "Legacy tab should show a simple available unlock count")
     assertContains(src, "track._gridIndex", "Legacy tab should position tracks from their order")
+end
+
+local function testLegacyPanelShowsAvailableLegacyRewards()
+    local src = readFile("UI/Tab_Legacy.lua")
+
+    assertContains(src, "Available Legacy Rewards", "Legacy tab should include a reward summary section")
+    assertContains(src, "refreshAvailableRewards", "Legacy tab should refresh merged active legacy rewards")
+    assertContains(src, "ActiveNodeIds", "Available rewards should derive from active legacy unlock nodes")
+    assertContains(src, "BuildRewardForTierIds", "Available rewards should use the canonical reward bundle builder")
+end
+
+local function testAvailableLegacyRewardsSitsAboveTalentBoard()
+    local src = readFile("UI/Tab_Legacy.lua")
+
+    assertContains(src, "local afterRewards = refreshAvailableRewards(self, 0)",
+        "Available Legacy Rewards should refresh at the top of the Legacy page")
+    assertContains(src, "local afterUnlocks = self:_RefreshUnlocks(afterRewards + 28)",
+        "Talent board should render after the Available Legacy Rewards section")
 end
 
 testMainFrameUsesSingleLegacyTab()
 testTocLoadsLegacyPanel()
 testLegacyPanelSupportsFourUnlockTracks()
+testLegacyPanelShowsAvailableLegacyRewards()
+testAvailableLegacyRewardsSitsAboveTalentBoard()
 
 print("LegacyTabWiring.test.lua: ok")

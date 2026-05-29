@@ -12,20 +12,20 @@ local TRACK_ORDER = { "storage", "stipend", "alchemy", "fate" }
 local TRACK_DEFS = {
     storage = {
         id = "storage",
-        name = "Storage",
+        name = "Storage Vault",
         blurb = "Bags and space for cleaner starts.",
         nodes = {
             { rank = 1, nodeId = 101, cost = g(3),   bundleId = "storage_1", name = "Satchel Start" },
             { rank = 2, nodeId = 102, cost = g(10),  bundleId = "storage_2", name = "Traveler Space" },
             { rank = 3, nodeId = 103, cost = g(25),  bundleId = "storage_3", name = "Campaign Bags" },
-            { rank = 4, nodeId = 104, cost = g(75),  bundleId = "storage_4", name = "Deep Run Packs" },
+            { rank = 4, nodeId = 104, cost = g(75),  bundleId = "storage_4", name = "Deep Packs" },
             { rank = 5, nodeId = 105, cost = g(250), bundleId = "storage_5", name = "Outland Packs" },
             { rank = 6, nodeId = 106, cost = g(750), bundleId = "storage_6", name = "Legacy Haul" },
         },
     },
     stipend = {
         id = "stipend",
-        name = "Stipend",
+        name = "Starter Stipend",
         blurb = "Starter gold for training, travel, and setup choices.",
         nodes = {
             { rank = 1, nodeId = 201, cost = g(3),   bundleId = "stipend_1", name = "Seed Purse" },
@@ -51,7 +51,7 @@ local TRACK_DEFS = {
     },
     fate = {
         id = "fate",
-        name = "Fate",
+        name = "Fate Loom",
         blurb = "Rare extra-life milestones. Powerful, expensive, and sparse.",
         nodes = {
             { rank = 1, nodeId = 301, cost = g(25),  bundleId = "fate_1", name = "Second Thread", milestone = 3 },

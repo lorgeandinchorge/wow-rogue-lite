@@ -25,6 +25,18 @@ local function levelAtLeast(rec, n)
     return (rec and (rec.levelCurrent or rec.levelAtCreate or 1) or 1) >= n
 end
 
+local function levelInDecade(rec, decade)
+    local level = rec and (rec.levelCurrent or rec.levelAtCreate or 1) or 1
+    return level >= decade and level <= (decade + 9)
+end
+
+local function deathCountAtLeast(rec, n)
+    local logged = rec and type(rec.deathLog) == "table" and #rec.deathLog or 0
+    local counted = rec and rec.deathCount or 0
+    local accountCount = WRL_DB and WRL_DB.deathCount or 0
+    return math.max(logged, counted, accountCount) >= n
+end
+
 local function isRunCharacterKey(key)
     if not key then return false end
     if not ns.Database or not ns.Database.IsBankCharacter then return true end
@@ -56,7 +68,9 @@ end
 local function canEvaluateDefinition(def, ctx)
     if not def or not ctx then return false end
     if ctx.event == "death_final" then
-        return def.id == "first_final_death"
+        return def.id == "first_final_death" or def.deathAchievement == true
+    elseif ctx.event == "death_soft" then
+        return def.deathAchievement == true
     end
     return isPlayableRunContext(ctx)
 end
@@ -69,28 +83,6 @@ local ACHIEVEMENTS = {
         hidden = false,
         criteria = function(ctx)
             return ctx.event == "death_final"
-        end,
-    },
-    {
-        id = "reach_level_10",
-        name = "Double Digits",
-        description = "Reach level 10 on any run character.",
-        hidden = false,
-        criteria = function(ctx)
-            local key = ctx.key or currentKey()
-            local rec = ctx.rec or currentRec()
-            return isRunCharacterKey(key) and levelAtLeast(rec, 10)
-        end,
-    },
-    {
-        id = "reach_level_20",
-        name = "Seasoned Adventurer",
-        description = "Reach level 20 on any run character.",
-        hidden = false,
-        criteria = function(ctx)
-            local key = ctx.key or currentKey()
-            local rec = ctx.rec or currentRec()
-            return isRunCharacterKey(key) and levelAtLeast(rec, 20)
         end,
     },
     {
@@ -138,7 +130,7 @@ local ACHIEVEMENTS = {
     },
     {
         id = "first_extra_life_used",
-        name = "Second Wind",
+        name = "Insert Coin",
         description = "Use an extra life for the first time.",
         hidden = false,
         criteria = function(ctx)
@@ -156,6 +148,84 @@ local ACHIEVEMENTS = {
         end,
     },
 }
+
+local LEVEL_TITLES = {
+    [10] = "Double Digits",
+    [20] = "Seasoned Adventurer",
+    [30] = "Thirty Something",
+    [40] = "Midlife Runner",
+    [50] = "Halfway Haunted",
+    [60] = "Sixty Survived",
+    [70] = "Outland Survivor",
+}
+
+for level = 10, 70, 10 do
+    local threshold = level
+    ACHIEVEMENTS[#ACHIEVEMENTS + 1] = {
+        id = "reach_level_" .. tostring(threshold),
+        name = LEVEL_TITLES[threshold],
+        description = ("Reach level %d on any run character."):format(threshold),
+        hidden = false,
+        criteria = function(ctx)
+            local key = ctx.key or currentKey()
+            local rec = ctx.rec or currentRec()
+            return isRunCharacterKey(key) and levelAtLeast(rec, threshold)
+        end,
+    }
+end
+
+local DEATH_DECADE_TITLES = {
+    [10] = "Teenage Dirt Nap",
+    [20] = "Twenties Trouble",
+    [30] = "Thirty Yard Stare",
+    [40] = "Forty Winks",
+    [50] = "Fifty Shades Dead",
+    [60] = "Senior Moment",
+    [70] = "Outland Oops",
+}
+
+for decade = 10, 70, 10 do
+    local band = decade
+    ACHIEVEMENTS[#ACHIEVEMENTS + 1] = {
+        id = "death_decade_" .. tostring(band),
+        name = DEATH_DECADE_TITLES[band],
+        description = ("Die once at level %d-%d. Extra-life deaths count."):format(band, band + 9),
+        hidden = false,
+        deathAchievement = true,
+        criteria = function(ctx)
+            local key = ctx.key or currentKey()
+            local rec = ctx.rec or currentRec()
+            return (ctx.event == "death_soft" or ctx.event == "death_final")
+                and isRunCharacterKey(key)
+                and levelInDecade(rec, band)
+        end,
+    }
+end
+
+local DEATH_COUNT_TITLES = {
+    [1] = "Floor Inspector",
+    [10] = "Professional Casualty",
+    [50] = "Spirit Healer Loyalty",
+    [100] = "Graveyard Regular",
+}
+
+for _, count in ipairs({ 1, 10, 50, 100 }) do
+    local threshold = count
+    ACHIEVEMENTS[#ACHIEVEMENTS + 1] = {
+        id = "death_count_" .. tostring(threshold),
+        name = DEATH_COUNT_TITLES[threshold],
+        description = ("Die %d total %s across the account."):format(threshold, threshold == 1 and "time" or "times"),
+        hidden = false,
+        deathAchievement = true,
+        criteria = function(ctx)
+            local key = ctx.key or currentKey()
+            local rec = ctx.rec or currentRec()
+            return (ctx.event == "death_soft" or ctx.event == "death_final")
+                and isRunCharacterKey(key)
+                and deathCountAtLeast(rec, threshold)
+        end,
+    }
+end
 
 local byId = {}
 for _, def in ipairs(ACHIEVEMENTS) do
@@ -270,11 +340,17 @@ function A:OnRuleLog(characterKey, logEntry)
 end
 
 function A:OnFinalDeath(characterKey, rec)
+    self:OnDeath("final", characterKey, rec)
     self:Evaluate("death_final", { key = characterKey, rec = rec })
 end
 
 function A:OnExtraLifeUsed(characterKey, rec)
     self:Evaluate("extra_life_used", { key = characterKey, rec = rec })
+end
+
+function A:OnDeath(kind, characterKey, rec)
+    local event = kind == "final" and "death_final" or "death_soft"
+    self:Evaluate(event, { key = characterKey, rec = rec })
 end
 
 function A:OnRunStateChanged(characterKey, newState, prevState, reason)

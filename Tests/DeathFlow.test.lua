@@ -1065,6 +1065,8 @@ local function testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
 
     assertEqual(rec.livesRemaining, 1,
         "testDuplicateDeath: only one life consumed by duplicate PLAYER_DEAD")
+    assertEqual(WRL_DB.deathCount, 1,
+        "testDuplicateDeath: duplicate PLAYER_DEAD increments account death count once")
     assertEqual(rec.status, "active",
         "testDuplicateDeath: soft death does not end the run")
     assertEqual(#rec.deathLog, 0,
