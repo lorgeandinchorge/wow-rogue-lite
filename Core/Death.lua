@@ -43,7 +43,6 @@ local DEATH_SOUND_OPTIONS = {
     { id = "off", label = "Off" },
     { id = "random", label = "Random" },
     { id = "dark_souls", label = "Dark Souls", file = "dark-souls-you-died-sound-effect_hm5sYFG.mp3" },
-    { id = "dark_souls_alt", label = "Dark Souls Alt", file = "dark-souls-you-died-sound-effect_hm5sYFG (1).mp3" },
     { id = "gta_wasted", label = "GTA Wasted", file = "gta-v-wasted-death-sound.mp3" },
     { id = "half_life", label = "Half-Life 2", file = "half-life-2-death-sound.mp3" },
     { id = "lego_yoda", label = "Lego Yoda", file = "lego-yoda-death-sound-effect.mp3" },

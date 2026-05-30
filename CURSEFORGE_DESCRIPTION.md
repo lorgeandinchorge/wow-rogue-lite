@@ -30,11 +30,11 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.1a - Legacy Layout Polish
+### Latest Update: v0.4.1b - Package Cleanup
 
-- Includes the Legacy layout polish that keeps **Permanent Unlocks** anchored below **Available Legacy Rewards**.
-- Prevents the Legacy availability summary and permanent unlock board from visually colliding after refreshes.
-- Keeps the v0.4.1 dungeon and battleground death-ignore Settings from the previous release.
+- Removes an unused legacy icon asset from the packaged addon.
+- Removes the duplicate Dark Souls death sound file and redundant **Dark Souls Alt** Settings option.
+- Keeps the v0.4.1a Legacy layout polish and v0.4.1 dungeon/battleground death-ignore Settings from the previous releases.
 
 ### Bank And Run Structure
 

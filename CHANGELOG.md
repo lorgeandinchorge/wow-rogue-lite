@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.4.1b
+
+- Remove an unused legacy icon asset from the packaged addon.
+- Remove the duplicate Dark Souls death sound file and redundant **Dark Souls Alt** Settings option.
+- Keep death-sound regression coverage focused on the shipped sound choices.
+
 ## v0.4.1a
 
 - Include the Legacy layout polish that re-anchors the **Permanent Unlocks** title below **Available Legacy Rewards**.

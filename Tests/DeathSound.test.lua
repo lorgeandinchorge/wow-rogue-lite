@@ -53,7 +53,7 @@ local function testDeathSoundOptionsExposeShippedSounds()
     assertEqual(options[1].id, "off", "first sound option is off")
     assertEqual(options[2].id, "random", "second sound option is random")
     assertTrue(ns.Death:DeathSoundLabel("dark_souls"):find("Dark Souls", 1, true), "Dark Souls option is labeled")
-    assertTrue(ns.Death:DeathSoundPath("dark_souls_alt"):find("%(1%)", 1) ~= nil, "duplicate Dark Souls sound is also exposed")
+    assertEqual(ns.Death:DeathSoundPath("dark_" .. "souls_alt"), nil, "duplicate Dark Souls option is not exposed")
     assertTrue(ns.Death:DeathSoundPath("dark_souls"):find("sounds\\dark%-souls", 1) ~= nil, "Dark Souls option points at bundled sound")
 end
 
