@@ -74,6 +74,15 @@ local function testSettingsOwnsCoreResetSurface()
     assertContains(src, "ResetLedgerEconomy", "Settings reset handler should use the database helper")
 end
 
+local function testSettingsOwnsIgnoredInstanceDeathToggles()
+    local src = readFile("UI/SettingsPopup.lua")
+
+    assertContains(src, "Ignore deaths in dungeons", "Settings should include dungeon death ignore toggle")
+    assertContains(src, "Ignore deaths in battlegrounds", "Settings should include battleground death ignore toggle")
+    assertContains(src, "ignoreDungeonDeaths", "Settings should write dungeon death ignore setting")
+    assertContains(src, "ignoreBattlegroundDeaths", "Settings should write battleground death ignore setting")
+end
+
 local function testOldRulesTabNoLongerLoads()
     local toc = readFile("WoWRoguelite.toc")
 
@@ -92,6 +101,7 @@ testSettingsOwnsRulesProfilesSurface()
 testSettingsOwnsRunModifiersSurface()
 testSettingsOwnsPricingSurface()
 testSettingsOwnsCoreResetSurface()
+testSettingsOwnsIgnoredInstanceDeathToggles()
 testOldRulesTabNoLongerLoads()
 testInterfaceOptionsPointsRulesToSettings()
 

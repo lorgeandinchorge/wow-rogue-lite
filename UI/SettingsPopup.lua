@@ -504,6 +504,20 @@ function Popup:Init()
     end)
     self.optBank:SetPoint("TOPLEFT", 0, -y)
     self.optBank:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+    y = y + ROW_H + 4
+    self.optIgnoreDungeons = buildToggle(content, Theme, "Ignore deaths in dungeons", function()
+        ns.Settings:Set("ignoreDungeonDeaths", not (ns.Settings:Get("ignoreDungeonDeaths", false) == true))
+        Popup:Refresh()
+    end)
+    self.optIgnoreDungeons:SetPoint("TOPLEFT", 0, -y)
+    self.optIgnoreDungeons:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+    y = y + ROW_H + 4
+    self.optIgnoreBattlegrounds = buildToggle(content, Theme, "Ignore deaths in battlegrounds", function()
+        ns.Settings:Set("ignoreBattlegroundDeaths", not (ns.Settings:Get("ignoreBattlegroundDeaths", false) == true))
+        Popup:Refresh()
+    end)
+    self.optIgnoreBattlegrounds:SetPoint("TOPLEFT", 0, -y)
+    self.optIgnoreBattlegrounds:SetPoint("RIGHT", content, "RIGHT", 0, 0)
     y = y + ROW_H + 18
 
     self.pricingLabel, y = buildSectionHeader(content, Theme, "Pricing", y)
@@ -826,6 +840,8 @@ function Popup:Refresh()
 
     setToggle(self.optBank, ns.Settings:Get("allowBankRewards", true) == true, Theme)
     setToggle(self.optSoftDeaths, ns.Settings:Get("announceSoftDeaths", false) == true, Theme)
+    setToggle(self.optIgnoreDungeons, ns.Settings:Get("ignoreDungeonDeaths", false) == true, Theme)
+    setToggle(self.optIgnoreBattlegrounds, ns.Settings:Get("ignoreBattlegroundDeaths", false) == true, Theme)
 
     local gw2Note = ns.Theme:IsThemeAvailable("gw2") and "GW2 UI detected." or "GW2 UI is not detected yet."
     self.note:SetText(gw2Note .. " Theme changes apply immediately to open addon windows.")

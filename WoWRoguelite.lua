@@ -7,7 +7,7 @@
 local ADDON_NAME, ns = ...
 
 ns.name        = ADDON_NAME
-ns.version     = "0.4.0b"
+ns.version     = "0.4.1"
 ns.commPrefix  = "WRL_COMM" -- must be <= 16 chars for RegisterAddonMessagePrefix
 
 -- Module registration helper. Modules call ns:NewModule("Name") and attach
@@ -429,6 +429,8 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  allowBankRewards  = %s", tostring(s.allowBankRewards))
         ns:Print("  announceDeaths     = %s", tostring(s.announceDeaths))
         ns:Print("  announceSoftDeaths = %s", tostring(s.announceSoftDeaths))
+        ns:Print("  ignoreDungeonDeaths = %s", tostring(s.ignoreDungeonDeaths))
+        ns:Print("  ignoreBattlegroundDeaths = %s", tostring(s.ignoreBattlegroundDeaths))
         ns:Print("  uiTheme            = %s (active: %s)",
             tostring(s.uiTheme),
             ns.Theme and ns.Theme:GetActiveThemeId() or "?")

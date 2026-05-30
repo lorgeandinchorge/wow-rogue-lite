@@ -10,6 +10,7 @@ local inboxHeaders = {}
 local hasDeadOrGhostApi = true
 local unitIsDead = false
 local unitIsGhost = false
+local instanceType = nil
 local deathScreenShows = {}    -- captured ns.DeathScreen:Show invocations
 local createdButtons = {}
 local scheduledTimers = {}
@@ -31,9 +32,11 @@ local function resetHarness(opts)
     if hasDeadOrGhostApi == nil then hasDeadOrGhostApi = true end
     unitIsDead = opts.unitIsDead or false
     unitIsGhost = opts.unitIsGhost or false
+    instanceType = opts.instanceType
 
     WRL_DB = {
         bankCharacter = "Bank-Realm",
+        settings = opts.settings or {},
         characters = {
             ["Runner-Realm"] = {
                 key = "Runner-Realm",
@@ -63,6 +66,9 @@ local function resetHarness(opts)
     _G.UnitName   = function(unit) return unit == "player" and "Runner" or nil end
     _G.UnitPosition  = function() return nil end   -- no position by default
     _G.GetInstanceInfo = function() return nil end
+    _G.IsInInstance = function()
+        return instanceType ~= nil, instanceType
+    end
     _G.C_Map      = nil   -- no map API by default
     if hasDeadOrGhostApi then
         _G.UnitIsDeadOrGhost = function() return currentDead end
@@ -267,7 +273,15 @@ local function resetHarness(opts)
     function ns.Tiers:FormatMoney(copper)
         return tostring(copper) .. "c"
     end
-    function ns.Settings:Get() return "off" end
+    function ns.Settings:Get(pathOrKey, default)
+        local tbl = WRL_DB.settings or {}
+        for segment in tostring(pathOrKey or ""):gmatch("[^%.]+") do
+            if type(tbl) ~= "table" then return default end
+            tbl = tbl[segment]
+        end
+        if tbl == nil then return default end
+        return tbl
+    end
     function ns.Settings:GetProfile() return "default" end
     function ns.Rules:TaintCount() return 0 end
 
@@ -1073,6 +1087,141 @@ local function testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
         "testDuplicateDeath: soft death writes no death log entry")
 end
 
+local function testDungeonDeathIgnoredWhenSettingEnabled()
+    local ns = resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        instanceType = "party",
+        settings = { ignoreDungeonDeaths = true },
+    })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "active"
+    rec.livesRemaining = 1
+    rec.deathLog = {}
+    WRL_DB.memorials = {}
+    WRL_DB.deathCount = 0
+    popupShown = {}
+    deathScreenShows = {}
+
+    registeredEvents.PLAYER_DEAD()
+
+    assertEqual(rec.status, "active", "ignored dungeon death keeps run active")
+    assertEqual(rec.livesRemaining, 1, "ignored dungeon death does not consume a life")
+    assertEqual(WRL_DB.deathCount, 0, "ignored dungeon death does not increment account death count")
+    assertEqual(#rec.deathLog, 0, "ignored dungeon death writes no death log")
+    assertEqual(next(WRL_DB.memorials), nil, "ignored dungeon death creates no memorial")
+    assertEqual(#popupShown, 0, "ignored dungeon death shows no popup")
+    assertEqual(#deathScreenShows, 0, "ignored dungeon death shows no death screen")
+    assertEqual(rec.ignoreDeathUntilAlive, true, "ignored dungeon death is suppressed until revive")
+end
+
+local function testBattlegroundDeathIgnoredWhenSettingEnabled()
+    resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        instanceType = "pvp",
+        settings = { ignoreBattlegroundDeaths = true },
+    })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "active"
+    rec.livesRemaining = 1
+    rec.deathLog = {}
+    WRL_DB.memorials = {}
+    WRL_DB.deathCount = 0
+    popupShown = {}
+    deathScreenShows = {}
+
+    registeredEvents.PLAYER_DEAD()
+
+    assertEqual(rec.status, "active", "ignored battleground death keeps run active")
+    assertEqual(rec.livesRemaining, 1, "ignored battleground death does not consume a life")
+    assertEqual(WRL_DB.deathCount, 0, "ignored battleground death does not increment account death count")
+    assertEqual(#rec.deathLog, 0, "ignored battleground death writes no death log")
+    assertEqual(next(WRL_DB.memorials), nil, "ignored battleground death creates no memorial")
+    assertEqual(#popupShown, 0, "ignored battleground death shows no popup")
+    assertEqual(#deathScreenShows, 0, "ignored battleground death shows no death screen")
+end
+
+local function testDungeonDeathStillCountsWhenSettingDisabled()
+    resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        instanceType = "party",
+        settings = { ignoreDungeonDeaths = false },
+    })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "active"
+    rec.livesRemaining = 1
+    rec.deathLog = {}
+    WRL_DB.memorials = {}
+    WRL_DB.deathCount = 0
+    popupShown = {}
+    deathScreenShows = {}
+
+    registeredEvents.PLAYER_DEAD()
+
+    assertEqual(rec.status, "dead_pending_contribution", "dungeon death counts when ignore setting is disabled")
+    assertEqual(rec.livesRemaining, 0, "counted dungeon death consumes the final life")
+    assertEqual(WRL_DB.deathCount, 1, "counted dungeon death increments account death count")
+    assert(WRL_DB.memorials["Runner-Realm#100"] ~= nil, "counted dungeon death creates a memorial")
+end
+
+local function testIgnoredDeathRemainsIgnoredAfterLeavingInstanceWhileDead()
+    resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        instanceType = "party",
+        settings = { ignoreDungeonDeaths = true },
+    })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "active"
+    rec.livesRemaining = 1
+    rec.deathLog = {}
+    WRL_DB.memorials = {}
+    WRL_DB.deathCount = 0
+
+    currentDead = true
+    registeredEvents.PLAYER_DEAD()
+    instanceType = nil
+    registeredEvents.PLAYER_ENTERING_WORLD()
+
+    assertEqual(rec.status, "active", "ignored corpse state remains active after zoning while dead")
+    assertEqual(rec.livesRemaining, 1, "ignored corpse state still does not consume a life")
+    assertEqual(WRL_DB.deathCount, 0, "ignored corpse state still does not increment death count")
+    assertEqual(#rec.deathLog, 0, "ignored corpse state still writes no death log")
+end
+
+local function testIgnoredDeathFlagClearsOnReviveAndLaterWorldDeathCounts()
+    resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        instanceType = "party",
+        settings = { ignoreDungeonDeaths = true },
+    })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "active"
+    rec.livesRemaining = 1
+    rec.deathLog = {}
+    WRL_DB.memorials = {}
+    WRL_DB.deathCount = 0
+
+    currentDead = true
+    registeredEvents.PLAYER_DEAD()
+    assertEqual(rec.ignoreDeathUntilAlive, true, "ignored death flag is set while corpse-running")
+
+    currentDead = false
+    registeredEvents.PLAYER_ALIVE()
+    assertEqual(rec.ignoreDeathUntilAlive, nil, "ignored death flag clears when alive")
+
+    instanceType = nil
+    registeredEvents.PLAYER_DEAD()
+
+    assertEqual(rec.status, "dead_pending_contribution", "later world death counts after ignored flag clears")
+    assertEqual(rec.livesRemaining, 0, "later world death consumes the final life")
+    assertEqual(WRL_DB.deathCount, 1, "later world death increments death count")
+    assert(WRL_DB.memorials["Runner-Realm#100"] ~= nil, "later world death creates a memorial")
+end
+
 local function testStaleLastAttackerIsIgnoredAfterTimeout()
     local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
 
@@ -1143,6 +1292,11 @@ testFinalDeathMemorialIncludesSourceContext()
 testCombatLogGetCurrentEventInfoSourceCapturedBeforeDeath()
 testCombatLogGetCurrentEventInfoEnvironmentalDeathCaptured()
 testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
+testDungeonDeathIgnoredWhenSettingEnabled()
+testBattlegroundDeathIgnoredWhenSettingEnabled()
+testDungeonDeathStillCountsWhenSettingDisabled()
+testIgnoredDeathRemainsIgnoredAfterLeavingInstanceWhileDead()
+testIgnoredDeathFlagClearsOnReviveAndLaterWorldDeathCounts()
 testStaleLastAttackerIsIgnoredAfterTimeout()
 testMissingMapAPIsDoNotBreakDeathHandling()
 

@@ -622,6 +622,23 @@ function D:_IsPlayerDeadOrGhost()
     return false
 end
 
+function D:_IgnoredInstanceDeathType()
+    if not IsInInstance then return nil end
+    local inInstance, instanceType = IsInInstance()
+    if not inInstance then return nil end
+    if instanceType == "party"
+        and ns.Settings
+        and ns.Settings:Get("ignoreDungeonDeaths", false) == true then
+        return "dungeon"
+    end
+    if instanceType == "pvp"
+        and ns.Settings
+        and ns.Settings:Get("ignoreBattlegroundDeaths", false) == true then
+        return "battleground"
+    end
+    return nil
+end
+
 function D:_ShowFinalDeathPopup(rec, snap)
     snap = snap or {}
     local bank = WRL_DB.bankCharacter or "(no bank set)"
@@ -752,6 +769,20 @@ function D:ProcessCurrentDeath(reason)
     local state = ns.Run:GetState(rec)
     if self:_IsEndedState(state) then return end
 
+    if rec.ignoreDeathUntilAlive then
+        if self:_IsPlayerDeadOrGhost() then
+            return true
+        end
+        rec.ignoreDeathUntilAlive = nil
+    end
+
+    local ignoredType = self:_IgnoredInstanceDeathType()
+    if ignoredType then
+        rec.ignoreDeathUntilAlive = true
+        ns:Debug("Death ignored in %s instance by Settings toggle.", ignoredType)
+        return true
+    end
+
     if rec.livesRemaining == nil then rec.livesRemaining = 1 end
 
     -- Soft-death cycle guard: if PLAYER_DEAD fires more than once before
@@ -877,9 +908,11 @@ end
 
 function D:OnRevive()
     deathCycleOpen = false   -- reset soft-death cycle guard on successful revive
+    local rec = ns.Database:GetCurrentCharacter()
+    if rec then rec.ignoreDeathUntilAlive = nil end
     self:ReconcileCurrentDeath("player_alive")
 
-    local rec = ns.Database:GetCurrentCharacter(); if not rec then return end
+    rec = ns.Database:GetCurrentCharacter(); if not rec then return end
     local state = ns.Run:GetState(rec)
     if state == "dead_pending_contribution" then
         -- Player has just returned to their corpse (or accepted the spirit

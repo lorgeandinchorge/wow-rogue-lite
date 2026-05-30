@@ -51,6 +51,15 @@ local function testSettingsDefaultIncludesDarkSoulsDeathSound()
     assertEqual(ns.Settings:Get("deathSound"), "dark_souls", "death sound defaults to Dark Souls")
 end
 
+local function testSettingsDefaultsDoNotIgnoreInstanceDeaths()
+    local ns = resetHarness()
+
+    ns.Settings:Init()
+
+    assertEqual(ns.Settings:Get("ignoreDungeonDeaths"), false, "dungeon deaths count by default")
+    assertEqual(ns.Settings:Get("ignoreBattlegroundDeaths"), false, "battleground deaths count by default")
+end
+
 local function testSettingsUINamesPricingControls()
     local src = readFile("UI/SettingsPopup.lua")
 
@@ -69,9 +78,20 @@ local function testSettingsUINamesDeathSoundControls()
     assertContains(src, "DeathSoundOptions", "Settings should use death module sound options")
 end
 
+local function testSettingsUINamesIgnoredInstanceDeathControls()
+    local src = readFile("UI/SettingsPopup.lua")
+
+    assertContains(src, "Ignore deaths in dungeons", "Settings should expose dungeon death ignore toggle")
+    assertContains(src, "Ignore deaths in battlegrounds", "Settings should expose battleground death ignore toggle")
+    assertContains(src, "ignoreDungeonDeaths", "Settings should persist dungeon death ignore preference")
+    assertContains(src, "ignoreBattlegroundDeaths", "Settings should persist battleground death ignore preference")
+end
+
 testSettingsDefaultIncludesAutoResalePricing()
 testSettingsDefaultIncludesDarkSoulsDeathSound()
+testSettingsDefaultsDoNotIgnoreInstanceDeaths()
 testSettingsUINamesPricingControls()
+testSettingsUINamesIgnoredInstanceDeathControls()
 testSettingsUINamesDeathSoundControls()
 
 print("SettingsPricing.test.lua: ok")

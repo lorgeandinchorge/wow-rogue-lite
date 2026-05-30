@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.4.1
+
+- Add Settings toggles to ignore WoW Roguelite death handling in dungeons and battlegrounds separately.
+- Keep ignored dungeon and battleground deaths from consuming lives, creating memorials, playing death sounds, incrementing death counts, or opening final-contribution prompts.
+- Preserve ignored corpse states until the player revives so zoning or reloading after an exempt death does not retroactively retire the run.
+- Add regression coverage for ignored instance deaths, the Settings toggles, and release metadata.
+
 ## v0.4.0b
 
 - Continue the 0.4 Legacy Revamp with talent-style circular unlock nodes, connector lines, and an **Available Legacy Rewards** summary.

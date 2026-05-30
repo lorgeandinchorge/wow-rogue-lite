@@ -30,13 +30,11 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.0b - Legacy Revamp Completion
+### Latest Update: v0.4.1 - Instance Death Ignore Settings
 
-- Legacy unlocks now use a talent-board style layout with connected unlock nodes and clearer owned, available, and locked states.
-- **Available Legacy Rewards** summarizes your currently unlocked starter-kit pieces: bags, gold, potions, and extra lives.
-- Alchemist's Table rewards now grant potions in multiples of five.
-- Death sounds are selectable under Settings, with Dark Souls as the default plus Off and Random options.
-- Achievement coverage now includes 10-level milestones, death-decade milestones, Insert Coin, and total-death milestones.
+- Settings now includes separate toggles to ignore WoW Roguelite deaths in dungeons and battlegrounds.
+- Ignored instance deaths do not consume lives, create memorials, play death sounds, increment death counts, or open final-contribution prompts.
+- Ignored corpse states stay exempt until the character revives, so zoning or reloading after a dungeon or battleground death does not retroactively retire the run.
 
 ### Bank And Run Structure
 
