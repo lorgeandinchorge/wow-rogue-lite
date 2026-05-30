@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.4.1a
+
+- Include the Legacy layout polish that re-anchors the **Permanent Unlocks** title below **Available Legacy Rewards**.
+- Keep the Legacy tab's availability summary and permanent-unlock board from visually colliding after refreshes.
+- Add regression coverage for the permanent-unlock title anchor.
+
 ## v0.4.1
 
 - Add Settings toggles to ignore WoW Roguelite death handling in dungeons and battlegrounds separately.

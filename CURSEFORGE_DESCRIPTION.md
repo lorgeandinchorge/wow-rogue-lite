@@ -30,11 +30,11 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.1 - Instance Death Ignore Settings
+### Latest Update: v0.4.1a - Legacy Layout Polish
 
-- Settings now includes separate toggles to ignore WoW Roguelite deaths in dungeons and battlegrounds.
-- Ignored instance deaths do not consume lives, create memorials, play death sounds, increment death counts, or open final-contribution prompts.
-- Ignored corpse states stay exempt until the character revives, so zoning or reloading after a dungeon or battleground death does not retroactively retire the run.
+- Includes the Legacy layout polish that keeps **Permanent Unlocks** anchored below **Available Legacy Rewards**.
+- Prevents the Legacy availability summary and permanent unlock board from visually colliding after refreshes.
+- Keeps the v0.4.1 dungeon and battleground death-ignore Settings from the previous release.
 
 ### Bank And Run Structure
 

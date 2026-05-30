@@ -66,6 +66,10 @@ local function testAvailableLegacyRewardsSitsAboveTalentBoard()
         "Available Legacy Rewards should refresh at the top of the Legacy page")
     assertContains(src, "local afterUnlocks = self:_RefreshUnlocks(afterRewards + 28)",
         "Talent board should render after the Available Legacy Rewards section")
+    assertContains(src, "self.unlockTitle:ClearAllPoints()",
+        "Permanent Unlocks title should not keep its initial top-left anchor")
+    assertContains(src, 'self.unlockTitle:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -startY)',
+        "Permanent Unlocks title should move below the Available Legacy Rewards section")
 end
 
 testMainFrameUsesSingleLegacyTab()

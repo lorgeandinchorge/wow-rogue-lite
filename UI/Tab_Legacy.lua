@@ -357,6 +357,10 @@ function Tab:_RefreshUnlocks(startY)
     local L = ns.LegacyUnlocks
     if not L then return startY end
 
+    self.unlockTitle:ClearAllPoints()
+    self.unlockTitle:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -startY)
+    self.unlockTitle:SetText("Permanent Unlocks")
+
     local unlockedCount, totalCount = unlockAvailability(L)
     if self.unlockAvailability then
         self.unlockAvailability:SetText(("Unlocks available: %d / %d"):format(unlockedCount, totalCount))
