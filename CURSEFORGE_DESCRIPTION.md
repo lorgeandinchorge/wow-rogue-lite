@@ -30,11 +30,11 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.1b - Package Cleanup
+### Latest Update: v0.4.1c - Death Sound Previews
 
-- Removes an unused legacy icon asset from the packaged addon.
-- Removes the duplicate Dark Souls death sound file and redundant **Dark Souls Alt** Settings option.
-- Keeps the v0.4.1a Legacy layout polish and v0.4.1 dungeon/battleground death-ignore Settings from the previous releases.
+- Adds a **Play** button beside the Settings death-sound picker so players can preview the selected sound.
+- Renames death-sound choices to slightly off-brand labels such as **Dark Fates** while keeping saved settings stable.
+- Keeps the v0.4.1b package cleanup, v0.4.1a Legacy layout polish, and v0.4.1 dungeon/battleground death-ignore Settings from the previous releases.
 
 ### Bank And Run Structure
 

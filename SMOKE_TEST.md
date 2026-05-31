@@ -105,7 +105,7 @@ If you only have 10 to 15 minutes, please do this section.
   Expected: boons and burdens appear there, not inside the Rewards tab.
 
 - [ ] Open gear Settings and find **Death Sound**.
-  Expected: Dark Souls, Random, Off, and the shipped sound choices appear without errors.
+  Expected: Off, Random, Dark Fates, and the other renamed shipped sound choices appear without errors; **Play** previews the current selection.
 
 - [ ] In gear Settings, switch from **Options** to **Resets**.
   Expected: separate confirmed reset controls appear for achievements, legacy progression, and ledger/economy data.

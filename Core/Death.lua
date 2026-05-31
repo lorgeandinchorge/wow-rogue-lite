@@ -42,15 +42,36 @@ local SOUND_ROOT = "Interface\\AddOns\\WoWRoguelite\\sounds\\"
 local DEATH_SOUND_OPTIONS = {
     { id = "off", label = "Off" },
     { id = "random", label = "Random" },
-    { id = "dark_souls", label = "Dark Souls", file = "dark-souls-you-died-sound-effect_hm5sYFG.mp3" },
-    { id = "gta_wasted", label = "GTA Wasted", file = "gta-v-wasted-death-sound.mp3" },
-    { id = "half_life", label = "Half-Life 2", file = "half-life-2-death-sound.mp3" },
-    { id = "lego_yoda", label = "Lego Yoda", file = "lego-yoda-death-sound-effect.mp3" },
-    { id = "super_mario", label = "Super Mario", file = "super-mario-death-sound-sound-effect.mp3" },
+    { id = "dark_souls", label = "Dark Fates", file = "dark-souls-you-died-sound-effect_hm5sYFG.mp3" },
+    { id = "gta_wasted", label = "Cart Theft Flattened", file = "gta-v-wasted-death-sound.mp3" },
+    { id = "half_life", label = "Quarter-Life 2", file = "half-life-2-death-sound.mp3" },
+    { id = "lego_yoda", label = "Brick Mystic", file = "lego-yoda-death-sound-effect.mp3" },
+    { id = "super_mario", label = "Super Plumber", file = "super-mario-death-sound-sound-effect.mp3" },
 }
 local deathSoundById = {}
 for _, option in ipairs(DEATH_SOUND_OPTIONS) do
     deathSoundById[option.id] = option
+end
+
+local function resolvePlayableDeathSound(soundId)
+    if soundId == "off" then return nil end
+
+    local option = deathSoundById[soundId or ""] or deathSoundById.dark_souls
+    if soundId == "random" then
+        local playable = {}
+        for _, item in ipairs(DEATH_SOUND_OPTIONS) do
+            if item.file then playable[#playable + 1] = item end
+        end
+        option = playable[math.random(#playable)]
+    end
+
+    return option
+end
+
+local function playDeathSoundOption(option)
+    if not PlaySoundFile or not option or not option.file then return false end
+    PlaySoundFile(SOUND_ROOT .. option.file, "Master")
+    return true
 end
 
 -- ── Death-context state ───────────────────────────────────────────────────────
@@ -89,23 +110,12 @@ function D:DeathSoundPath(soundId)
 end
 
 function D:PlayDeathSound()
-    if not PlaySoundFile then return false end
     local selected = ns.Settings and ns.Settings:Get("deathSound", "dark_souls") or "dark_souls"
-    if selected == "off" then return false end
+    return playDeathSoundOption(resolvePlayableDeathSound(selected))
+end
 
-    local option = deathSoundById[selected] or deathSoundById.dark_souls
-    if selected == "random" then
-        local playable = {}
-        for _, item in ipairs(DEATH_SOUND_OPTIONS) do
-            if item.file then playable[#playable + 1] = item end
-        end
-        option = playable[math.random(#playable)]
-    end
-
-    local path = option and option.file and (SOUND_ROOT .. option.file) or nil
-    if not path then return false end
-    PlaySoundFile(path, "Master")
-    return true
+function D:PreviewDeathSound(soundId)
+    return playDeathSoundOption(resolvePlayableDeathSound(soundId or "dark_souls"))
 end
 
 -- ── Helpers ──────────────────────────────────────────────────────────────────

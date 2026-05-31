@@ -682,8 +682,8 @@ function Theme:ApplyFont(fs)
 end
 
 -- Button with themed texture support, flat fallback, and a 1px accent underline.
-function Theme:Button(parent, label, width, height)
-    local b = CreateFrame("Button", nil, parent)
+function Theme:Button(parent, label, width, height, name)
+    local b = CreateFrame("Button", name, parent)
     b:SetSize(width or 120, height or 24)
     self._buttons = self._buttons or {}
     self._buttons[#self._buttons + 1] = b

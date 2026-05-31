@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.4.1c
+
+- Add a **Play** button beside the Settings death-sound picker so players can preview the selected sound.
+- Rename death-sound choices to slightly off-brand labels such as **Dark Fates** while keeping the bundled files and saved setting IDs stable.
+- Add regression coverage for death-sound preview playback and Settings preview-button wiring.
+
 ## v0.4.1b
 
 - Remove an unused legacy icon asset from the packaged addon.
@@ -24,7 +30,7 @@
 - Continue the 0.4 Legacy Revamp with talent-style circular unlock nodes, connector lines, and an **Available Legacy Rewards** summary.
 - Rename Legacy tracks to Storage Vault, Starter Stipend, Alchemist's Table, and Fate Loom, with two-word rank titles across the board.
 - Increase Alchemist's Table potion grants to five potions per unlocked rank.
-- Add selectable death sounds under Settings, defaulting to Dark Souls, with Off and Random options.
+- Add selectable death sounds under Settings, defaulting to Dark Fates, with Off and Random options.
 - Expand achievements with 10-level milestones through 70, death-decade milestones, `Insert Coin` for the first extra life used, and death-count milestones for 1, 10, 50, and 100 deaths.
 
 ## v0.4.0a

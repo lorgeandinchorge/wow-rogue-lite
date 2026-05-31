@@ -21,7 +21,7 @@ local DEATH_LABELS = {
 local DEATH_SOUND_FALLBACKS = {
     { id = "off", label = "Off" },
     { id = "random", label = "Random" },
-    { id = "dark_souls", label = "Dark Souls" },
+    { id = "dark_souls", label = "Dark Fates" },
 }
 
 local RESALE_PRICING_FALLBACKS = {
@@ -83,7 +83,7 @@ local function deathSoundLabel(soundId)
     for _, item in ipairs(DEATH_SOUND_FALLBACKS) do
         if item.id == soundId then return item.label end
     end
-    return "Dark Souls"
+    return "Dark Fates"
 end
 
 local function setTextColor(fs, color, alpha)
@@ -490,9 +490,17 @@ function Popup:Init()
     deathSoundDd:SetPoint("TOPLEFT", self.deathSoundLabel, "BOTTOMLEFT", -16, -2)
     dropdownSetWidth(deathSoundDd, 196)
     self.deathSoundDropdown = deathSoundDd
+    self.deathSoundPreview = Theme:Button(content, "Play", 58, 22, "WRL_SettingsDeathSoundPreview")
+    self.deathSoundPreview:SetPoint("TOPLEFT", 220, -(y - 2))
+    self.deathSoundPreview:SetScript("OnClick", function()
+        local soundId = ns.Settings:Get("deathSound", "dark_souls")
+        if ns.Death and ns.Death.PreviewDeathSound then
+            ns.Death:PreviewDeathSound(soundId)
+        end
+    end)
     self.deathSoundNote = Theme:Text(content, 10, Theme.c.fg2)
-    self.deathSoundNote:SetPoint("TOPLEFT", 220, -y)
-    self.deathSoundNote:SetWidth(400)
+    self.deathSoundNote:SetPoint("TOPLEFT", 292, -y)
+    self.deathSoundNote:SetWidth(328)
     self.deathSoundNote:SetJustifyH("LEFT")
     y = y + 48
 

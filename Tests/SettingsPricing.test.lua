@@ -48,7 +48,7 @@ local function testSettingsDefaultIncludesDarkSoulsDeathSound()
 
     ns.Settings:Init()
 
-    assertEqual(ns.Settings:Get("deathSound"), "dark_souls", "death sound defaults to Dark Souls")
+    assertEqual(ns.Settings:Get("deathSound"), "dark_souls", "death sound defaults to Dark Fates")
 end
 
 local function testSettingsDefaultsDoNotIgnoreInstanceDeaths()
@@ -74,6 +74,8 @@ local function testSettingsUINamesDeathSoundControls()
 
     assertContains(src, "Death Sound", "Settings should include death sound section")
     assertContains(src, "WRL_SettingsDeathSoundDropdown", "Settings should create death sound dropdown")
+    assertContains(src, "WRL_SettingsDeathSoundPreview", "Settings should create death sound preview button")
+    assertContains(src, "PreviewDeathSound", "Settings should call death sound preview helper")
     assertContains(src, "deathSound", "Settings should persist death sound preference")
     assertContains(src, "DeathSoundOptions", "Settings should use death module sound options")
 end
