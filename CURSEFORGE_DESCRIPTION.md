@@ -30,11 +30,11 @@ It is part hardcore challenge, part account progression, and part self-made meta
 
 ## Main Features
 
-### Latest Update: v0.4.1c - Death Sound Previews
+### Latest Update: v0.4.2 - Co-op Awareness
 
-- Adds a **Play** button beside the Settings death-sound picker so players can preview the selected sound.
-- Renames death-sound choices to slightly off-brand labels such as **Dark Fates** while keeping saved settings stable.
-- Keeps the v0.4.1b package cleanup, v0.4.1a Legacy layout polish, and v0.4.1 dungeon/battleground death-ignore Settings from the previous releases.
+- Adds lightweight auto co-op awareness for party/raid groups, including nearby WRL player status, level, lives, and run state.
+- Adds a compact **Co-op Run** feed on the Dashboard for soft deaths, final deaths, revive returns, joins, and leaves.
+- Adds guild discovery pings while keeping gold, unlock ownership, and economy progression local or bank-based.
 
 ### Bank And Run Structure
 

@@ -1,6 +1,6 @@
 # WoW Roguelite Changelog
 
-## Unreleased
+## v0.4.2
 
 - Add lightweight auto co-op awareness for party/raid groups, with compact WRL roster state, recent co-op event feed, and guild discovery pings.
 - Add co-op event broadcasts for soft deaths, final deaths, and revive returns while keeping shared economy/progression out of scope.

@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.4.1c. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, lightweight co-op awareness, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, Settings reset controls, optional dungeon/battleground death ignores, and previewable death-sound choices are in place. The Legacy tab includes refreshed Stipend values, an Alchemist's Table potion track, talent-style unlock nodes, an Unlocks available progress readout, an Available Legacy Rewards summary, and improved spacing between the reward summary and permanent unlock board.
+> **Status:** v0.4.2. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, lightweight co-op awareness, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, Settings reset controls, optional dungeon/battleground death ignores, and previewable death-sound choices are in place. The Legacy tab includes refreshed Stipend values, an Alchemist's Table potion track, talent-style unlock nodes, an Unlocks available progress readout, an Available Legacy Rewards summary, and improved spacing between the reward summary and permanent unlock board.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.1c loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.2 loaded.` in chat.
 
 ### Quick start
 
