@@ -813,6 +813,9 @@ function D:ProcessCurrentDeath(reason)
         if ns.Achievements and ns.Achievements.OnExtraLifeUsed then
             ns.Achievements:OnExtraLifeUsed(ns:UnitKey(), rec)
         end
+        if ns.Multiplayer and ns.Multiplayer.BroadcastEvent then
+            ns.Multiplayer:BroadcastEvent("soft_death", rec.livesRemaining .. " lives remaining")
+        end
         -- Soft death: extra lives remain.  Announce locally only when the
         -- announceSoftDeaths setting is explicitly enabled (default: off).
         if ns.Settings and ns.Settings:Get("announceSoftDeaths", false) then
@@ -886,6 +889,9 @@ function D:ProcessCurrentDeath(reason)
         }
         ns.Database:SaveMemorial(memorial)
         self:AnnounceMemorial(memorial)
+        if ns.Multiplayer and ns.Multiplayer.BroadcastEvent then
+            ns.Multiplayer:BroadcastEvent("final_death", memorial.zone or "")
+        end
         self:ResetDeathContext()   -- clear context state after memorial is written
     end
 
@@ -926,6 +932,9 @@ function D:OnRevive()
     if state == "dead_pending_contribution" then
         -- Player has just returned to their corpse (or accepted the spirit
         -- healer res).  Present the death screen then retire popup chain.
+        if ns.Multiplayer and ns.Multiplayer.BroadcastEvent then
+            ns.Multiplayer:BroadcastEvent("revive", "returned to body")
+        end
         self:TryPresentPendingDeathScreen("revive")
     elseif state == "retired" then
         ns:Print("|cffff6060This character is retired.|r Further play will not be credited to the bank.")

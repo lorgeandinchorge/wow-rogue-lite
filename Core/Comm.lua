@@ -25,6 +25,8 @@ local prefix = ns.commPrefix
 
 -- Addon messages are short on Classic; keep ACK2 under this total size (prefix is separate).
 local MAX_ACK2_BODY = 220
+local MAX_SCOPED_BODY = 230
+local opHandlers = {}
 
 local function splitPayloadByPipe(payload)
     local parts = {}
@@ -61,16 +63,21 @@ local function encode(op, payload)
     return table.concat({ PROTO, op, payload or "" }, "|")
 end
 
-local function sendWhisper(target, msg)
+local function sendAddon(channel, msg, target)
+    if not channel or not msg then return false end
     if C2_ChatInfo and C2_ChatInfo.SendAddonMessage then
-        return C2_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", target)
+        return C2_ChatInfo.SendAddonMessage(prefix, msg, channel, target)
     elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        return C_ChatInfo.SendAddonMessage(prefix, msg, "WHISPER", target)
+        return C_ChatInfo.SendAddonMessage(prefix, msg, channel, target)
     elseif SendAddonMessage then
-        SendAddonMessage(prefix, msg, "WHISPER", target)
+        SendAddonMessage(prefix, msg, channel, target)
         return true
     end
     return false
+end
+
+local function sendWhisper(target, msg)
+    return sendAddon("WHISPER", msg, target)
 end
 
 local function decode(text)
@@ -89,6 +96,39 @@ function C:SendPresencePong(toKey)
     local fromKey = ns:UnitKey()
     if not toKey or not fromKey then return false end
     return sendWhisper(toKey, encode("PONG", fromKey))
+end
+
+function C:RegisterOpHandler(op, callback)
+    if not op or type(callback) ~= "function" then return false end
+    opHandlers[op] = callback
+    return true
+end
+
+function C:SendScoped(op, payload, channel, target)
+    if not op or not channel then return false end
+    local msg = encode(op, payload or "")
+    if #msg > MAX_SCOPED_BODY then
+        if ns.Debug then ns:Debug("Comm: refusing oversized %s message (%d bytes)", tostring(op), #msg) end
+        return false
+    end
+    return sendAddon(channel, msg, target)
+end
+
+function C:SendGroup(op, payload)
+    local raidSize = GetNumRaidMembers and (GetNumRaidMembers() or 0) or 0
+    if raidSize > 0 then
+        return self:SendScoped(op, payload, "RAID")
+    end
+    local partySize = GetNumPartyMembers and (GetNumPartyMembers() or 0) or 0
+    if partySize > 0 then
+        return self:SendScoped(op, payload, "PARTY")
+    end
+    return false
+end
+
+function C:SendGuild(op, payload)
+    if IsInGuild and not IsInGuild() then return false end
+    return self:SendScoped(op, payload, "GUILD")
 end
 
 -- Send a request from a non-bank character to the bank character.
@@ -188,6 +228,9 @@ function C:Receive(text, sender, channel)
         if ns.BankStatus and ns.BankStatus.MarkSeen then
             ns.BankStatus:MarkSeen((payload and payload ~= "") and payload or sender)
         end
+        return
+    elseif opHandlers[op] then
+        opHandlers[op](op, payload or "", sender, channel)
         return
     elseif op == "REQ" then
         -- Only the bank character processes incoming requests.

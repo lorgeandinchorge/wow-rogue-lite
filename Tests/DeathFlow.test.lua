@@ -14,6 +14,7 @@ local instanceType = nil
 local deathScreenShows = {}    -- captured ns.DeathScreen:Show invocations
 local createdButtons = {}
 local scheduledTimers = {}
+local multiplayerEvents = {}
 
 local function resetHarness(opts)
     opts = opts or {}
@@ -25,6 +26,7 @@ local function resetHarness(opts)
     deathScreenShows = {}
     createdButtons = {}
     scheduledTimers = {}
+    multiplayerEvents = {}
     currentDead = opts.currentDead
     if currentDead == nil then currentDead = true end
     currentMoney = opts.currentMoney or 12345
@@ -160,6 +162,15 @@ local function resetHarness(opts)
         Settings = {},
         Rules = {},
         Achievements = nil,
+        Multiplayer = {
+            BroadcastEvent = function(_, kind, detail)
+                multiplayerEvents[#multiplayerEvents + 1] = {
+                    kind = kind,
+                    detail = detail,
+                }
+                return true
+            end,
+        },
     }
 
     function ns:NewModule(name)
@@ -1085,6 +1096,41 @@ local function testDuplicatePlayerDeadDoesNotConsumeTwoSoftDeathLives()
         "testDuplicateDeath: soft death does not end the run")
     assertEqual(#rec.deathLog, 0,
         "testDuplicateDeath: soft death writes no death log entry")
+end
+
+local function testSoftDeathBroadcastsCoopEvent()
+    resetHarness({ currentDead = false, livesRemaining = 2 })
+
+    registeredEvents.PLAYER_DEAD()
+
+    assertEqual(multiplayerEvents[1].kind, "soft_death", "soft death broadcasts co-op event")
+    assertContains(multiplayerEvents[1].detail, "lives remaining", "soft death event includes remaining lives")
+end
+
+local function testFinalDeathBroadcastsCoopEvent()
+    resetHarness({ currentDead = false, livesRemaining = 0 })
+
+    registeredEvents.PLAYER_DEAD()
+
+    assertEqual(multiplayerEvents[1].kind, "final_death", "final death broadcasts co-op event")
+    assertEqual(multiplayerEvents[1].detail, "Westfall", "final death event includes zone")
+end
+
+local function testReviveBroadcastsCoopEventForPendingContribution()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 0 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    WRL_DB.memorials[rec.uid] = {
+        uid = rec.uid,
+        characterKey = rec.key,
+        level = 12,
+        zone = "Westfall",
+        acknowledged = false,
+    }
+
+    ns.Death:OnRevive()
+
+    assertEqual(multiplayerEvents[1].kind, "revive", "revive broadcasts co-op event")
 end
 
 local function testDungeonDeathIgnoredWhenSettingEnabled()

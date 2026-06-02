@@ -83,6 +83,13 @@ local function testSettingsOwnsIgnoredInstanceDeathToggles()
     assertContains(src, "ignoreBattlegroundDeaths", "Settings should write battleground death ignore setting")
 end
 
+local function testSettingsOwnsMultiplayerDefaults()
+    local src = readFile("Core/Settings.lua")
+
+    assertContains(src, "multiplayerEnabled", "Settings should default co-op multiplayer enablement")
+    assertContains(src, "multiplayerGuildDiscovery", "Settings should default guild discovery")
+end
+
 local function testOldRulesTabNoLongerLoads()
     local toc = readFile("WoWRoguelite.toc")
 
@@ -102,6 +109,7 @@ testSettingsOwnsRunModifiersSurface()
 testSettingsOwnsPricingSurface()
 testSettingsOwnsCoreResetSurface()
 testSettingsOwnsIgnoredInstanceDeathToggles()
+testSettingsOwnsMultiplayerDefaults()
 testOldRulesTabNoLongerLoads()
 testInterfaceOptionsPointsRulesToSettings()
 

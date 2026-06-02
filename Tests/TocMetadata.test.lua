@@ -24,11 +24,17 @@ end
 
 local loansPos = toc:find("Core/Loans.lua", 1, true)
 local contributionsPos = toc:find("Core/Contributions.lua", 1, true)
+local commPos = toc:find("Core/Comm.lua", 1, true)
+local multiplayerPos = toc:find("Core/Multiplayer.lua", 1, true)
+local requestsPos = toc:find("Core/Requests.lua", 1, true)
 if not loansPos then
     error("expected WoWRoguelite.toc to load Core/Loans.lua", 2)
 end
 if not contributionsPos or loansPos > contributionsPos then
     error("expected Core/Loans.lua to load before Core/Contributions.lua", 2)
+end
+if not commPos or not multiplayerPos or not requestsPos or commPos > multiplayerPos or multiplayerPos > requestsPos then
+    error("expected Core/Multiplayer.lua to load after Core/Comm.lua and before Core/Requests.lua", 2)
 end
 
 print("TocMetadata.test.lua: ok")

@@ -29,6 +29,7 @@ Core/Loans.lua
 Core/Contributions.lua
 Core/Achievements.lua
 Core/Comm.lua
+Core/Multiplayer.lua
 Core/Requests.lua
 Core/Death.lua
 

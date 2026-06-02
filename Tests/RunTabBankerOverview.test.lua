@@ -330,6 +330,15 @@ end
 
 local function testRunnerDashboardShowsLoanSummary()
     local tab = resetHarness()
+    tab._testNS.Multiplayer = {
+        DashboardLines = function()
+            return {
+                "|cffc0a060Co-op Run|r",
+                "WRL players nearby: 1",
+                " - Friend lvl 31 | 2 lives | active",
+            }
+        end,
+    }
     local lines = tab:_BuildCharacterOverviewLines("Graham-Realm", WRL_DB.characters["Graham-Realm"])
     local text = table.concat(lines, "\n")
 
@@ -337,6 +346,8 @@ local function testRunnerDashboardShowsLoanSummary()
     assertContains(text, "Outstanding loan:", "runner dashboard shows outstanding debt")
     assertContains(text, "Borrow available:", "runner dashboard shows available borrow amount")
     assertContains(text, "1g", "runner dashboard renders loan values in gold")
+    assertContains(text, "|cffc0a060Co-op Run|r", "runner dashboard includes co-op section")
+    assertContains(text, "WRL players nearby: 1", "runner dashboard includes co-op roster summary")
 end
 
 local function testContributionActionOnlyShowsForPendingContributionRuns()
@@ -724,10 +735,23 @@ local function testBankDeskUsesBorderedSectionsWithStrongHeadings()
     assertContains(src, "section:SetWidth(BANK_SECTION_WIDTH)", "bank sections should not draw under the main scrollbar")
 end
 
+local function testCharacterDashboardWiresCoopSummary()
+    local tabFile = assert(io.open("UI/Tab_Run.lua", "rb"))
+    local src = tabFile:read("*a"):gsub("\r\n", "\n")
+    tabFile:close()
+    local mpFile = assert(io.open("Core/Multiplayer.lua", "rb"))
+    local multiplayer = mpFile:read("*a"):gsub("\r\n", "\n")
+    mpFile:close()
+
+    assertContains(src, "ns.Multiplayer:DashboardLines()", "character dashboard should render multiplayer summary")
+    assertContains(multiplayer, "|cffc0a060Co-op Run|r", "multiplayer module should provide Co-op Run heading")
+end
+
 testBankerOverviewReplacesRunSnapshotCopy()
 testRunnerDashboardShowsLoanSummary()
 testContributionActionOnlyShowsForPendingContributionRuns()
 testContributionBoardShowsLocalAccountContributionsByCharacter()
+testCharacterDashboardWiresCoopSummary()
 testAccountAssignmentTextAssignsCharacterAndRequest()
 testAccountSummaryRowAssignmentTargetsSingleUnassignedCharacter()
 testAccountSummaryRowAssignmentFallsBackForMultipleCharacters()

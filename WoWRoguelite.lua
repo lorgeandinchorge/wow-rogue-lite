@@ -105,6 +105,7 @@ ns:On("PLAYER_LOGIN", function()
     ns.Contributions:Init() -- must follow Database + Vendor; used by Death
     ns.Achievements:Init()  -- must follow Contributions/Run/Rules/Tiers for criteria checks
     ns.Comm:Init()
+    ns.Multiplayer:Init()
     ns.Requests:Init()
     -- DeathScreen must Init before Death so Death:Init can call
     -- TryPresentPendingDeathScreen on login with the UI available.

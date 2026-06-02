@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## Unreleased
+
+- Add lightweight auto co-op awareness for party/raid groups, with compact WRL roster state, recent co-op event feed, and guild discovery pings.
+- Add co-op event broadcasts for soft deaths, final deaths, and revive returns while keeping shared economy/progression out of scope.
+- Extend addon-message routing beyond bank whispers with scoped party/raid/guild sends and regression coverage.
+
 ## v0.4.1c
 
 - Add a **Play** button beside the Settings death-sound picker so players can preview the selected sound.

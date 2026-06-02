@@ -1942,6 +1942,11 @@ end
 
 function Tab:_BuildCharacterOverviewLines(key, rec)
     local right = {}
+    if ns.Multiplayer and ns.Multiplayer.DashboardLines then
+        local coop = ns.Multiplayer:DashboardLines()
+        for i = 1, #coop do right[#right + 1] = coop[i] end
+        right[#right + 1] = ""
+    end
     if ns.Loans and ns.Loans.BorrowCapForCharacter then
         local cap = ns.Loans:BorrowCapForCharacter(key)
         right[#right + 1] = "|cffc0a060Loan status|r"
