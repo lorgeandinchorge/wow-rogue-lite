@@ -266,41 +266,151 @@ local function shallowCopyItems(items)
     return out
 end
 
-function R:OnAck(reqId, status)
+local function outgoingRequestById(reqId)
+    if not reqId or reqId == "" then return nil end
+    WRL_CharDB = WRL_CharDB or {}
     WRL_CharDB.outgoing = WRL_CharDB.outgoing or {}
     for _, r in ipairs(WRL_CharDB.outgoing) do
-        if r.id == reqId then r.status = status; break end
+        if r.id == reqId then return r end
     end
+end
+
+local function expectedBankerForOutgoing(row)
+    if row and row.bank and row.bank ~= "" then return row.bank end
+    if WRL_DB and WRL_DB.bankCharacter and WRL_DB.bankCharacter ~= "" then return WRL_DB.bankCharacter end
+end
+
+local function applyLocalClaim(row, fulfillment, verificationStatus, note)
+    if not row or row._localClaimApplied then return false end
+    local characterKey = ns:UnitKey()
+    local when = fulfillment and fulfillment.when or time()
+    local banker = fulfillment and fulfillment.banker or expectedBankerForOutgoing(row)
+    local method = (verificationStatus == "manual_confirmed") and "manual_review"
+        or (fulfillment and fulfillment.method)
+        or "manual"
+
+    if ns.Database and ns.Database.MarkTierClaimed then
+        for _, tierId in ipairs((fulfillment and fulfillment.tierIds) or row.tierIds or {}) do
+            ns.Database:MarkTierClaimed(characterKey, tierId, {
+                when = when,
+                requestId = row.id,
+                fulfilledBy = banker,
+                method = method,
+                verification = verificationStatus,
+                note = note,
+            })
+        end
+    end
+
+    if fulfillment and (fulfillment.extraLives or 0) > 0 and ns.Database and ns.Database.GetCharacter then
+        local rec = ns.Database:GetCharacter(characterKey)
+        if rec then
+            rec.livesRemaining = (rec.livesRemaining or 1) + fulfillment.extraLives
+        end
+    end
+
+    row._localClaimApplied = true
+    return true
+end
+
+local function refreshAfterRequesterAck()
     if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
         ns.MainFrame:RefreshCurrentTab()
     end
 end
 
+function R:OnAck(reqId, status)
+    local row = outgoingRequestById(reqId)
+    if not row then return false, "unknown_request" end
+    if status == REQ_STATUS.FULFILLED or status == "fulfilled" then
+        row.status = "needs_review"
+        row.verificationStatus = "needs_review"
+        row.reviewReason = "missing_ack2"
+        row.legacyAckStatus = status
+        row.legacyAckAt = time()
+        refreshAfterRequesterAck()
+        return false, "missing_ack2"
+    end
+    row.status = status
+    row.legacyAckStatus = status
+    row.legacyAckAt = time()
+    refreshAfterRequesterAck()
+    return true, status
+end
+
 -- Rich fulfillment sync for the requester (see Comm ACK2). Does not replace OnAck.
 function R:OnAck2(reqId, fields)
-    if not reqId or not fields then return end
-    WRL_CharDB.outgoing = WRL_CharDB.outgoing or {}
-    for _, r in ipairs(WRL_CharDB.outgoing) do
-        if r.id == reqId then
-            r.status = fields.status or r.status or REQ_STATUS.FULFILLED
-            r.fulfillment = {
-                when = fields.when or time(),
-                banker = fields.banker,
-                requester = fields.requester or ns:UnitKey(),
-                requestId = reqId,
-                tierIds = fields.tierIds or r.tierIds or {},
-                items = shallowCopyItems(fields.items),
-                gold = fields.gold or 0,
-                extraLives = fields.extraLives or 0,
-                method = fields.method or "manual",
-                status = fields.status or REQ_STATUS.FULFILLED,
-            }
-            break
-        end
+    if not reqId or reqId == "" then return false, "invalid_request_id" end
+    if not fields then return false, "missing_fields" end
+    local row = outgoingRequestById(reqId)
+    if not row then return false, "unknown_request" end
+    if row._ack2Confirmed then return false, "duplicate_ack2" end
+
+    local expectedBanker = expectedBankerForOutgoing(row)
+    if not fields.banker or fields.banker == "" or (expectedBanker and fields.banker ~= expectedBanker) then
+        row.status = "needs_review"
+        row.verificationStatus = "needs_review"
+        row.reviewReason = "invalid_banker"
+        row.rejectedFulfillment = {
+            when = fields.when or time(),
+            banker = fields.banker,
+            requestId = reqId,
+            tierIds = fields.tierIds or row.tierIds or {},
+            status = fields.status or REQ_STATUS.FULFILLED,
+        }
+        refreshAfterRequesterAck()
+        return false, "invalid_banker"
     end
-    if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
-        ns.MainFrame:RefreshCurrentTab()
-    end
+
+    local fulfillment = {
+        when = fields.when or time(),
+        banker = fields.banker,
+        requester = fields.requester or ns:UnitKey(),
+        requestId = reqId,
+        tierIds = fields.tierIds or row.tierIds or {},
+        items = shallowCopyItems(fields.items),
+        gold = fields.gold or 0,
+        extraLives = fields.extraLives or 0,
+        method = fields.method or "manual",
+        status = fields.status or REQ_STATUS.FULFILLED,
+    }
+    row.status = "confirmed"
+    row.verificationStatus = "confirmed"
+    row.reviewReason = nil
+    row.fulfillment = fulfillment
+    row.ack2Count = (row.ack2Count or 0) + 1
+    row._ack2Confirmed = true
+    applyLocalClaim(row, fulfillment, "confirmed")
+    refreshAfterRequesterAck()
+    return true, "confirmed"
+end
+
+function R:ManualConfirmOutgoing(reqId, note)
+    local row = outgoingRequestById(reqId)
+    if not row then return false, "unknown_request" end
+    if row._localClaimApplied then return false, "already_confirmed" end
+
+    row.status = "manual_confirmed"
+    row.verificationStatus = "manual_confirmed"
+    row.manualReviewNote = note
+    row.manualConfirmedAt = time()
+
+    local fulfillment = row.fulfillment or {
+        when = row.manualConfirmedAt,
+        banker = expectedBankerForOutgoing(row),
+        requester = ns:UnitKey(),
+        requestId = row.id,
+        tierIds = row.tierIds or {},
+        items = {},
+        gold = 0,
+        extraLives = 0,
+        method = "manual_review",
+        status = "manual_confirmed",
+    }
+    row.fulfillment = fulfillment
+    applyLocalClaim(row, fulfillment, "manual_confirmed", note)
+    refreshAfterRequesterAck()
+    return true, "manual_confirmed"
 end
 
 function R:PendingRequests()

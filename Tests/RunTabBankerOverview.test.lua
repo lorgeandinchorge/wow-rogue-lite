@@ -203,6 +203,14 @@ local function resetHarness()
         self.pendingCOD = nil
         return true
     end
+    function ns.BankResale:DismissInventoryStock(itemId, qty)
+        self.dismissedStock = { itemId = itemId, qty = qty }
+        return true
+    end
+    function ns.BankResale:DismissVisibleInventoryStock(rows)
+        self.dismissedVisibleRows = rows
+        return #(rows or {})
+    end
     function ns.BankResale:RemoveSimulatedStock(itemId)
         self.removedSimStock = itemId
         return true
@@ -477,26 +485,14 @@ local function testBankDeskCanSelectResaleRowsByClickTarget()
     assertEqual(tab:_ActiveResaleRow().itemId, 723, "invalid resale click keeps current active row")
 end
 
-local function testSelectedResaleOrderDefaultsToRequesterAndFullRow()
+local function testSelectedResaleOrderDoesNotDefaultUnmatchedRequester()
     local tab = resetHarness()
 
     local order = tab:_SelectResaleRow(1)
 
     assertEqual(order.itemId, 769, "selected resale order keeps the item")
     assertEqual(order.qty, 5, "selected resale order defaults to the full row quantity")
-    assertEqual(order.buyer, "Graham-Realm", "selected resale order defaults to the active requester")
-
-    tab:PromptResaleCOD(order)
-    assertEqual(tab._lastResalePrompted, nil, "known requester should avoid prompting for buyer")
-    assertEqual(tab._lastResaleCOD.itemId, 769, "mail action prepares the selected resale item")
-    assertEqual(tab._lastResaleCOD.qty, 5, "mail action prepares the full selected order")
-    assertEqual(tab._lastResaleCOD.buyer, "Graham-Realm", "mail action uses the known requester")
-
-    tab:_RecordResaleRow(order)
-    assertEqual(tab._lastResaleCOD, tab._testNS.BankResale.pendingCOD, "test keeps COD draft visible before record clears module state")
-    assertEqual(tab._testNS.BankResale.recordedSale.itemId, 769, "sold action records the selected item")
-    assertEqual(tab._testNS.BankResale.recordedSale.qty, 5, "sold action records the full selected order")
-    assertEqual(tab._testNS.BankResale.recordedSale.buyer, "Graham-Realm", "sold action records the known requester")
+    assertEqual(order.buyer, nil, "unmatched resale stock should not default to the active requester")
 
     order = tab:_SelectResaleRow(1)
     tab:PromptResaleCOD(order)
@@ -513,6 +509,17 @@ local function testCancelResaleRowRemovesSimulatedStockLine()
     tab:_CancelResaleRow(row)
 
     assertEqual(tab._testNS.BankResale.removedSimStock, 769, "cancel removes the simulated stock line")
+end
+
+local function testCancelResaleRowDismissesRealInventoryLine()
+    local tab = resetHarness()
+    local row = tab:_ResaleRows()[1]
+
+    tab:_CancelResaleRow(row)
+
+    assertEqual(tab._testNS.BankResale.dismissedStock.itemId, 769, "cancel dismisses the real inventory item")
+    assertEqual(tab._testNS.BankResale.dismissedStock.qty, 5, "cancel dismisses the visible owned quantity")
+    assertEqual(tab.pendingResaleOrder, nil, "cancel clears any selected resale order")
 end
 
 local function testSelectedResaleOrderUsesRequestedQuantityWhenRequestMatchesItem()
@@ -538,9 +545,32 @@ local function testSelectedResaleOrderUsesRequestedQuantityWhenRequestMatchesIte
     assertEqual(tab._lastResaleCOD.qty, 3, "COD draft receives requested item quantity")
 end
 
+local function testResaleRowWithoutMatchingRequestDoesNotRecreatePhantomOrder()
+    local tab = resetHarness()
+
+    local order = tab:_SelectResaleRow(1)
+    tab:_CancelResaleRow(tab:_ResaleRows()[1])
+    local rebuilt = tab:_BuildResaleOrder(tab:_ResaleRows()[1])
+
+    assertEqual(order.buyer, nil, "unrequested resale stock should not default to the active bank requester")
+    assertEqual(order.qty, 5, "unrequested resale stock should keep the owned count")
+    assertEqual(rebuilt.buyer, nil, "refresh should not recreate a phantom buyer after row cancel")
+end
+
 local function testResaleCODRehydratesStaleSelectionWithRequester()
     local tab = resetHarness()
     WRL_DB.requests[1].from = "Tester-Realm"
+    tab._testNS.Requests.FulfillmentReadiness = function(_, req)
+        return {
+            items = {
+                { id = 769, name = "Chunk of Boar Meat", required = 5, available = 5, missing = 0 },
+            },
+            missingItems = {},
+            requiredGold = 0,
+            availableGold = 0,
+            fulfillable = true,
+        }
+    end
     tab.pendingResaleOrder = {
         itemId = 769,
         name = "Chunk of Boar Meat",
@@ -579,6 +609,7 @@ local function testResaleDeskClearAllClearsSimulatedRowsAndSelection()
     tab:_ClearResaleDesk()
 
     assertEqual(tab._testNS.BankResale.clearedSimStock, true, "clear all calls simulated stock cleanup")
+    assertEqual(#tab._testNS.BankResale.dismissedVisibleRows, 2, "clear all dismisses visible inventory rows")
     assertEqual(tab.pendingResaleOrder, nil, "clear all removes selected resale order")
     assertEqual(tab._testNS.BankResale.pendingCOD, nil, "clear all removes pending COD draft")
     assertEqual(tab.bankResaleIndex, 1, "clear all resets resale selection")
@@ -757,9 +788,11 @@ testAccountSummaryRowAssignmentTargetsSingleUnassignedCharacter()
 testAccountSummaryRowAssignmentFallsBackForMultipleCharacters()
 testBankDeskActionButtonsAreDashboardOwned()
 testBankDeskCanSelectResaleRowsByClickTarget()
-testSelectedResaleOrderDefaultsToRequesterAndFullRow()
+testSelectedResaleOrderDoesNotDefaultUnmatchedRequester()
 testCancelResaleRowRemovesSimulatedStockLine()
+testCancelResaleRowDismissesRealInventoryLine()
 testSelectedResaleOrderUsesRequestedQuantityWhenRequestMatchesItem()
+testResaleRowWithoutMatchingRequestDoesNotRecreatePhantomOrder()
 testResaleCODRehydratesStaleSelectionWithRequester()
 testResaleCODUsesSimulatedBuyerWithoutBankRequest()
 testResaleDeskClearAllClearsSimulatedRowsAndSelection()

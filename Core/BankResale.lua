@@ -89,6 +89,7 @@ function BR:Init()
     WRL_DB = WRL_DB or {}
     WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
     WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
+    WRL_DB.resaleDismissedStock = WRL_DB.resaleDismissedStock or {}
 end
 
 function BR:Catalog()
@@ -294,6 +295,36 @@ function BR:ClearSimulatedStock()
     return true
 end
 
+function BR:DismissInventoryStock(itemId, qty)
+    WRL_DB = WRL_DB or {}
+    WRL_DB.resaleDismissedStock = WRL_DB.resaleDismissedStock or {}
+    itemId = tonumber(itemId)
+    qty = math.max(0, math.floor(tonumber(qty) or 0))
+    if not itemId then return false, "bad_item" end
+    if qty <= 0 then return false, "bad_qty" end
+    if not self:IsCatalogItem(itemId) then return false, "not_catalog" end
+
+    local key = tostring(itemId)
+    WRL_DB.resaleDismissedStock[key] = math.max(0, math.floor(tonumber(WRL_DB.resaleDismissedStock[key]) or 0)) + qty
+    if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+        ns.MainFrame:RefreshCurrentTab()
+    end
+    return true
+end
+
+function BR:DismissVisibleInventoryStock(rows)
+    local dismissed = 0
+    rows = rows or self:InventoryRows()
+    for _, row in ipairs(rows or {}) do
+        local qty = math.max(0, math.floor(tonumber(row.actualCount or row.count) or 0))
+        if row.itemId and qty > 0 then
+            local ok = self:DismissInventoryStock(row.itemId, qty)
+            if ok then dismissed = dismissed + 1 end
+        end
+    end
+    return dismissed
+end
+
 function BR:RemoveSimulatedStock(itemId)
     WRL_DB = WRL_DB or {}
     itemId = tonumber(itemId)
@@ -397,10 +428,13 @@ function BR:InventoryRows()
                         priceLabel = priceDetail and priceDetail.sourceLabel or nil,
                         priceShortLabel = ns.Pricing and ns.Pricing.ShortSourceLabel and ns.Pricing:ShortSourceLabel(priceDetail and (priceDetail.sourceId or priceDetail.sourceLabel)) or nil,
                         totalCopper = 0,
+                        actualCount = 0,
+                        simulatedCount = 0,
                     }
                     byId[itemId] = row
                 end
                 row.count = row.count + qty
+                row.actualCount = (row.actualCount or 0) + qty
                 row.totalCopper = row.count * row.priceEach
             end
         end
@@ -422,18 +456,34 @@ function BR:InventoryRows()
                     priceLabel = priceDetail and priceDetail.sourceLabel or nil,
                     priceShortLabel = ns.Pricing and ns.Pricing.ShortSourceLabel and ns.Pricing:ShortSourceLabel(priceDetail and (priceDetail.sourceId or priceDetail.sourceLabel)) or nil,
                     totalCopper = 0,
+                    actualCount = 0,
+                    simulatedCount = 0,
                     simulated = true,
                 }
                 byId[itemId] = row
             end
             row.count = row.count + qty
+            row.simulatedCount = (row.simulatedCount or 0) + qty
             row.totalCopper = row.count * row.priceEach
             row.simulated = true
         end
     end
 
     local rows = {}
-    for _, row in pairs(byId) do rows[#rows + 1] = row end
+    local dismissedStock = (WRL_DB and WRL_DB.resaleDismissedStock) or {}
+    for _, row in pairs(byId) do
+        local dismissed = math.max(0, math.floor(tonumber(dismissedStock[tostring(row.itemId)] or 0) or 0))
+        local actualCount = math.max(0, math.floor(tonumber(row.actualCount) or 0))
+        local hiddenActual = math.min(actualCount, dismissed)
+        if hiddenActual > 0 then
+            row.actualCount = actualCount - hiddenActual
+            row.count = math.max(0, math.floor(tonumber(row.count) or 0)) - hiddenActual
+            row.totalCopper = row.count * (row.priceEach or 0)
+        end
+        if (row.count or 0) > 0 then
+            rows[#rows + 1] = row
+        end
+    end
     table.sort(rows, function(a, b)
         if tostring(a.name) == tostring(b.name) then
             return (a.itemId or 0) < (b.itemId or 0)

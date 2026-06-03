@@ -336,12 +336,14 @@ function Tab:_SelectResaleRow(index)
     return self.pendingResaleOrder
 end
 
-function Tab:_DefaultResaleBuyer()
+function Tab:_DefaultResaleBuyer(includeActiveRequest)
     local draft = ns.BankResale and ns.BankResale.pendingCOD
     if draft and draft.buyer then return draft.buyer end
     if self.pendingResaleOrder and self.pendingResaleOrder.buyer then return self.pendingResaleOrder.buyer end
-    local req = self:_ActiveBankRequest()
-    if req and req.from then return req.from end
+    if includeActiveRequest then
+        local req = self:_ActiveBankRequest()
+        if req and req.from then return req.from end
+    end
     if ns.BankResale and ns.BankResale.SimulatedBuyer then
         local buyer = ns.BankResale:SimulatedBuyer()
         if buyer and buyer ~= "" then return buyer end
@@ -371,12 +373,14 @@ function Tab:_BuildResaleOrder(row)
     local req, requestItem = self:_RequestItemForResaleRow(row)
     local requestedQty = requestItem and tonumber(requestItem.required or requestItem.qty)
     local qty = math.max(1, math.floor(requestedQty or tonumber(row.count) or tonumber(row.qty) or 1))
+    local buyer = requestItem and req and req.from or self:_DefaultResaleBuyer(false)
     return {
         itemId = row.itemId,
         itemName = row.name,
         name = row.name,
         qty = qty,
-        buyer = (req and req.from) or self:_DefaultResaleBuyer(),
+        buyer = buyer,
+        requested = requestItem ~= nil,
         priceEach = row.priceEach,
         priceSource = row.priceSource,
         priceLabel = row.priceLabel,
@@ -391,6 +395,7 @@ function Tab:_ResaleOrderForRow(row)
     if pending and pending.itemId == row.itemId then
         pending.buyer = (fresh and fresh.buyer) or pending.buyer
         pending.qty = (fresh and fresh.qty) or pending.qty
+        pending.requested = (fresh and fresh.requested) or pending.requested
         pending.name = pending.name or (fresh and fresh.name)
         pending.itemName = pending.itemName or (fresh and fresh.itemName)
         pending.priceEach = pending.priceEach or (fresh and fresh.priceEach) or row.priceEach
@@ -429,6 +434,16 @@ function Tab:_CancelResaleRow(row)
         if ns.BankResale then ns.BankResale.pendingCOD = nil end
         self.pendingResaleOrder = nil
         ns:Print("Removed simulated resale stock line.")
+    elseif row and ns.BankResale and ns.BankResale.DismissInventoryStock then
+        local qty = math.max(0, math.floor(tonumber(row.actualCount or row.count or row.qty) or 0))
+        local ok = qty > 0 and ns.BankResale:DismissInventoryStock(row.itemId, qty)
+        if ok then
+            if ns.BankResale then ns.BankResale.pendingCOD = nil end
+            self.pendingResaleOrder = nil
+            ns:Print("Cleared resale stock line from the desk.")
+        else
+            ns:Print("No visible resale stock line to clear.")
+        end
     elseif pending and (not row or pending.itemId == row.itemId) then
         ns.BankResale.pendingCOD = nil
         self.pendingResaleOrder = nil
@@ -444,6 +459,9 @@ end
 
 function Tab:_ClearResaleDesk()
     if ns.BankResale then
+        if ns.BankResale.DismissVisibleInventoryStock then
+            ns.BankResale:DismissVisibleInventoryStock(self:_ResaleRows())
+        end
         ns.BankResale.pendingCOD = nil
         if ns.BankResale.ClearSimulatedStock then
             ns.BankResale:ClearSimulatedStock()
@@ -451,7 +469,7 @@ function Tab:_ClearResaleDesk()
     end
     self.pendingResaleOrder = nil
     self.bankResaleIndex = 1
-    ns:Print("Cleared simulated resale desk stock.")
+    ns:Print("Cleared visible resale desk stock.")
     self:Refresh()
 end
 
@@ -786,7 +804,8 @@ local function appendResaleDesk(lines, maxRows, owner)
         local row = rows[i]
         local order = owner and owner._BuildResaleOrder and owner:_BuildResaleOrder(row) or nil
         local name = row.name or ("item:" .. tostring(row.itemId or "?"))
-        local buyer = (order and order.buyer) or "Unknown"
+        local buyer = (order and order.buyer) or ""
+        local showOrderQty = order and (order.requested or order.buyer)
         if #name > 20 then name = name:sub(1, 17) .. "..." end
         if #buyer > 18 then buyer = buyer:sub(1, 15) .. "..." end
         local priceLabel = row.priceShortLabel or row.priceLabel or ""
@@ -803,7 +822,7 @@ local function appendResaleDesk(lines, maxRows, owner)
         lines[#lines + 1] = string.format("%-20s %-18s %3s %3d %13s %8s",
             name,
             buyer,
-            tostring(order and order.qty or row.count or 0),
+            showOrderQty and tostring(order.qty or row.count or 0) or "",
             row.count or 0,
             eachText,
             ns.Tiers:FormatMoney((order and order.totalCopper) or row.totalCopper or 0))
@@ -1535,7 +1554,8 @@ local function setResaleSection(section, lines, rows, owner)
             local selected = (owner.bankResaleIndex or 1) == i
             local order = owner and owner._BuildResaleOrder and owner:_BuildResaleOrder(row) or nil
             local name = row.name or ("item:" .. tostring(row.itemId or "?"))
-            local buyer = (order and order.buyer) or "Unknown"
+            local buyer = (order and order.buyer) or ""
+            local showOrderQty = order and (order.requested or order.buyer)
             if #name > 20 then name = name:sub(1, 17) .. "..." end
             if #buyer > 18 then buyer = buyer:sub(1, 15) .. "..." end
             local priceLabel = row.priceShortLabel or row.priceLabel or ""
@@ -1554,7 +1574,7 @@ local function setResaleSection(section, lines, rows, owner)
             setResaleRowText(button,
                 name,
                 buyer,
-                tostring(order and order.qty or row.count or 0),
+                showOrderQty and tostring(order.qty or row.count or 0) or "",
                 tostring(row.count or 0),
                 eachText,
                 ns.Tiers:FormatMoney((order and order.totalCopper) or row.totalCopper or 0))

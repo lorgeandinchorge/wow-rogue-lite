@@ -160,6 +160,33 @@ local function testInventoryRowsAggregateCatalogStacks()
     assertEqual(rows[2].count, 5, "visible bank slots aggregate with carried bags")
 end
 
+local function testDismissInventoryStockHidesVisibleCatalogRowUntilCountIncreases()
+    local ns = resetHarness()
+    local boarCount = 5
+    ns.Container = {
+        GetNumSlots = function(_, bag)
+            if bag == 0 then return 1 end
+            return 0
+        end,
+        GetItemInfo = function(_, bag, slot)
+            if bag == 0 and slot == 1 then return { itemID = 769, count = boarCount, itemLink = "item:769" } end
+            return nil
+        end,
+    }
+
+    local ok, reason = ns.BankResale:DismissInventoryStock(769, boarCount)
+    local hiddenRows = ns.BankResale:InventoryRows()
+    boarCount = 7
+    local newRows = ns.BankResale:InventoryRows()
+
+    assertEqual(ok, true, "dismissing visible resale stock succeeds")
+    assertEqual(reason, nil, "dismissing visible resale stock has no error")
+    assertEqual(#hiddenRows, 0, "dismissed inventory stock no longer redraws the same row")
+    assertEqual(#newRows, 1, "newly added stock can still appear after dismissal")
+    assertEqual(newRows[1].itemId, 769, "new stock keeps the dismissed item id")
+    assertEqual(newRows[1].count, 2, "only stock above the dismissed count is shown")
+end
+
 local function testSimulatedStockAppearsInInventoryRows()
     local ns = resetHarness()
 
@@ -320,6 +347,7 @@ testPriceUsesVendorDoubleOrFallbackMinimum()
 testPriceUsesFallbackWhenGetItemInfoIsUncached()
 testAutoPricingUsesTSMWithSourceMetadata()
 testInventoryRowsAggregateCatalogStacks()
+testDismissInventoryStockHidesVisibleCatalogRowUntilCountIncreases()
 testSimulatedStockAppearsInInventoryRows()
 testRemoveSimulatedStockRemovesOneItemLine()
 testRecordSaleStoresReceipt()

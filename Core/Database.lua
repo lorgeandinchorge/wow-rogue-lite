@@ -60,6 +60,7 @@ local function defaults()
         resaleReceipts       = {}, -- account-wide resale sale ledger; owned by Core/BankResale.lua
         loanReceipts         = {}, -- account-wide loan borrow/repayment ledger; owned by Core/Loans.lua
         resaleSimStock       = {}, -- temporary simulated resale stock for local testing
+        resaleDismissedStock = {}, -- [itemId] = quantity hidden from the Resale Desk inventory scanner
         bankLedgerClearedAt  = 0,  -- visibility cutoff for the Recent Ledger UI
     }
 end
@@ -174,6 +175,7 @@ function D:Init()
         if WRL_DB.schema < 13 then
             WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
             WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
+            WRL_DB.resaleDismissedStock = WRL_DB.resaleDismissedStock or {}
         end
         if WRL_DB.schema < 14 then
             WRL_DB.loanReceipts = WRL_DB.loanReceipts or {}
@@ -186,6 +188,7 @@ function D:Init()
     WRL_DB.resaleReceipts = WRL_DB.resaleReceipts or {}
     WRL_DB.loanReceipts = WRL_DB.loanReceipts or {}
     WRL_DB.resaleSimStock = WRL_DB.resaleSimStock or {}
+    WRL_DB.resaleDismissedStock = WRL_DB.resaleDismissedStock or {}
     WRL_DB.accounts = WRL_DB.accounts or {}
     WRL_DB.accountLinks = WRL_DB.accountLinks or {}
     self:EnsureDefaultAccount()
