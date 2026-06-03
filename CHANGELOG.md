@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.4.2a
+
+- Fix Resale Desk row clearing so real scanned inventory can be dismissed from the desk instead of immediately redrawing.
+- Stop unmatched resale stock from inheriting a phantom active requester or requested quantity.
+- Add runner-side ACK2 verification for reward requests, with banker validation, duplicate suppression, local auto-claiming, and manual review fallback.
+
 ## v0.4.2
 
 - Add lightweight auto co-op awareness for party/raid groups, with compact WRL roster state, recent co-op event feed, and guild discovery pings.
