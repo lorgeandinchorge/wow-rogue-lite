@@ -1,117 +1,199 @@
 # WoW Roguelite
 
-WoW Roguelite is a run-based progression addon for WoW Classic.
+WoW Roguelite is a rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**.
 
-You choose one character to act as your bank. Every other character becomes a run. When a run ends, its contribution helps fund the next generation. Over time, your account builds a legacy bank that unlocks stronger starter kits for future characters.
+Pick one character as your **bank**. Every other character is a hardcore **run**. Final death retires the run, but what it contributes to the bank becomes spendable legacy budget that future characters can use for starter kits.
 
 It is part hardcore challenge, part account progression, and part self-made metagame.
 
-## Core Idea
+## Latest Update: v0.4.2a
 
-- One character is your bank.
-- Other characters are runs.
-- Final death retires a run.
-- Retired runs contribute value back into the account.
-- Lifetime contributions become spendable legacy budget.
-- New runs can request unlocked Storage, Stipend, Alchemist's Table, and Fate rewards from the bank.
+- Adds runner-side verification for fulfilled reward requests. Modern bank clients send a richer ACK2 receipt, and the runner validates the banker, suppresses duplicates, auto-confirms valid fulfillments, and falls back to manual review when needed.
+- Fixes Resale Desk row clearing so real scanned inventory can be dismissed without immediately redrawing.
+- Keeps the v0.4.2 lightweight co-op layer: nearby WRL party/raid status, run state, lives, level, joins, leaves, soft deaths, final deaths, revive returns, and guild discovery pings.
 
-## What The Addon Tracks
+## Core Loop
 
-- current run state
-- bank character assignment
-- account-wide contribution totals
-- unlocked legacy rewards
-- request and fulfillment flow between run and bank
-- bank reporting, aggregate supplies, and resale ledgers
-- manual loan cap, debt, and repayment accounting
-- roguelite rule profiles
-- optional boons and burdens for a run
-- retirements, rule logs, and exports
+One character is your bank. Every other character is a run. When a run dies for good, its carried gold and vendorable value flow back to the bank and become part of your lifetime contribution total.
 
-## Main Features
+That total turns into spendable legacy budget you allocate into permanent unlock tracks:
 
-### Latest Update: v0.4.2 - Co-op Awareness
+- **Storage Vault**: better starter bags and storage support
+- **Starter Stipend**: starter gold
+- **Alchemist's Table**: healing potions
+- **Fate Loom**: extra lives
 
-- Adds lightweight auto co-op awareness for party/raid groups, including nearby WRL player status, level, lives, and run state.
-- Adds a compact **Co-op Run** feed on the Dashboard for soft deaths, final deaths, revive returns, joins, and leaves.
-- Adds guild discovery pings while keeping gold, unlock ownership, and economy progression local or bank-based.
+New runs can request unlocked rewards as starter kits. The bank itself is infrastructure, not a run, so it can freely handle storage, mail, trading, auction house work, travel, loans, resale stock, and reward fulfillment.
 
-### Bank And Run Structure
+## Install
 
-Set one character as your bank with `/wrl setbank`. The bank is treated as infrastructure, not as a run, so it can handle storage, mail, trading, and reward fulfillment.
+Install via CurseForge, or copy the `WoWRoguelite` folder into:
 
-### Account-Wide Progression
+```text
+World of Warcraft\_anniversary_\Interface\AddOns\
+```
 
-When a run dies permanently, the addon tracks its final contribution and adds it to your lifetime total. At a vendor, use **WRL: Sell All** to confirm and liquidate vendorable bags plus equipped gear. At a mailbox, use **WRL: Contribute** to prepare the currency-only handoff to the bank. That total becomes spendable budget for permanent legacy unlocks.
+The final path should be:
 
-### Starter Reward Requests
+```text
+...\AddOns\WoWRoguelite\WoWRoguelite.toc
+```
 
-On a new run, spend budget on the Legacy tab, then open the Rewards tab, choose an unlocked starter reward, and prepare a request mail for the bank. On the bank character, open the Rewards tab to see what is needed and fulfill it by mail or trade.
+Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.2a loaded.` in chat.
 
-### Loans Prototype
+## Quick Start
 
-Loans are fully manual. The addon records the loan paperwork and shows debt/cap visibility, but it does not mail, trade, or move gold. The bank can record a loan after handing gold over manually, and repayments are accounted for before normal contribution credit.
+1. On the character you want as your bank: `/wrl setbank`.
+2. Roll a new character. That is your first run.
+3. Type `/wrl` to open the main window.
+4. Use **Legacy** to spend available budget.
+5. Use **Rewards** to prepare a starter-kit request mail.
+6. Use **Dashboard** to track the current run, bank desk, co-op status, loans, resale, and contribution prep.
 
-### Banker Reporting
+## How A Run Works
 
-The bank Dashboard is the main work surface for final fulfillment: Requisitions Desk, Banker Summary, Needed Supplies, Account Summary, Contribution Board, Loans Desk, Resale Desk, and Recent Ledger all live together so the banker can see what is ready, what is missing, what is owed, and what was recently handled.
+**On a run character.** Open `/wrl` -> **Legacy** to review lifetime contributions and spend available legacy budget into Storage Vault, Starter Stipend, Alchemist's Table, and Fate Loom. Open `/wrl` -> **Rewards**, choose one unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually. The Dashboard also shows your current loan cap, outstanding debt, remaining borrow room, and co-op status.
 
-### Profiles, Rules, And Run Modifiers
+**On your bank character.** Open `/wrl` -> **Dashboard** to use the Requisitions Desk: active request readiness, Banker Summary, aggregate Needed Supplies, account summaries, character contribution rows, loan balances, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
 
-Choose from built-in profiles like Casual Roguelite, Banked Hardcore, Solo Self Found, and Ironman. You can also customize individual rule toggles and set boons and burdens from Settings under Run Modifiers.
+**On death.** If a non-bank run has lives left from Fate Loom unlocks, you get a soft popup and continue. Death sounds are selectable under gear **Settings** -> **Death Sound** and can be previewed with the adjacent **Play** button. On a final death, the addon snapshots carried currency plus vendor value and lists captured item stacks with vendor sell value. Visit a vendor and click **WRL: Sell All** to confirm and sell vendorable bag contents plus equipped gear. At a mailbox, click **WRL: Contribute** in the mail header to prepare the currency-only contribution mail, reserving 30c for postage. If you defer or close the prompt, the **Dashboard** tab has **Prepare Contribution Mail** and `/wrl contribute` reopens it.
 
-Settings also includes confirmed resets for core account sections: achievements, legacy progression, and ledger/economy data.
+After final death, the character is marked **retired**. Retirement is soft: the addon does not delete the character or block play, but further play is not credited.
 
-### Export And Audit Tools
+## Co-op Awareness
 
-Use `/wrl export` to generate a compact summary of a run or your account state for sharing, logging, or troubleshooting.
+Group with other players who have WRL enabled. The Dashboard automatically shows a compact **Co-op Run** section with nearby WRL party/raid members, their run state, level, lives, and recent soft-death/final-death/revive events.
 
-## Reward Philosophy
+Guild discovery is lightweight presence only. Gold, unlock ownership, banking, loans, resale, and economy progression stay local or bank-based.
 
-The addon is designed to make each run feel connected to the last one.
+## Profiles, Rules, Boons, And Burdens
 
-You are not just deleting characters and starting over. You are building a lineage:
+Built-in profiles cover common run shapes:
 
-- Storage: better bags
-- Stipend: starter gold
-- Alchemist's Table: healing potions
-- Fate: rare extra lives
+- **Casual Roguelite**
+- **Banked Hardcore**
+- **Solo Self Found**
+- **Ironman**
 
-Each death still matters, but it also helps push the account forward.
+Apply one with `/wrl profile <id>` or through the gear -> Settings popup. Individual rule toggles and per-run **boon / burden** modifiers live in the same Settings popup. Rule taints and warnings are logged per character and viewable with `/wrl rules log`.
 
-## Important Limitation
+Settings also includes confirmed resets for achievements, legacy progression, and ledger/economy data, so testers can restart one part of progression without wiping everything.
 
-Because of Blizzard API restrictions, the addon cannot click protected buttons for you. It can prepare mail and trade actions, show the shopping list, and assist with fulfillment, but the player must still confirm the final send or trade manually.
+## Legacy Unlocks
+
+Lifetime contributions become spendable legacy budget. Spending budget does not reduce the lifetime total; it records how much of that total has been allocated into permanent unlock tracks.
+
+| Track | Costs | Grants |
+| --- | --- | --- |
+| Storage Vault | 3g, 10g, 25g, 75g, 250g, 750g | Better starter bags and storage support |
+| Starter Stipend | 3g, 10g, 25g, 75g, 250g, 750g | Starter gold grants of 1g, 5g, 10g, 25g, 100g, and 350g |
+| Alchemist's Table | 3g, 10g, 25g, 75g, 250g, 750g | Five healing potions per rank, from Minor through Super |
+| Fate Loom | 25g, 750g | +1 extra life at ranks 3 and 6 |
+
+The Legacy tab shows these as talent-style rank nodes plus an **Unlocks available: X / Y** summary and an **Available Legacy Rewards** list of the starter kit pieces you have unlocked so far.
+
+## Banker Tools
+
+The bank Dashboard is the main work surface for fulfillment and accounting:
+
+- Requisitions Desk
+- Banker Summary
+- Needed Supplies
+- Account Summary
+- Contribution Board
+- Loans Desk
+- Resale Desk
+- Recent Ledger
+
+Loans are fully manual. The addon records loan paperwork, cap, debt, repayment, and account ownership, but it does not mail, trade, or move gold. When a character with outstanding account debt contributes money, repayment is applied before normal contribution credit.
+
+Resale is also manual. The bank can track curated quest-useful goods, use Auto pricing with optional TSM DBMarket support, prepare COD mail, and record sold stock.
 
 ## Slash Commands
 
 ```text
-/wrl
-/wrl help
-/wrl setbank
-/wrl bank
-/wrl settings
-/wrl profile
-/wrl rules
-/wrl export
-/wrl contribute
-/wrl bankreport
-/wrl needed
-/wrl loan
-/wrl loan borrow
-/wrl loan repay
-/wrl simloan
-/wrl sellfinal
+Window
+  /wrl                  toggle the main window
+  /wrl dashboard        jump to the Dashboard tab
+  /wrl request          jump to the Rewards tab
+
+Bank identity and tools
+  /wrl setbank          mark the current character as the bank
+  /wrl setbank NAME     set an external bank character by Name-Realm
+  /wrl bank             show the current bank character
+  /wrl account L C-R    assign Character-Realm to account label L
+  /wrl bankreport       print banker summary lines
+  /wrl needed           print aggregate needed supplies
+
+Loans and resale
+  /wrl loan             show loan desk status
+  /wrl loan borrow C-R AMT
+  /wrl loan repay C-R AMT
+  /wrl simloan C-R AMT  simulate a manual loan for testing
+  /wrl simresale        simulate resale stock for testing
+  /wrl resale           show bank resale catalog inventory
+  /wrl resale cod ID QTY BUYER
+  /wrl resale sold ID QTY [BUYER]
+
+Run lifecycle
+  /wrl contribute       reopen pending final-contribution mail prep
+  /wrl sellfinal        open vendor sell-all prompt
+  /wrl vendorfinal      alias for /wrl sellfinal
+
+Configuration
+  /wrl settings         print current settings to chat
+  /wrl profile          show active profile
+  /wrl profile list     list available profiles
+  /wrl profile <id>     apply a profile
+  /wrl rules            list rules and their enabled state
+  /wrl rules log        print recent taint/warn log entries
+  /wrl theme            show the active UI theme
+  /wrl theme <id>       set UI theme
+
+Export
+  /wrl export           export current run summary
+  /wrl export run       same as /wrl export
+  /wrl export account   export account-wide legacy summary
+
+Maintenance
+  /wrl reqrefresh       refresh bag item indicators
+  /wrl debug            toggle debug logging
+  /wrl reset confirm    wipe ALL addon data
+  /wrl help             print this command list
 ```
+
+`/roguelite` is an alias for `/wrl`.
+
+## UI Themes
+
+Open `/wrl` and click the gear button to choose the account-wide theme, or use `/wrl theme <id>`.
+
+- `classic`: Classic WoW / BetterBags-style palette
+- `dark`: the former dark default palette
+- `gw2`: GW2 UI-inspired palette, available when GW2 UI is installed and enabled
+- `havok`: black surfaces with electric blue accents
+- `rabid`: strong blue surfaces with cooler blue-purple accents
+- `grant` / **Graham**: jewel purples primary, greens secondary
+- `isabella`: jewel pinks primary, teals secondary
+
+Theme changes apply immediately to open addon windows.
+
+## Known Limits
+
+- **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
+- **Contribution value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value. The vendor-only **WRL: Sell All** button can sell vendorable bags plus equipped gear after confirmation. Mail contribution remains currency-only and reserves 30c for postage.
+- **Cross-realm addon whispers are not guaranteed in TBC.** The mail fallback path exists for this reason.
+- **Retirement is soft.** The addon marks a character retired but does not delete them or block play; it just stops crediting further contributions.
 
 ## Good Fit If You Want
 
 - a self-imposed hardcore progression mode
 - account-wide persistence between runs
 - a bank-driven legacy system
+- co-op awareness without shared economy ownership
 - more structure for reroll-heavy play
 - a personal roguelite layer on top of WoW Classic
 
 ## Early Version Note
 
-This project is still in an early version, so feedback on bugs, rough edges, and confusing UI is especially helpful.
+This project is still in an early version, so feedback on bugs, rough edges, confusing UI, and awkward bank workflows is especially helpful.

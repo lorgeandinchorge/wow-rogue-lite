@@ -5,6 +5,7 @@ local ADDON_NAME, ns = ...
 local M = ns:NewModule("Multiplayer")
 
 local FIELD = "^"
+local SUMMARY_SCHEMA = "R2"
 local ROSTER_TTL = 90
 local EVENT_TTL = 300
 local EVENT_LIMIT = 8
@@ -72,6 +73,63 @@ local function eventLabel(kind)
     return tostring(kind or "event")
 end
 
+local function isFinalDeathState(state)
+    return state == "dead_pending_contribution" or state == "retired"
+end
+
+local function profileId()
+    if ns.Settings and ns.Settings.GetProfile then
+        return ns.Settings:GetProfile() or "unknown"
+    end
+    if WRL_DB and WRL_DB.settings and WRL_DB.settings.profile then
+        return WRL_DB.settings.profile
+    end
+    return "unknown"
+end
+
+local function bankReady()
+    return WRL_DB and WRL_DB.bankCharacter and WRL_DB.bankCharacter ~= ""
+end
+
+local function checksumAdd(sum, text)
+    text = tostring(text or "")
+    for i = 1, #text do
+        sum = (sum + (text:byte(i) * i)) % 9973
+    end
+    return sum
+end
+
+local function ruleEnabled(ruleId)
+    if ns.Rules and ns.Rules.IsEnabled then
+        return ns.Rules:IsEnabled(ruleId) == true
+    end
+    if WRL_DB and WRL_DB.settings and WRL_DB.settings.rules then
+        return WRL_DB.settings.rules[ruleId] == true
+    end
+    return false
+end
+
+local function rulesFingerprint()
+    local enabledIds = {}
+    if ns.Rules and ns.Rules.Definitions then
+        for _, def in ipairs(ns.Rules:Definitions() or {}) do
+            local id = def and def.id
+            if id and ruleEnabled(id) then enabledIds[#enabledIds + 1] = id end
+        end
+    elseif WRL_DB and WRL_DB.settings and WRL_DB.settings.rules then
+        for id, on in pairs(WRL_DB.settings.rules) do
+            if on == true then enabledIds[#enabledIds + 1] = tostring(id) end
+        end
+        table.sort(enabledIds)
+    end
+
+    local sum = 0
+    for _, id in ipairs(enabledIds) do
+        sum = checksumAdd(sum, id)
+    end
+    return ("r%d-%04d"):format(#enabledIds, sum)
+end
+
 local function refreshUI()
     if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
         ns.MainFrame:RefreshCurrentTab()
@@ -115,38 +173,88 @@ function M:_CurrentSummary()
     if lives == nil then lives = 0 end
     local state = (ns.Run and ns.Run.GetState and rec and ns.Run:GetState(rec)) or (rec and rec.status) or "unknown"
     return {
+        schema = SUMMARY_SCHEMA,
         key = key,
         version = ns.version or "?",
         class = class or "UNKNOWN",
         level = tonumber(level) or 0,
         lives = tonumber(lives) or 0,
         state = state or "unknown",
+        profile = profileId(),
+        rules = rulesFingerprint(),
+        bankReady = bankReady(),
+        finalDeath = isFinalDeathState(state),
     }
 end
 
 function M:_EncodeSummary(summary)
     if not summary then return nil end
     return table.concat({
+        SUMMARY_SCHEMA,
         clean(summary.key),
         clean(summary.version),
         clean(summary.class),
         tostring(math.floor(tonumber(summary.level) or 0)),
         tostring(math.floor(tonumber(summary.lives) or 0)),
         clean(summary.state),
+        clean(summary.profile or "unknown"),
+        clean(summary.rules or "r0-0000"),
+        summary.bankReady and "1" or "0",
+        summary.finalDeath and "1" or "0",
     }, FIELD)
 end
 
 function M:_DecodeSummary(payload)
     local f = splitFields(payload)
     if not f[1] or f[1] == "" then return nil end
+    if f[1] == SUMMARY_SCHEMA then
+        if not f[2] or f[2] == "" then return nil end
+        return {
+            schema = f[1],
+            key = f[2],
+            version = f[3] or "?",
+            class = f[4] or "UNKNOWN",
+            level = tonumber(f[5]) or 0,
+            lives = tonumber(f[6]) or 0,
+            state = f[7] or "unknown",
+            profile = f[8] or "unknown",
+            rules = f[9] or "r0-0000",
+            bankReady = f[10] == "1",
+            finalDeath = f[11] == "1" or isFinalDeathState(f[7]),
+        }
+    end
     return {
+        schema = "legacy",
         key = f[1],
         version = f[2] or "?",
         class = f[3] or "UNKNOWN",
         level = tonumber(f[4]) or 0,
         lives = tonumber(f[5]) or 0,
         state = f[6] or "unknown",
+        readiness = "Unknown",
+        readinessReason = "older client",
     }
+end
+
+function M:_EvaluateReadiness(peer)
+    if not peer then return "Unknown", "missing state" end
+    if peer.channel == "GUILD" then return "Unknown", "guild presence" end
+    if peer.schema ~= SUMMARY_SCHEMA then return "Unknown", peer.readinessReason or "older client" end
+
+    local localSummary = self:_CurrentSummary()
+    if not localSummary then return "Unknown", "local state missing" end
+    if not peer.version or peer.version == "" or not peer.profile or peer.profile == "" or not peer.rules or peer.rules == "" then
+        return "Warning", "missing readiness"
+    end
+    if peer.version ~= localSummary.version then return "Warning", "version mismatch" end
+    if peer.profile ~= localSummary.profile then return "Warning", "different profile" end
+    if peer.rules ~= localSummary.rules then return "Warning", "different rules" end
+    if not localSummary.bankReady then return "Warning", "your bank not set" end
+    if not peer.bankReady then return "Warning", "no bank set" end
+    if peer.finalDeath then return "Warning", "final death pending" end
+    if localSummary.finalDeath then return "Warning", "your run ended" end
+    if peer.state ~= localSummary.state then return "Warning", "different run state" end
+    return "Ready", "aligned"
 end
 
 function M:_RememberPeer(summary, channel)
@@ -156,6 +264,7 @@ function M:_RememberPeer(summary, channel)
     local isNew = roster[summary.key] == nil
     summary.channel = channel or summary.channel
     summary.seenAt = now()
+    summary.readiness, summary.readinessReason = self:_EvaluateReadiness(summary)
     roster[summary.key] = summary
     if isNew and channel ~= "GUILD" then
         addLocalEvent(summary.key, "join", "WRL client seen", channel)
@@ -291,12 +400,16 @@ function M:DashboardLines()
         lines[#lines + 1] = ("WRL players nearby: %d"):format(#peers)
         for i = 1, math.min(#peers, 5) do
             local p = peers[i]
-            lines[#lines + 1] = (" - %s lvl %d | %d %s | %s"):format(
+            local readiness = p.readiness or "Unknown"
+            local reason = p.readinessReason and p.readinessReason ~= "" and (" - " .. p.readinessReason) or ""
+            lines[#lines + 1] = (" - %s lvl %d | %d %s | %s | %s%s"):format(
                 shortName(p.key),
                 p.level or 0,
                 p.lives or 0,
                 (p.lives or 0) == 1 and "life" or "lives",
-                p.state or "unknown")
+                p.state or "unknown",
+                readiness,
+                reason)
         end
     end
     local feed = self:EventRows()

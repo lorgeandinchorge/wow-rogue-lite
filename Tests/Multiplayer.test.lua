@@ -1,8 +1,14 @@
 local function resetHarness()
     WRL_DB = {
+        bankCharacter = "Bank-Realm",
         settings = {
+            profile = "casual_roguelite",
             multiplayerEnabled = true,
             multiplayerGuildDiscovery = true,
+            rules = {
+                no_auction_house = false,
+                no_dungeon_repeats = false,
+            },
         },
         characters = {
             ["Runner-Realm"] = {
@@ -32,6 +38,7 @@ local function resetHarness()
         version = "0.4.1c",
         Database = {},
         Run = {},
+        Rules = {},
         Settings = {},
         Comm = {},
         MainFrame = {
@@ -58,6 +65,10 @@ local function resetHarness()
         return v
     end
 
+    function ns.Settings:GetProfile()
+        return WRL_DB.settings.profile
+    end
+
     function ns.Database:GetCurrentCharacter()
         return WRL_DB.characters["Runner-Realm"]
     end
@@ -68,6 +79,17 @@ local function resetHarness()
 
     function ns.Run:GetState(rec)
         return rec and rec.status or "unknown"
+    end
+
+    function ns.Rules:Definitions()
+        return {
+            { id = "no_auction_house" },
+            { id = "no_dungeon_repeats" },
+        }
+    end
+
+    function ns.Rules:IsEnabled(ruleId)
+        return WRL_DB.settings.rules and WRL_DB.settings.rules[ruleId] == true
     end
 
     function ns.Comm:RegisterOpHandler(op, cb)
@@ -87,6 +109,36 @@ local function resetHarness()
 
     assert(loadfile("Core/Multiplayer.lua"))("WoWRoguelite", ns)
     return ns, sent, events, function(value) if value then now = value end return now end
+end
+
+local function r2Payload(overrides)
+    local row = {
+        schema = "R2",
+        key = "Friend-Realm",
+        version = "0.4.1c",
+        class = "PRIEST",
+        level = "31",
+        lives = "3",
+        state = "active",
+        profile = "casual_roguelite",
+        rules = "r0-0000",
+        bank = "1",
+        finalDeath = "0",
+    }
+    for k, v in pairs(overrides or {}) do row[k] = tostring(v) end
+    return table.concat({
+        row.schema,
+        row.key,
+        row.version,
+        row.class,
+        row.level,
+        row.lives,
+        row.state,
+        row.profile,
+        row.rules,
+        row.bank,
+        row.finalDeath,
+    }, "^")
 end
 
 local function assertEqual(actual, expected, message)
@@ -121,7 +173,7 @@ local function testGroupHelloBroadcastUsesCompactRunSummary()
     assertEqual(ok, true, "hello broadcast succeeds")
     assertEqual(sent[1].channel, "PARTY", "hello uses group channel")
     assertEqual(sent[1].op, "HELLO", "hello op")
-    assertEqual(sent[1].payload, "Runner-Realm^0.4.1c^MAGE^24^2^active", "hello payload")
+    assertEqual(sent[1].payload, "R2^Runner-Realm^0.4.1c^MAGE^24^2^active^casual_roguelite^r0-0000^1^0", "hello payload")
 end
 
 local function testGuildDiscoverySendsLightweightHello()
@@ -158,11 +210,79 @@ local function testIncomingStateUpdatesRosterAndExpiresWhenStale()
     assertEqual(rows[1].key, "Friend-Realm", "roster key")
     assertEqual(rows[1].level, 19, "roster level")
     assertEqual(rows[1].lives, 1, "roster lives")
+    assertEqual(rows[1].readiness, "Unknown", "legacy state readiness")
+    assertEqual(rows[1].readinessReason, "older client", "legacy readiness reason")
 
     setNow(1101)
     rows = ns.Multiplayer:RosterRows()
 
     assertEqual(#rows, 0, "stale roster entry expires")
+end
+
+local function testMatchingR2PeerIsReady()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload(), "PARTY", "Friend-Realm")
+    local rows = ns.Multiplayer:RosterRows()
+
+    assertEqual(rows[1].readiness, "Ready", "matching R2 peer is ready")
+    assertEqual(rows[1].readinessReason, "aligned", "matching R2 reason")
+end
+
+local function testVersionMismatchWarns()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload({ version = "0.4.0" }), "PARTY", "Friend-Realm")
+    local rows = ns.Multiplayer:RosterRows()
+
+    assertEqual(rows[1].readiness, "Warning", "version mismatch warns")
+    assertEqual(rows[1].readinessReason, "version mismatch", "version mismatch reason")
+end
+
+local function testProfileMismatchWarns()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload({ profile = "banked_hardcore" }), "PARTY", "Friend-Realm")
+    local rows = ns.Multiplayer:RosterRows()
+
+    assertEqual(rows[1].readiness, "Warning", "profile mismatch warns")
+    assertEqual(rows[1].readinessReason, "different profile", "profile mismatch reason")
+end
+
+local function testRulesMismatchWarns()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload({ rules = "r1-1234" }), "PARTY", "Friend-Realm")
+    local rows = ns.Multiplayer:RosterRows()
+
+    assertEqual(rows[1].readiness, "Warning", "rules mismatch warns")
+    assertEqual(rows[1].readinessReason, "different rules", "rules mismatch reason")
+end
+
+local function testMissingBankWarns()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload({ bank = "0" }), "PARTY", "Friend-Realm")
+    local rows = ns.Multiplayer:RosterRows()
+
+    assertEqual(rows[1].readiness, "Warning", "missing bank warns")
+    assertEqual(rows[1].readinessReason, "no bank set", "missing bank reason")
+end
+
+local function testFinalDeathWarns()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload({ state = "dead_pending_contribution", lives = "0", finalDeath = "1" }), "PARTY", "Friend-Realm")
+    local rows = ns.Multiplayer:RosterRows()
+
+    assertEqual(rows[1].readiness, "Warning", "final death warns")
+    assertEqual(rows[1].readinessReason, "final death pending", "final death reason")
 end
 
 local function testHelloAndByeCreateLocalJoinLeaveFeed()
@@ -202,7 +322,19 @@ local function testDashboardLinesSummarizeRosterAndEvents()
     assertContains(joined, "Co-op Run", "dashboard has co-op heading")
     assertContains(joined, "Friend", "dashboard includes short player name")
     assertContains(joined, "lvl 31", "dashboard includes level")
+    assertContains(joined, "Unknown - older client", "dashboard includes legacy readiness")
     assertContains(joined, "final death", "dashboard includes readable event kind")
+end
+
+local function testDashboardLinesShowReadyPeerCompactly()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload(), "PARTY", "Friend-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Friend lvl 31", "dashboard keeps compact peer row")
+    assertContains(joined, "Ready - aligned", "dashboard includes ready status")
 end
 
 testInitRegistersMultiplayerOps()
@@ -210,8 +342,15 @@ testGroupHelloBroadcastUsesCompactRunSummary()
 testGuildDiscoverySendsLightweightHello()
 testStateBroadcastsAreThrottled()
 testIncomingStateUpdatesRosterAndExpiresWhenStale()
+testMatchingR2PeerIsReady()
+testVersionMismatchWarns()
+testProfileMismatchWarns()
+testRulesMismatchWarns()
+testMissingBankWarns()
+testFinalDeathWarns()
 testHelloAndByeCreateLocalJoinLeaveFeed()
 testDuplicateEventsAreIgnored()
 testDashboardLinesSummarizeRosterAndEvents()
+testDashboardLinesShowReadyPeerCompactly()
 
 print("Multiplayer.test.lua: ok")
