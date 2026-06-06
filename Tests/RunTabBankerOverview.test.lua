@@ -358,6 +358,43 @@ local function testRunnerDashboardShowsLoanSummary()
     assertContains(text, "WRL players nearby: 1", "runner dashboard includes co-op roster summary")
 end
 
+local function testRunnerSnapshotShowsRecentOutgoingRequestStatuses()
+    local tab = resetHarness()
+    WRL_CharDB.outgoing = {
+        {
+            id = "req-1",
+            when = 100,
+            bank = "Bank-Realm",
+            tierIds = { 101, 201 },
+            status = "sent",
+        },
+        {
+            id = "req-2",
+            when = 120,
+            bank = "Bank-Realm",
+            tierIds = { 301 },
+            status = "confirmed",
+            verificationStatus = "confirmed",
+        },
+        {
+            id = "req-3",
+            when = 110,
+            bank = "Altbank-Realm",
+            tierIds = { 401 },
+            status = "needs_review",
+            reviewReason = "invalid_banker",
+        },
+    }
+
+    local lines = tab:_BuildCharacterSnapshotLines("Graham-Realm", WRL_DB.characters["Graham-Realm"])
+    local text = table.concat(lines, "\n")
+
+    assertContains(text, "Recent outgoing requests:", "runner snapshot names outgoing request history")
+    assertContains(text, "301 | confirmed | Bank", "runner snapshot shows latest confirmed request")
+    assertContains(text, "401 | needs review (invalid_banker) | Altbank", "runner snapshot shows review context")
+    assertContains(text, "101, 201 | sent | Bank", "runner snapshot keeps older sent request visible")
+end
+
 local function testContributionActionOnlyShowsForPendingContributionRuns()
     local tab = resetHarness()
 
@@ -780,6 +817,7 @@ end
 
 testBankerOverviewReplacesRunSnapshotCopy()
 testRunnerDashboardShowsLoanSummary()
+testRunnerSnapshotShowsRecentOutgoingRequestStatuses()
 testContributionActionOnlyShowsForPendingContributionRuns()
 testContributionBoardShowsLocalAccountContributionsByCharacter()
 testCharacterDashboardWiresCoopSummary()

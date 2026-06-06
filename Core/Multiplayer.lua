@@ -79,6 +79,15 @@ local function eventLabel(kind)
     return tostring(kind or "event")
 end
 
+local function isAuditEvent(kind)
+    return kind == "request_created"
+        or kind == "request_confirmed"
+        or kind == "bank_fulfilled"
+        or kind == "contribution_prepared"
+        or kind == "contribution_completed"
+        or kind == "contribution_received"
+end
+
 local function isFinalDeathState(state)
     return state == "dead_pending_contribution" or state == "retired"
 end
@@ -425,6 +434,19 @@ function M:DashboardLines()
             local e = feed[i]
             local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
             lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
+        end
+        local auditShown = 0
+        for i = 1, #feed do
+            local e = feed[i]
+            if isAuditEvent(e.kind) then
+                if auditShown == 0 then
+                    lines[#lines + 1] = "Peer audit context:"
+                end
+                local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
+                lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
+                auditShown = auditShown + 1
+                if auditShown >= 3 then break end
+            end
         end
     end
     return lines

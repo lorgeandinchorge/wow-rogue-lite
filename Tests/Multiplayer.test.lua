@@ -351,6 +351,19 @@ local function testDashboardLinesNameAuditEvents()
     assertContains(joined, "contribution completed", "dashboard labels contribution audit event")
 end
 
+local function testDashboardLinesShowPeerAuditContext()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("EVENT", "evt-6^Friend-Realm^request_created^31^3^active^Rewards 101, 201 to Bank", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-7^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101, 201 for Friend", "PARTY", "Bank-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Peer audit context:", "dashboard separates peer audit context from the raw event feed")
+    assertContains(joined, "Bank: bank fulfilled - Rewards 101, 201 for Friend", "dashboard shows bank fulfillment context")
+    assertContains(joined, "Friend: request created - Rewards 101, 201 to Bank", "dashboard shows peer request context")
+end
+
 testInitRegistersMultiplayerOps()
 testGroupHelloBroadcastUsesCompactRunSummary()
 testGuildDiscoverySendsLightweightHello()
@@ -367,5 +380,6 @@ testDuplicateEventsAreIgnored()
 testDashboardLinesSummarizeRosterAndEvents()
 testDashboardLinesShowReadyPeerCompactly()
 testDashboardLinesNameAuditEvents()
+testDashboardLinesShowPeerAuditContext()
 
 print("Multiplayer.test.lua: ok")

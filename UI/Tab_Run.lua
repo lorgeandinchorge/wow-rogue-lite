@@ -54,18 +54,29 @@ local function isRequestPending(status)
     return status == "sent" or status == "pending" or status == "gathering"
 end
 
-local function newestPendingOutgoing()
+local function isOutgoingVisible(status)
+    return status == "sent"
+        or status == "pending"
+        or status == "gathering"
+        or status == "confirmed"
+        or status == "manual_confirmed"
+        or status == "needs_review"
+end
+
+local function recentOutgoingRequests(limit)
     local outgoing = WRL_CharDB and WRL_CharDB.outgoing
-    if type(outgoing) ~= "table" then return nil end
-    local best = nil
+    if type(outgoing) ~= "table" then return {} end
+    local rows = {}
     for _, req in ipairs(outgoing) do
-        if req and isRequestPending(req.status) then
-            if (not best) or ((req.when or 0) > (best.when or 0)) then
-                best = req
-            end
+        if req and isOutgoingVisible(req.status) then
+            rows[#rows + 1] = req
         end
     end
-    return best
+    table.sort(rows, function(a, b) return (a.when or 0) > (b.when or 0) end)
+    if limit and #rows > limit then
+        for i = #rows, limit + 1, -1 do table.remove(rows, i) end
+    end
+    return rows
 end
 
 local function requestTierLabel(req)
@@ -74,6 +85,16 @@ local function requestTierLabel(req)
         return "unknown rewards"
     end
     return table.concat(tierIds, ", ")
+end
+
+local function outgoingRequestStatusLabel(req)
+    local status = req and req.status or "sent"
+    if status == "needs_review" then
+        local reason = req.reviewReason and req.reviewReason ~= "" and (" (" .. req.reviewReason .. ")") or ""
+        return "needs review" .. reason
+    end
+    if status == "manual_confirmed" then return "manual confirmed" end
+    return status
 end
 
 local function rulesSummary(maxRules)
@@ -2007,6 +2028,45 @@ function Tab:_BuildCharacterOverviewLines(key, rec)
     return right
 end
 
+function Tab:_BuildCharacterSnapshotLines(key, rec)
+    local name, realm = withRealm(key)
+    local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"
+    local level = rec.levelCurrent or rec.levelAtCreate or (UnitLevel and UnitLevel("player")) or "?"
+    local lives = rec.livesRemaining or 0
+    local money, bags, total = bagEstimate()
+
+    local left = {
+        ("Name: |cffc0a060%s|r"):format(name),
+        ("Class: %s"):format(classLabel(rec.class)),
+        ("Level: %s"):format(tostring(level)),
+        ("Realm: %s"):format(realm),
+        ("Run state: %s"):format(stateLabel(runState)),
+        ("Lives remaining: %d"):format(math.max(0, lives)),
+        achievementSummaryLine(),
+        "",
+        ("Estimated contribution: %s"):format(ns.Tiers:FormatMoney(total)),
+        (" - Money: %s"):format(ns.Tiers:FormatMoney(money)),
+        (" - Vendorable bags: %s"):format(ns.Tiers:FormatMoney(bags)),
+    }
+
+    local outgoing = recentOutgoingRequests(3)
+    left[#left + 1] = ""
+    if #outgoing == 0 then
+        left[#left + 1] = "Recent outgoing requests: none"
+    else
+        left[#left + 1] = "Recent outgoing requests:"
+        for _, req in ipairs(outgoing) do
+            left[#left + 1] = (" - %s | %s | %s | %s"):format(
+                requestTierLabel(req),
+                outgoingRequestStatusLabel(req),
+                shortName(req.bank),
+                fmtWhen(req.when))
+        end
+    end
+
+    return left
+end
+
 function Tab:_AssignAccount(characterKey, label)
     if not characterKey or characterKey == "" or not label or label == "" then return nil end
     if not ns.Database or not ns.Database.AssignCharacterToAccountLabel then return nil end
@@ -2488,7 +2548,6 @@ function Tab:Refresh()
     if self.bankLedgerSection then self.bankLedgerSection:Hide() end
     self.leftTitle:SetText("Character Dashboard")
 
-    local runState = ns.Run and ns.Run.GetState and ns.Run:GetState(rec) or rec.status or "unknown"
     if self.contributionButton then
         if self:_ShouldShowContributionAction(rec) then
             self.contributionButton:Show()
@@ -2496,34 +2555,7 @@ function Tab:Refresh()
             self.contributionButton:Hide()
         end
     end
-    local level = rec.levelCurrent or rec.levelAtCreate or (UnitLevel and UnitLevel("player")) or "?"
-    local lives = rec.livesRemaining or 0
-    local pending = newestPendingOutgoing()
-    local money, bags, total = bagEstimate()
-
-    local left = {
-        ("Name: |cffc0a060%s|r"):format(name),
-        ("Class: %s"):format(classLabel(rec.class)),
-        ("Level: %s"):format(tostring(level)),
-        ("Realm: %s"):format(realm),
-        ("Run state: %s"):format(stateLabel(runState)),
-        ("Lives remaining: %d"):format(math.max(0, lives)),
-        achievementSummaryLine(),
-        "",
-        ("Estimated contribution: %s"):format(ns.Tiers:FormatMoney(total)),
-        (" - Money: %s"):format(ns.Tiers:FormatMoney(money)),
-        (" - Vendorable bags: %s"):format(ns.Tiers:FormatMoney(bags)),
-    }
-
-    if pending then
-        left[#left + 1] = ""
-        left[#left + 1] = ("Pending outgoing request: %s"):format(requestTierLabel(pending))
-        left[#left + 1] = (" - Status: %s | Sent: %s"):format(pending.status or "sent", fmtWhen(pending.when))
-        left[#left + 1] = (" - Bank: %s"):format(shortName(pending.bank))
-    else
-        left[#left + 1] = ""
-        left[#left + 1] = "Pending outgoing request: none"
-    end
+    local left = self:_BuildCharacterSnapshotLines(key, rec)
 
     writeLines(self.leftLines, left)
 
