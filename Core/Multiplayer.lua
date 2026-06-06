@@ -70,6 +70,12 @@ local function eventLabel(kind)
     if kind == "revive" then return "revived" end
     if kind == "join" then return "joined" end
     if kind == "leave" then return "left" end
+    if kind == "request_created" then return "request created" end
+    if kind == "request_confirmed" then return "request confirmed" end
+    if kind == "bank_fulfilled" then return "bank fulfilled" end
+    if kind == "contribution_prepared" then return "contribution prepared" end
+    if kind == "contribution_completed" then return "contribution completed" end
+    if kind == "contribution_received" then return "contribution received" end
     return tostring(kind or "event")
 end
 

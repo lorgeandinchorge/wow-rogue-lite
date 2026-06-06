@@ -368,6 +368,19 @@ local function plainMoney(copper)
     return string.format("%dg %ds %dc", gold, silver, copperOnly)
 end
 
+local function auditMoney(copper)
+    if ns.Tiers and ns.Tiers.FormatMoney then
+        return ns.Tiers:FormatMoney(copper or 0)
+    end
+    return tostring(copper or 0) .. "c"
+end
+
+local function broadcastAudit(kind, detail)
+    if ns.Multiplayer and ns.Multiplayer.BroadcastEvent then
+        ns.Multiplayer:BroadcastEvent(kind, detail)
+    end
+end
+
 local function mailPostageCopper()
     return ns.MAIL_POSTAGE_COPPER or 30
 end
@@ -1067,6 +1080,7 @@ function D:FillContributionMail(contributionCopper)
     setSendMailCopper(contributionCopper)
 
     ns:Print("Contribution mail filled for %s. Currency is filled; press Send when ready.", bank)
+    broadcastAudit("contribution_prepared", ("Prepared %s for %s"):format(auditMoney(contributionCopper), short or bank or "bank"))
     return true
 end
 
@@ -1132,6 +1146,7 @@ function D:ScanContributionInbox()
                         ns.Tiers:FormatMoney(money),
                         characterKey,
                         ns.Tiers:FormatMoney(ns.Database:TotalContributed()))
+                    broadcastAudit("contribution_received", ("Received %s from %s"):format(auditMoney(money), characterKey))
                 end
             else
                 out.status = out.status or "seen"
@@ -1189,6 +1204,7 @@ function D:OnMailSent()
         ns:Print("|cffc0a060+%s|r contributed to the bank (est.). Total lifetime: %s",
             ns.Tiers:FormatMoney(receipt.amount),
             ns.Tiers:FormatMoney(ns.Database:TotalContributed()))
+        broadcastAudit("contribution_completed", ("Sent %s to %s"):format(auditMoney(receipt.amount), WRL_DB.bankCharacter or "bank"))
     else
         ns:Print("|cffc0a060Run retired.|r No new contribution detected since death snapshot.")
     end

@@ -337,6 +337,20 @@ local function testDashboardLinesShowReadyPeerCompactly()
     assertContains(joined, "Ready - aligned", "dashboard includes ready status")
 end
 
+local function testDashboardLinesNameAuditEvents()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("EVENT", "evt-3^Friend-Realm^request_created^31^3^active^Rewards 101, 201", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-4^Friend-Realm^bank_fulfilled^31^3^active^Rewards 101, 201", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-5^Friend-Realm^contribution_completed^31^3^retired^105c", "PARTY", "Friend-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "request created", "dashboard labels request audit event")
+    assertContains(joined, "bank fulfilled", "dashboard labels bank fulfillment audit event")
+    assertContains(joined, "contribution completed", "dashboard labels contribution audit event")
+end
+
 testInitRegistersMultiplayerOps()
 testGroupHelloBroadcastUsesCompactRunSummary()
 testGuildDiscoverySendsLightweightHello()
@@ -352,5 +366,6 @@ testHelloAndByeCreateLocalJoinLeaveFeed()
 testDuplicateEventsAreIgnored()
 testDashboardLinesSummarizeRosterAndEvents()
 testDashboardLinesShowReadyPeerCompactly()
+testDashboardLinesNameAuditEvents()
 
 print("Multiplayer.test.lua: ok")

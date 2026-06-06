@@ -677,6 +677,26 @@ local function testContributionMailFillCreatesDurableMailRecordAndBody()
         "contribution mail creates outbox ledger")
 end
 
+local function testContributionMailPreparedBroadcastsAuditEvent()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 12345,
+        estimatedBagValue = 2000,
+        estimatedGearValue = 3000,
+        totalLiquid = 14345,
+        maximumPotential = 17315,
+    }
+
+    ns.Death:PrepareContributionMail()
+
+    assertEqual(multiplayerEvents[1].kind, "contribution_prepared",
+        "prepared contribution broadcasts co-op audit event")
+    assertContains(multiplayerEvents[1].detail, "12315c",
+        "prepared contribution audit detail includes attached amount")
+end
+
 local function testContributionMailUsesExpectedContributionWhenEnoughCurrencyRemains()
     local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 150000 })
     local rec = WRL_DB.characters["Runner-Realm"]
@@ -900,6 +920,37 @@ local function testBankInboxContributionMailCreditsAttachedCopperOnce()
         "bank inbox scan marks contribution mail received")
 end
 
+local function testBankInboxContributionReceiptBroadcastsAuditEvent()
+    local mailId = "Runner-Realm#100-200"
+    resetHarness({
+        currentDead = false,
+        livesRemaining = 1,
+        isBank = true,
+        inboxHeaders = {
+            { sender = "Runner", subject = "WRL-CONTRIB: " .. mailId, money = 4321, itemCount = 0 },
+        },
+    })
+    WRL_DB.contributionMail = {
+        outbox = {
+            [mailId] = {
+                id = mailId,
+                characterKey = "Runner-Realm",
+                uid = "Runner-Realm#100",
+                estimated = 14345,
+                status = "sent",
+            },
+        },
+        inbox = {},
+    }
+
+    registeredEvents.MAIL_SHOW()
+
+    assertEqual(multiplayerEvents[1].kind, "contribution_received",
+        "bank inbox contribution receipt broadcasts audit event")
+    assertContains(multiplayerEvents[1].detail, "4321c",
+        "bank inbox contribution audit detail includes amount")
+end
+
 local function testMailSendCreditsPreparedCopperInsteadOfWalletDelta()
     local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 135 })
     local rec = WRL_DB.characters["Runner-Realm"]
@@ -925,6 +976,28 @@ local function testMailSendCreditsPreparedCopperInsteadOfWalletDelta()
     assertEqual(receipt.source, "final_contribution_mail",
         "prepared mail credit is recorded as mail contribution")
     assertEqual(rec.status, "retired", "mail send retires the run")
+end
+
+local function testMailSendBroadcastsCompletedContributionAuditEvent()
+    local ns = resetHarness({ currentDead = false, livesRemaining = 1, currentMoney = 135 })
+    local rec = WRL_DB.characters["Runner-Realm"]
+    rec.status = "dead_pending_contribution"
+    rec.deathSnapshot = {
+        preMoney = 135,
+        estimatedBagValue = 0,
+        estimatedGearValue = 0,
+        totalLiquid = 135,
+        maximumPotential = 105,
+    }
+
+    ns.Death:PrepareContributionMail()
+    multiplayerEvents = {}
+    registeredEvents.MAIL_SEND_SUCCESS()
+
+    assertEqual(multiplayerEvents[1].kind, "contribution_completed",
+        "sent contribution broadcasts completed audit event")
+    assertContains(multiplayerEvents[1].detail, "105c",
+        "completed contribution audit detail includes amount")
 end
 
 local function testMailSendFallbackCountsGoldSilverAndCopperFields()
@@ -1321,6 +1394,7 @@ testFinalDeathPopupUsesSingleFormattedMessageArgument()
 testFinalDeathPopupWarnsWhenContributionCannotCoverPostage()
 testRetirePopupCancelKeepsContributionPending()
 testContributionMailFillCreatesDurableMailRecordAndBody()
+testContributionMailPreparedBroadcastsAuditEvent()
 testContributionMailUsesExpectedContributionWhenEnoughCurrencyRemains()
 testContributionMailLeavesPostageWhenCurrencyIsBelowExpected()
 testPrepareContributionMailCanBeReopenedWhenMailboxIsAlreadyOpen()
@@ -1330,7 +1404,9 @@ testMailShowRetriesWhenMailFrameAppearsAfterEvent()
 testMailShowRefreshesAfterFrameBecomesShown()
 testMailboxContributionButtonHidesWhenMailFrameHides()
 testBankInboxContributionMailCreditsAttachedCopperOnce()
+testBankInboxContributionReceiptBroadcastsAuditEvent()
 testMailSendCreditsPreparedCopperInsteadOfWalletDelta()
+testMailSendBroadcastsCompletedContributionAuditEvent()
 testMailSendFallbackCountsGoldSilverAndCopperFields()
 testCombatDamageSourceCapturedBeforeDeath()
 testEnvironmentalDamageSourceCapturedBeforeDeath()

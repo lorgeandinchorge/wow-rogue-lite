@@ -36,6 +36,22 @@ local function sortedRewardIds(tierIds)
     return ids
 end
 
+local function auditRewardsLabel(tierIds)
+    local ids = sortedRewardIds(tierIds)
+    if #ids == 0 then return "none recorded" end
+    return table.concat(ids, ", ")
+end
+
+local function shortName(key)
+    return (key and key:match("^([^-]+)")) or key or "Unknown"
+end
+
+local function broadcastAudit(kind, detail)
+    if ns.Multiplayer and ns.Multiplayer.BroadcastEvent then
+        ns.Multiplayer:BroadcastEvent(kind, detail)
+    end
+end
+
 function R:MailFallbackSubject(tierIds)
     return MAIL_SUBJECT_PREFIX .. " " .. table.concat(sortedRewardIds(tierIds), ",")
 end
@@ -83,6 +99,7 @@ function R:EnqueueOutgoing(bankKey, tierIds, note)
         status = "sent",
         mailSubject = self:MailFallbackSubject(tierIds),
     })
+    broadcastAudit("request_created", ("Rewards %s to %s"):format(auditRewardsLabel(tierIds), shortName(bankKey)))
     return id
 end
 
@@ -381,6 +398,7 @@ function R:OnAck2(reqId, fields)
     row.ack2Count = (row.ack2Count or 0) + 1
     row._ack2Confirmed = true
     applyLocalClaim(row, fulfillment, "confirmed")
+    broadcastAudit("request_confirmed", ("Rewards %s by %s"):format(auditRewardsLabel(fulfillment.tierIds), shortName(fulfillment.banker)))
     refreshAfterRequesterAck()
     return true, "confirmed"
 end
@@ -1013,6 +1031,7 @@ function R:MarkFulfilled(reqId)
     -- Acknowledge: legacy ACK for older clients, ACK2 with receipt summary for newer.
     ns.Comm:SendAck(req.from, req.id, REQ_STATUS.FULFILLED)
     ns.Comm:SendAck2(req.from, fulfillment)
+    broadcastAudit("bank_fulfilled", ("Rewards %s for %s"):format(auditRewardsLabel(req.tierIds), shortName(req.from)))
 
     ns:Print("|cffc0a060Fulfilled|r %s's request (method: %s).", req.from, method)
     if ns.MainFrame and ns.MainFrame.RefreshCurrentTab then

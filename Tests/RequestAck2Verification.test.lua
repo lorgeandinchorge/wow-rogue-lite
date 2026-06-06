@@ -17,6 +17,7 @@ local function resetHarness()
     _G.NUM_BAG_SLOTS = nil
 
     local refreshes = 0
+    local multiplayerEvents = {}
     local ns = {
         Database = {},
         Debug = function() end,
@@ -27,7 +28,22 @@ local function resetHarness()
                 refreshes = refreshes + 1
             end,
         },
+        Multiplayer = {
+            BroadcastEvent = function(_, kind, detail)
+                multiplayerEvents[#multiplayerEvents + 1] = {
+                    kind = kind,
+                    detail = detail,
+                }
+                return true
+            end,
+        },
+        Comm = {
+            SendAck = function() end,
+            SendAck2 = function() end,
+        },
+        Rewards = {},
         _refreshes = function() return refreshes end,
+        _multiplayerEvents = multiplayerEvents,
     }
 
     function ns:NewModule(name)
@@ -51,6 +67,23 @@ local function resetHarness()
         if not rec.claimedTiers[tierId] then
             rec.claimedTiers[tierId] = claimInfo or { when = time() }
         end
+    end
+
+    function ns.Database:AppendFulfillmentReceipt(receipt)
+        WRL_DB.fulfillmentReceipts = WRL_DB.fulfillmentReceipts or {}
+        WRL_DB.fulfillmentReceipts[#WRL_DB.fulfillmentReceipts + 1] = receipt
+    end
+
+    function ns.Database:AccountIdForCharacter()
+        return nil
+    end
+
+    function ns.Rewards:BuildRewardForTierIds()
+        return {
+            items = {},
+            gold = 1500,
+            extraLives = 1,
+        }
     end
 
     assert(loadfile("Core/Vendor.lua"))("WoWRoguelite", ns)
@@ -146,6 +179,42 @@ local function testValidAck2AutoConfirmsAndClaimsLocally()
     assertEqual(WRL_DB.characters["Runner-Realm"].livesRemaining, 2, "valid ACK2 applies local extra life")
 end
 
+local function testOutgoingRequestBroadcastsAuditEvent()
+    local ns = resetHarness()
+
+    ns.Requests:EnqueueOutgoing("Bank-Realm", { 101, 201 }, "")
+
+    assertEqual(ns._multiplayerEvents[1].kind, "request_created", "outgoing request broadcasts audit event")
+    assertEqual(ns._multiplayerEvents[1].detail, "Rewards 101, 201 to Bank", "outgoing request audit detail")
+end
+
+local function testValidAck2BroadcastsConfirmedAuditEvent()
+    local ns = resetHarness()
+    seedOutgoing(ns, "req-1")
+
+    ns.Requests:OnAck2("req-1", ack2Fields())
+
+    assertEqual(ns._multiplayerEvents[1].kind, "request_confirmed", "valid ACK2 broadcasts confirmed audit event")
+    assertEqual(ns._multiplayerEvents[1].detail, "Rewards 101, 201 by Bank", "valid ACK2 audit detail")
+end
+
+local function testBankFulfillmentBroadcastsAuditEvent()
+    local ns = resetHarness()
+    WRL_DB.requests = {
+        {
+            id = "req-1",
+            from = "Runner-Realm",
+            tierIds = { 101, 201 },
+            status = "pending",
+        },
+    }
+
+    ns.Requests:MarkFulfilled("req-1")
+
+    assertEqual(ns._multiplayerEvents[1].kind, "bank_fulfilled", "bank fulfillment broadcasts audit event")
+    assertEqual(ns._multiplayerEvents[1].detail, "Rewards 101, 201 for Runner", "bank fulfillment audit detail")
+end
+
 local function testLegacyAckFulfilledNeedsReviewAndCanBeManuallyConfirmed()
     local ns = resetHarness()
     local row = seedOutgoing(ns, "req-1")
@@ -213,6 +282,9 @@ testAck2IgnoresUnknownRequestId()
 testAck2RejectsWrongBanker()
 testDuplicateAck2IsSuppressed()
 testValidAck2AutoConfirmsAndClaimsLocally()
+testOutgoingRequestBroadcastsAuditEvent()
+testValidAck2BroadcastsConfirmedAuditEvent()
+testBankFulfillmentBroadcastsAuditEvent()
 testLegacyAckFulfilledNeedsReviewAndCanBeManuallyConfirmed()
 testExistingBankRequestMessageStillUsesClientRequestId()
 
