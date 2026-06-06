@@ -364,6 +364,19 @@ local function testDashboardLinesShowPeerAuditContext()
     assertContains(joined, "Friend: request created - Rewards 101, 201 to Bank", "dashboard shows peer request context")
 end
 
+local function testDashboardLinesShowPartyRequestWatch()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("EVENT", "evt-8^Friend-Realm^request_created^31^3^active^Rewards 101, 201 to Bank", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-9^Friend-Realm^request_confirmed^31^3^active^Rewards 101, 201 by Bank", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-10^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101, 201 for Friend", "PARTY", "Bank-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Party request watch:", "dashboard groups peer request milestones")
+    assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Friend request confirmed; Friend request created", "dashboard shows recent party request timeline")
+end
+
 testInitRegistersMultiplayerOps()
 testGroupHelloBroadcastUsesCompactRunSummary()
 testGuildDiscoverySendsLightweightHello()
@@ -381,5 +394,6 @@ testDashboardLinesSummarizeRosterAndEvents()
 testDashboardLinesShowReadyPeerCompactly()
 testDashboardLinesNameAuditEvents()
 testDashboardLinesShowPeerAuditContext()
+testDashboardLinesShowPartyRequestWatch()
 
 print("Multiplayer.test.lua: ok")

@@ -88,6 +88,21 @@ local function isAuditEvent(kind)
         or kind == "contribution_received"
 end
 
+local function isRequestWatchEvent(kind)
+    return kind == "request_created"
+        or kind == "request_confirmed"
+        or kind == "bank_fulfilled"
+end
+
+local function requestSubject(detail)
+    detail = tostring(detail or "")
+    local subject = detail:match("^(Rewards%s+.-)%s+to%s+")
+        or detail:match("^(Rewards%s+.-)%s+by%s+")
+        or detail:match("^(Rewards%s+.-)%s+for%s+")
+    if subject and subject ~= "" then return subject end
+    return detail ~= "" and detail or nil
+end
+
 local function isFinalDeathState(state)
     return state == "dead_pending_contribution" or state == "retired"
 end
@@ -406,6 +421,32 @@ function M:EventRows()
     return rows
 end
 
+function M:PartyRequestRows(limit)
+    local grouped = {}
+    local order = {}
+    for _, event in ipairs(self:EventRows()) do
+        if isRequestWatchEvent(event.kind) then
+            local subject = requestSubject(event.detail)
+            if subject then
+                local row = grouped[subject]
+                if not row then
+                    row = { subject = subject, milestones = {}, latest = event.when or 0 }
+                    grouped[subject] = row
+                    order[#order + 1] = row
+                end
+                row.latest = math.max(row.latest or 0, event.when or 0)
+                if #row.milestones < 3 then
+                    row.milestones[#row.milestones + 1] = ("%s %s"):format(shortName(event.key), eventLabel(event.kind))
+                end
+            end
+        end
+    end
+    table.sort(order, function(a, b) return (a.latest or 0) > (b.latest or 0) end)
+    limit = limit or #order
+    while #order > limit do table.remove(order) end
+    return order
+end
+
 function M:DashboardLines()
     local lines = { "|cffc0a060Co-op Run|r" }
     local peers = self:RosterRows()
@@ -446,6 +487,13 @@ function M:DashboardLines()
                 lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
                 auditShown = auditShown + 1
                 if auditShown >= 3 then break end
+            end
+        end
+        local watched = self:PartyRequestRows(3)
+        if #watched > 0 then
+            lines[#lines + 1] = "Party request watch:"
+            for i = 1, #watched do
+                lines[#lines + 1] = (" - %s: %s"):format(watched[i].subject, table.concat(watched[i].milestones, "; "))
             end
         end
     end
