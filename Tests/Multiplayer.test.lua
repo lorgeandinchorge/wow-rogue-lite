@@ -322,7 +322,7 @@ local function testDashboardLinesSummarizeRosterAndEvents()
     assertContains(joined, "Co-op Run", "dashboard has co-op heading")
     assertContains(joined, "Friend", "dashboard includes short player name")
     assertContains(joined, "lvl 31", "dashboard includes level")
-    assertContains(joined, "Unknown - older client", "dashboard includes legacy readiness")
+    assertContains(joined, "Unknown - older WRL client; details may be limited", "dashboard includes legacy readiness")
     assertContains(joined, "final death", "dashboard includes readable event kind")
 end
 
@@ -335,6 +335,7 @@ local function testDashboardLinesShowReadyPeerCompactly()
 
     assertContains(joined, "Friend lvl 31", "dashboard keeps compact peer row")
     assertContains(joined, "Ready - aligned", "dashboard includes ready status")
+    assertContains(joined, "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit.", "dashboard explains peer visibility is non-authoritative")
 end
 
 local function testDashboardLinesNameAuditEvents()
@@ -373,8 +374,44 @@ local function testDashboardLinesShowPartyRequestWatch()
     ns.Multiplayer:Receive("EVENT", "evt-10^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101, 201 for Friend", "PARTY", "Bank-Realm")
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "Party request watch:", "dashboard groups peer request milestones")
+    assertContains(joined, "Party requests nearby (visibility only):", "dashboard groups peer request milestones")
     assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Friend request confirmed; Friend request created", "dashboard shows recent party request timeline")
+end
+
+local function testDashboardLinesShowPartyContributionWatch()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("EVENT", "evt-11^Friend-Realm^contribution_prepared^31^0^dead_pending_contribution^Final tithe 105c", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-12^Friend-Realm^contribution_completed^31^0^retired^Final tithe 105c", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-13^Bank-Realm^contribution_received^1^0^bank^Final tithe 105c", "PARTY", "Bank-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Party final contributions nearby (visibility only):", "dashboard groups peer contribution milestones")
+    assertContains(joined, "Final tithe 105c: Bank contribution received; Friend contribution completed; Friend contribution prepared", "dashboard shows recent party contribution timeline")
+end
+
+local function testDashboardLinesExplainEmptyCoopVisibility()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "No WRL co-op signals from your party yet.", "dashboard gives a clearer empty co-op state")
+    assertContains(joined, "Requests, bank mail, deaths, and contributions still follow your local rules.", "dashboard states co-op visibility is non-authoritative")
+end
+
+local function testDashboardLinesExplainStaleRosterWithRecentActivity()
+    local ns, _, _, setNow = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload(), "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-14^Friend-Realm^request_created^31^3^active^Rewards 101 to Bank", "PARTY", "Friend-Realm")
+    setNow(1095)
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "No active WRL party peers right now; showing recent party activity only.", "dashboard explains stale roster with live event history")
+    assertContains(joined, "Party requests nearby (visibility only):", "stale roster still keeps request watch visible")
 end
 
 testInitRegistersMultiplayerOps()
@@ -395,5 +432,8 @@ testDashboardLinesShowReadyPeerCompactly()
 testDashboardLinesNameAuditEvents()
 testDashboardLinesShowPeerAuditContext()
 testDashboardLinesShowPartyRequestWatch()
+testDashboardLinesShowPartyContributionWatch()
+testDashboardLinesExplainEmptyCoopVisibility()
+testDashboardLinesExplainStaleRosterWithRecentActivity()
 
 print("Multiplayer.test.lua: ok")

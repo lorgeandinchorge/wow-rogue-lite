@@ -79,6 +79,15 @@ local function eventLabel(kind)
     return tostring(kind or "event")
 end
 
+local function readinessReasonLabel(reason)
+    if reason == "older client" then return "older WRL client; details may be limited" end
+    if reason == "guild presence" then return "guild discovery only" end
+    if reason == "missing state" then return "missing run state" end
+    if reason == "missing readiness" then return "readiness details missing" end
+    if reason == "local state missing" then return "your run state is unavailable" end
+    return reason
+end
+
 local function isAuditEvent(kind)
     return kind == "request_created"
         or kind == "request_confirmed"
@@ -92,6 +101,12 @@ local function isRequestWatchEvent(kind)
     return kind == "request_created"
         or kind == "request_confirmed"
         or kind == "bank_fulfilled"
+end
+
+local function isContributionWatchEvent(kind)
+    return kind == "contribution_prepared"
+        or kind == "contribution_completed"
+        or kind == "contribution_received"
 end
 
 local function requestSubject(detail)
@@ -447,17 +462,51 @@ function M:PartyRequestRows(limit)
     return order
 end
 
+function M:PartyContributionRows(limit)
+    local grouped = {}
+    local order = {}
+    for _, event in ipairs(self:EventRows()) do
+        if isContributionWatchEvent(event.kind) then
+            local subject = tostring(event.detail or "")
+            if subject ~= "" then
+                local row = grouped[subject]
+                if not row then
+                    row = { subject = subject, milestones = {}, latest = event.when or 0 }
+                    grouped[subject] = row
+                    order[#order + 1] = row
+                end
+                row.latest = math.max(row.latest or 0, event.when or 0)
+                if #row.milestones < 3 then
+                    row.milestones[#row.milestones + 1] = ("%s %s"):format(shortName(event.key), eventLabel(event.kind))
+                end
+            end
+        end
+    end
+    table.sort(order, function(a, b) return (a.latest or 0) > (b.latest or 0) end)
+    limit = limit or #order
+    while #order > limit do table.remove(order) end
+    return order
+end
+
 function M:DashboardLines()
     local lines = { "|cffc0a060Co-op Run|r" }
     local peers = self:RosterRows()
+    local feed = self:EventRows()
     if #peers == 0 then
-        lines[#lines + 1] = "No WRL co-op players seen in your group yet."
+        if #feed > 0 then
+            lines[#lines + 1] = "No active WRL party peers right now; showing recent party activity only."
+        else
+            lines[#lines + 1] = "No WRL co-op signals from your party yet."
+            lines[#lines + 1] = "Requests, bank mail, deaths, and contributions still follow your local rules."
+        end
     else
         lines[#lines + 1] = ("WRL players nearby: %d"):format(#peers)
+        lines[#lines + 1] = "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit."
         for i = 1, math.min(#peers, 5) do
             local p = peers[i]
             local readiness = p.readiness or "Unknown"
-            local reason = p.readinessReason and p.readinessReason ~= "" and (" - " .. p.readinessReason) or ""
+            local readableReason = readinessReasonLabel(p.readinessReason)
+            local reason = readableReason and readableReason ~= "" and (" - " .. readableReason) or ""
             lines[#lines + 1] = (" - %s lvl %d | %d %s | %s | %s%s"):format(
                 shortName(p.key),
                 p.level or 0,
@@ -468,7 +517,6 @@ function M:DashboardLines()
                 reason)
         end
     end
-    local feed = self:EventRows()
     if #feed > 0 then
         lines[#lines + 1] = "Recent co-op events:"
         for i = 1, math.min(#feed, 4) do
@@ -491,9 +539,16 @@ function M:DashboardLines()
         end
         local watched = self:PartyRequestRows(3)
         if #watched > 0 then
-            lines[#lines + 1] = "Party request watch:"
+            lines[#lines + 1] = "Party requests nearby (visibility only):"
             for i = 1, #watched do
                 lines[#lines + 1] = (" - %s: %s"):format(watched[i].subject, table.concat(watched[i].milestones, "; "))
+            end
+        end
+        local contributions = self:PartyContributionRows(3)
+        if #contributions > 0 then
+            lines[#lines + 1] = "Party final contributions nearby (visibility only):"
+            for i = 1, #contributions do
+                lines[#lines + 1] = (" - %s: %s"):format(contributions[i].subject, table.concat(contributions[i].milestones, "; "))
             end
         end
     end
