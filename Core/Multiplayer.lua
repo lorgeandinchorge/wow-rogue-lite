@@ -610,6 +610,7 @@ function M:DashboardLines()
         end
     else
         lines[#lines + 1] = ("WRL players nearby: %d"):format(#peers)
+        lines[#lines + 1] = "Readiness check (warnings first):"
         lines[#lines + 1] = readinessSummary(peers)
         lines[#lines + 1] = "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit."
         lines[#lines + 1] = "Ready/Warning/Unknown are visibility hints, not request gates."

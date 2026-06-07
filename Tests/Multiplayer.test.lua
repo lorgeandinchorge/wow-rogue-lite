@@ -372,6 +372,7 @@ local function testDashboardLinesSummarizeReadinessAndShowWarningsFirst()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertContains(joined, "Readiness hints: 1 ready / 1 warning / 1 unknown", "dashboard summarizes readiness labels")
+    assertContains(joined, "Readiness check (warnings first):", "dashboard labels the peer roster as warning-first")
     assertBefore(joined, "Warning lvl 31", "Ready lvl 31", "dashboard lists warning peers before ready peers")
     assertBefore(joined, "Ready lvl 31", "Legacy lvl 31", "dashboard lists unknown peers after ready peers")
 end
