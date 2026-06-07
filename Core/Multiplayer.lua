@@ -114,6 +114,10 @@ local function readinessSummary(peers)
     return ("Readiness hints: %d ready / %d warning / %d unknown"):format(ready, warning, unknown)
 end
 
+local function countLabel(count, singular, plural)
+    return ("%d %s"):format(count or 0, ((count or 0) == 1) and singular or (plural or (singular .. "s")))
+end
+
 local function sortedDashboardPeers(peers)
     local out = {}
     for i, peer in ipairs(peers or {}) do out[i] = peer end
@@ -595,8 +599,14 @@ function M:DashboardLines()
     local lines = { "|cffc0a060Co-op Run|r" }
     local peers = self:RosterRows()
     local feed = self:EventRows()
+    local watched = self:PartyRequestRows(3)
+    local contributions = self:PartyContributionRows(3)
     if #peers > 0 or #feed > 0 then
-        lines[#lines + 1] = "Visibility snapshot:"
+        lines[#lines + 1] = ("Visibility snapshot: %s / %s / %s / %s"):format(
+            countLabel(#peers, "peer"),
+            countLabel(#feed, "recent signal"),
+            countLabel(#watched, "request watch", "request watches"),
+            countLabel(#contributions, "contribution watch", "contribution watches"))
         lines[#lines + 1] = ("Active WRL party peers: %d"):format(#peers)
         lines[#lines + 1] = ("Recent party activity: %d"):format(#feed)
         lines[#lines + 1] = "Local rules decide actions; this panel only reports party signals."
@@ -604,8 +614,10 @@ function M:DashboardLines()
     if #peers == 0 then
         if #feed > 0 then
             lines[#lines + 1] = "No active WRL party peers right now; showing recent party activity only."
+            lines[#lines + 1] = "Roster can go stale before audit events expire."
         else
             lines[#lines + 1] = "No WRL co-op signals from your party yet."
+            lines[#lines + 1] = "Waiting for party HELLO, STATE, or EVENT traffic; solo play is unchanged."
             lines[#lines + 1] = "Requests, bank mail, deaths, and contributions still follow your local rules."
         end
     else
@@ -631,7 +643,7 @@ function M:DashboardLines()
         end
     end
     if #feed > 0 then
-        lines[#lines + 1] = "Recent co-op events:"
+        lines[#lines + 1] = "Recent co-op events (last 4):"
         for i = 1, math.min(#feed, 4) do
             local e = feed[i]
             local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
@@ -642,7 +654,7 @@ function M:DashboardLines()
             local e = feed[i]
             if isAuditEvent(e.kind) then
                 if auditShown == 0 then
-                    lines[#lines + 1] = "Peer audit context:"
+                    lines[#lines + 1] = "Peer audit context (last 3 request/contribution signals):"
                 end
                 local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
                 lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
@@ -650,18 +662,16 @@ function M:DashboardLines()
                 if auditShown >= 3 then break end
             end
         end
-        local watched = self:PartyRequestRows(3)
         if #watched > 0 then
-            lines[#lines + 1] = "Party requests nearby (visibility only):"
-            lines[#lines + 1] = "Nearby request milestones only; act from your own request and bank rows."
+            lines[#lines + 1] = "Party request milestones (visibility only):"
+            lines[#lines + 1] = "Audit context only; fulfill from your local request and Requisitions rows."
             for i = 1, #watched do
                 lines[#lines + 1] = (" - %s: %s"):format(watched[i].subject, table.concat(watched[i].milestones, "; "))
             end
         end
-        local contributions = self:PartyContributionRows(3)
         if #contributions > 0 then
-            lines[#lines + 1] = "Party final contributions nearby (visibility only):"
-            lines[#lines + 1] = "Nearby contribution milestones only; each runner's local contribution credit still decides outcomes."
+            lines[#lines + 1] = "Party contribution milestones (visibility only):"
+            lines[#lines + 1] = "Audit context only; each runner's local contribution credit still decides outcomes."
             for i = 1, #contributions do
                 lines[#lines + 1] = (" - %s: %s"):format(contributions[i].subject, table.concat(contributions[i].milestones, "; "))
             end
