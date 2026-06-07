@@ -94,6 +94,38 @@ local function readinessReasonLabel(reason)
     return reason
 end
 
+local function readinessRank(readiness)
+    if readiness == "Warning" then return 1 end
+    if readiness == "Ready" then return 2 end
+    return 3
+end
+
+local function readinessSummary(peers)
+    local ready, warning, unknown = 0, 0, 0
+    for _, peer in ipairs(peers or {}) do
+        if peer.readiness == "Ready" then
+            ready = ready + 1
+        elseif peer.readiness == "Warning" then
+            warning = warning + 1
+        else
+            unknown = unknown + 1
+        end
+    end
+    return ("Readiness hints: %d ready / %d warning / %d unknown"):format(ready, warning, unknown)
+end
+
+local function sortedDashboardPeers(peers)
+    local out = {}
+    for i, peer in ipairs(peers or {}) do out[i] = peer end
+    table.sort(out, function(a, b)
+        local ar = readinessRank(a and a.readiness)
+        local br = readinessRank(b and b.readiness)
+        if ar ~= br then return ar < br end
+        return ((a and a.key) or "") < ((b and b.key) or "")
+    end)
+    return out
+end
+
 local function isAuditEvent(kind)
     return kind == "request_created"
         or kind == "request_confirmed"
@@ -513,10 +545,12 @@ function M:DashboardLines()
         end
     else
         lines[#lines + 1] = ("WRL players nearby: %d"):format(#peers)
+        lines[#lines + 1] = readinessSummary(peers)
         lines[#lines + 1] = "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit."
         lines[#lines + 1] = "Ready/Warning/Unknown are visibility hints, not request gates."
-        for i = 1, math.min(#peers, 5) do
-            local p = peers[i]
+        local displayPeers = sortedDashboardPeers(peers)
+        for i = 1, math.min(#displayPeers, 5) do
+            local p = displayPeers[i]
             local readiness = p.readiness or "Unknown"
             local readableReason = readinessReasonLabel(p.readinessReason)
             local reason = readableReason and readableReason ~= "" and (" - " .. readableReason) or ""

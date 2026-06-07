@@ -153,6 +153,14 @@ local function assertContains(text, needle, message)
     end
 end
 
+local function assertBefore(text, first, second, message)
+    local firstPos = tostring(text):find(first, 1, true)
+    local secondPos = tostring(text):find(second, 1, true)
+    if not firstPos or not secondPos or firstPos >= secondPos then
+        error(string.format("%s: expected '%s' before '%s' in '%s'", message, tostring(first), tostring(second), tostring(text)), 2)
+    end
+end
+
 local function testInitRegistersMultiplayerOps()
     local ns = resetHarness()
 
@@ -354,6 +362,20 @@ local function testDashboardLinesShowVisibilitySnapshotCounts()
     assertContains(joined, "Local rules decide actions; this panel only reports party signals.", "dashboard keeps snapshot non-authoritative")
 end
 
+local function testDashboardLinesSummarizeReadinessAndShowWarningsFirst()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload({ key = "Ready-Realm" }), "PARTY", "Ready-Realm")
+    ns.Multiplayer:Receive("STATE", r2Payload({ key = "Warning-Realm", version = "0.4.0" }), "PARTY", "Warning-Realm")
+    ns.Multiplayer:Receive("STATE", "Legacy-Realm^0.4.1c^PRIEST^31^3^active", "PARTY", "Legacy-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Readiness hints: 1 ready / 1 warning / 1 unknown", "dashboard summarizes readiness labels")
+    assertBefore(joined, "Warning lvl 31", "Ready lvl 31", "dashboard lists warning peers before ready peers")
+    assertBefore(joined, "Ready lvl 31", "Legacy lvl 31", "dashboard lists unknown peers after ready peers")
+end
+
 local function testDashboardLinesUseReadableReadinessReasons()
     local cases = {
         { overrides = { version = "0.4.0" }, expected = "Warning - different WRL version" },
@@ -470,6 +492,7 @@ testDuplicateEventsAreIgnored()
 testDashboardLinesSummarizeRosterAndEvents()
 testDashboardLinesShowReadyPeerCompactly()
 testDashboardLinesShowVisibilitySnapshotCounts()
+testDashboardLinesSummarizeReadinessAndShowWarningsFirst()
 testDashboardLinesUseReadableReadinessReasons()
 testDashboardLinesNameAuditEvents()
 testDashboardLinesShowPeerAuditContext()
