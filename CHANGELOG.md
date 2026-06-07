@@ -1,5 +1,13 @@
 # WoW Roguelite Changelog
 
+## v0.5.0
+
+- Cut the first 0.5 multiplayer tester build around co-op visibility and shared awareness rather than shared party authority.
+- Expand the Dashboard co-op panel with readiness hints, warning-first roster ordering, party request milestones, contribution milestones, and death-signal visibility.
+- Keep reward fulfillment runner-authoritative through ACK2 verification: valid banker receipts can auto-confirm locally, while mismatches and unsupported clients stay reviewable.
+- Add `/wrl simparty` tester sample labeling plus simulated request, contribution, soft-death, and final-death signals so testers can inspect the Dashboard without a second client.
+- Document known tester limits: no shared bank ownership, no formal session host, no cross-client control, local death/rule outcomes remain local, and mail/trade actions still require player confirmation.
+
 ## v0.4.2a
 
 - Fix Resale Desk row clearing so real scanned inventory can be dismissed from the desk instead of immediately redrawing.

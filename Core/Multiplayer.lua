@@ -16,6 +16,7 @@ local events = {}
 local seenEvents = {}
 local lastSentAt = {}
 local seq = 0
+local simulatedSampleActive = false
 
 local function now()
     return time and time() or 0
@@ -149,6 +150,11 @@ local function isContributionWatchEvent(kind)
     return kind == "contribution_prepared"
         or kind == "contribution_completed"
         or kind == "contribution_received"
+end
+
+local function isDeathSignalEvent(kind)
+    return kind == "soft_death"
+        or kind == "final_death"
 end
 
 local function requestSubject(detail)
@@ -530,7 +536,20 @@ function M:PartyContributionRows(limit)
     return order
 end
 
+function M:PartyDeathRows(limit)
+    local rows = {}
+    for _, event in ipairs(self:EventRows()) do
+        if isDeathSignalEvent(event.kind) then
+            rows[#rows + 1] = event
+        end
+    end
+    limit = limit or #rows
+    while #rows > limit do table.remove(rows) end
+    return rows
+end
+
 function M:SimulateParty()
+    simulatedSampleActive = true
     local localSummary = self:_CurrentSummary() or {}
     local version = localSummary.version or ns.version or "?"
     local profile = localSummary.profile or profileId()
@@ -587,6 +606,7 @@ function M:SimulateParty()
     simEvent("Alaia-Realm", "request_confirmed", 24, 1, "active", "Rewards 101, 201 by Bank")
     simEvent("Bank-Realm", "bank_fulfilled", 1, 0, "bank", "Rewards 101, 201 for Alaia")
     simEvent("Borin-Realm", "soft_death", 27, 2, "active", "Razorfen Kraul")
+    simEvent("Cato-Realm", "final_death", 18, 0, "dead_pending_contribution", "Wailing Caverns")
     simEvent("Cato-Realm", "contribution_prepared", 18, 0, "dead_pending_contribution", "Final tithe 105c")
     simEvent("Cato-Realm", "contribution_completed", 18, 0, "retired", "Final tithe 105c")
     simEvent("Bank-Realm", "contribution_received", 1, 0, "bank", "Final tithe 105c")
@@ -601,6 +621,7 @@ function M:DashboardLines()
     local feed = self:EventRows()
     local watched = self:PartyRequestRows(3)
     local contributions = self:PartyContributionRows(3)
+    local deaths = self:PartyDeathRows(3)
     if #peers > 0 or #feed > 0 then
         lines[#lines + 1] = ("Visibility snapshot: %s / %s / %s / %s"):format(
             countLabel(#peers, "peer"),
@@ -610,6 +631,9 @@ function M:DashboardLines()
         lines[#lines + 1] = ("Active WRL party peers: %d"):format(#peers)
         lines[#lines + 1] = ("Recent party activity: %d"):format(#feed)
         lines[#lines + 1] = "Local rules decide actions; this panel only reports party signals."
+        if simulatedSampleActive then
+            lines[#lines + 1] = "Simulated/test dashboard data from /wrl simparty; visibility only."
+        end
     end
     if #peers == 0 then
         if #feed > 0 then
@@ -667,6 +691,15 @@ function M:DashboardLines()
             lines[#lines + 1] = "Audit context only; fulfill from your local request and Requisitions rows."
             for i = 1, #watched do
                 lines[#lines + 1] = (" - %s: %s"):format(watched[i].subject, table.concat(watched[i].milestones, "; "))
+            end
+        end
+        if #deaths > 0 then
+            lines[#lines + 1] = "Party death signals (visibility only):"
+            lines[#lines + 1] = "Awareness only; each runner's local death rules still decide outcomes."
+            for i = 1, #deaths do
+                local e = deaths[i]
+                local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
+                lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
             end
         end
         if #contributions > 0 then

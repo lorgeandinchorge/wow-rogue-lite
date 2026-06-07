@@ -490,13 +490,18 @@ local function testSimulatedPartySeedsDashboardRosterAndActivity()
 
     assertEqual(count, 3, "simparty creates three local test peers")
     assertContains(joined, "Active WRL party peers: 3", "simparty dashboard shows seeded roster count")
+    assertContains(joined, "Simulated/test dashboard data from /wrl simparty; visibility only.", "simparty dashboard labels the sample as simulated")
     assertContains(joined, "Readiness hints: 1 ready / 1 warning / 1 unknown", "simparty seeds varied readiness")
     assertContains(joined, "Alaia lvl 24 | 1 life | active | Warning - different rule profile", "simparty warning peer looks believable")
     assertContains(joined, "Borin lvl 27 | 2 lives | active | Ready - aligned", "simparty ready peer looks believable")
     assertContains(joined, "Cato lvl 18 | 0 lives | dead_pending_contribution | Unknown - older WRL client; details may be limited", "simparty legacy peer looks believable")
+    assertContains(joined, "soft death - Razorfen Kraul", "simparty seeds a soft death dashboard signal")
+    assertContains(joined, "final death - Wailing Caverns", "simparty seeds a final death dashboard signal")
     assertContains(joined, "Party request milestones (visibility only):", "simparty seeds request watch activity")
+    assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Alaia request confirmed; Alaia request created", "simparty includes created/confirmed/fulfilled request milestones")
     assertContains(joined, "Rewards 101, 201", "simparty request activity includes starter reward context")
     assertContains(joined, "Party contribution milestones (visibility only):", "simparty seeds contribution watch activity")
+    assertContains(joined, "Final tithe 105c: Bank contribution received; Cato contribution completed; Cato contribution prepared", "simparty includes final contribution milestones")
     assertContains(joined, "Final tithe 105c", "simparty contribution activity includes final-run context")
 end
 

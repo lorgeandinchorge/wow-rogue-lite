@@ -6,11 +6,13 @@ Pick one character as your **bank**. Every other character is a hardcore **run**
 
 It is part hardcore challenge, part account progression, and part self-made metagame.
 
-## Latest Update: v0.4.2a
+## Latest Update: v0.5.0
 
-- Adds runner-side verification for fulfilled reward requests. Modern bank clients send a richer ACK2 receipt, and the runner validates the banker, suppresses duplicates, auto-confirms valid fulfillments, and falls back to manual review when needed.
-- Fixes Resale Desk row clearing so real scanned inventory can be dismissed without immediately redrawing.
-- Keeps the v0.4.2 lightweight co-op layer: nearby WRL party/raid status, run state, lives, level, joins, leaves, soft deaths, final deaths, revive returns, and guild discovery pings.
+- Cuts the first 0.5 multiplayer tester build around co-op visibility and shared awareness rather than shared party authority.
+- Expands the Dashboard co-op panel with readiness hints, party request milestones, contribution milestones, soft-death/final-death signals, and warning-first roster ordering.
+- Keeps reward fulfillment runner-authoritative through ACK2 verification: valid banker receipts can auto-confirm locally, while mismatches and unsupported clients stay reviewable.
+- Adds clearer `/wrl simparty` sample data for local tester inspection without a second client.
+- Known limit: co-op visibility does not provide shared bank ownership, formal sessions, party-wide rule enforcement, or cross-client control.
 
 ## Core Loop
 
@@ -39,7 +41,7 @@ The final path should be:
 ...\AddOns\WoWRoguelite\WoWRoguelite.toc
 ```
 
-Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.4.2a loaded.` in chat.
+Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.0 loaded.` in chat.
 
 ## Quick Start
 
@@ -52,7 +54,7 @@ Enable the addon at the character-select screen and `/reload` in-game to confirm
 
 ## How A Run Works
 
-**On a run character.** Open `/wrl` -> **Legacy** to review lifetime contributions and spend available legacy budget into Storage Vault, Starter Stipend, Alchemist's Table, and Fate Loom. Open `/wrl` -> **Rewards**, choose one unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually. The Dashboard also shows your current loan cap, outstanding debt, remaining borrow room, and co-op status.
+**On a run character.** Open `/wrl` -> **Legacy** to review lifetime contributions and spend available legacy budget into Storage Vault, Starter Stipend, Alchemist's Table, and Fate Loom. Open `/wrl` -> **Rewards**, choose one unlocked starter reward from the dropdown, and click **Prepare Mail** at a mailbox. The addon fills a request letter for your bank character; you still press Send manually. The Dashboard also shows your current loan cap, outstanding debt, remaining borrow room, and co-op visibility status.
 
 **On your bank character.** Open `/wrl` -> **Dashboard** to use the Requisitions Desk: active request readiness, Banker Summary, aggregate Needed Supplies, account summaries, character contribution rows, loan balances, quest-goods resale inventory, recent ledger activity, and fulfillment actions. Use **Next Request** to cycle the request queue. At a mailbox, **Prepare Mail** pre-fills name, subject, body, and gold; drag items into the attachment slots and press Send. Or open **Rewards** for the detailed request list and trade checklist.
 
@@ -62,9 +64,9 @@ After final death, the character is marked **retired**. Retirement is soft: the 
 
 ## Co-op Awareness
 
-Group with other players who have WRL enabled. The Dashboard automatically shows a compact **Co-op Run** section with nearby WRL party/raid members, their run state, level, lives, and recent soft-death/final-death/revive events.
+Group with other players who have WRL enabled. The Dashboard automatically shows a compact **Co-op Run** section with nearby WRL party/raid members, their run state, level, lives, readiness hints, party request milestones, contribution milestones, and recent soft-death/final-death/revive events.
 
-Guild discovery is lightweight presence only. Gold, unlock ownership, banking, loans, resale, and economy progression stay local or bank-based.
+This is visibility and co-op awareness, not shared party authority. Each player's local rules decide death outcomes, each runner confirms request fulfillment locally, and the bank/economy model remains local or bank-based. Guild discovery is lightweight presence only. Gold, unlock ownership, banking, loans, resale, and economy progression are not shared across clients.
 
 ## Profiles, Rules, Boons, And Burdens
 
@@ -183,6 +185,7 @@ Theme changes apply immediately to open addon windows.
 - **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
 - **Contribution value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value. The vendor-only **WRL: Sell All** button can sell vendorable bags plus equipped gear after confirmation. Mail contribution remains currency-only and reserves 30c for postage.
 - **Cross-realm addon whispers are not guaranteed in TBC.** The mail fallback path exists for this reason.
+- **Co-op is visibility-only in v0.5.0.** Party members can see readiness, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
 - **Retirement is soft.** The addon marks a character retired but does not delete them or block play; it just stops crediting further contributions.
 
 ## Good Fit If You Want
