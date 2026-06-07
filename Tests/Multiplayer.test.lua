@@ -336,6 +336,44 @@ local function testDashboardLinesShowReadyPeerCompactly()
     assertContains(joined, "Friend lvl 31", "dashboard keeps compact peer row")
     assertContains(joined, "Ready - aligned", "dashboard includes ready status")
     assertContains(joined, "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit.", "dashboard explains peer visibility is non-authoritative")
+    assertContains(joined, "Ready/Warning/Unknown are visibility hints, not request gates.", "dashboard explains readiness labels are informational")
+end
+
+local function testDashboardLinesShowVisibilitySnapshotCounts()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("STATE", r2Payload(), "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-snapshot-1^Friend-Realm^request_created^31^3^active^Rewards 101 to Bank", "PARTY", "Friend-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-snapshot-2^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101 for Friend", "PARTY", "Bank-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Visibility snapshot:", "dashboard adds compact visibility snapshot")
+    assertContains(joined, "Active WRL party peers: 1", "dashboard summarizes active peer count")
+    assertContains(joined, "Recent party activity: 3", "dashboard summarizes recent activity count including join/event feed")
+    assertContains(joined, "Local rules decide actions; this panel only reports party signals.", "dashboard keeps snapshot non-authoritative")
+end
+
+local function testDashboardLinesUseReadableReadinessReasons()
+    local cases = {
+        { overrides = { version = "0.4.0" }, expected = "Warning - different WRL version" },
+        { overrides = { profile = "banked_hardcore" }, expected = "Warning - different rule profile" },
+        { overrides = { rules = "r1-1234" }, expected = "Warning - different enabled rules" },
+        { overrides = { bank = "0" }, expected = "Warning - peer has no bank set" },
+        { configure = function() WRL_DB.bankCharacter = "" end, expected = "Warning - your bank is not set" },
+        { configure = function() WRL_DB.characters["Runner-Realm"].status = "retired" end, expected = "Warning - your run has ended" },
+    }
+
+    for i, case in ipairs(cases) do
+        local ns = resetHarness()
+        if case.configure then case.configure() end
+        ns.Multiplayer:Init()
+
+        ns.Multiplayer:Receive("STATE", r2Payload(case.overrides), "PARTY", "Friend-Realm")
+        local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+        assertContains(joined, case.expected, "dashboard uses readable readiness reason " .. tostring(i))
+    end
 end
 
 local function testDashboardLinesNameAuditEvents()
@@ -375,6 +413,7 @@ local function testDashboardLinesShowPartyRequestWatch()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertContains(joined, "Party requests nearby (visibility only):", "dashboard groups peer request milestones")
+    assertContains(joined, "Nearby request milestones only; act from your own request and bank rows.", "dashboard clarifies request watch is not an action queue")
     assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Friend request confirmed; Friend request created", "dashboard shows recent party request timeline")
 end
 
@@ -388,6 +427,7 @@ local function testDashboardLinesShowPartyContributionWatch()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertContains(joined, "Party final contributions nearby (visibility only):", "dashboard groups peer contribution milestones")
+    assertContains(joined, "Nearby contribution milestones only; each runner's local contribution credit still decides outcomes.", "dashboard clarifies contribution watch is not shared credit")
     assertContains(joined, "Final tithe 105c: Bank contribution received; Friend contribution completed; Friend contribution prepared", "dashboard shows recent party contribution timeline")
 end
 
@@ -429,6 +469,8 @@ testHelloAndByeCreateLocalJoinLeaveFeed()
 testDuplicateEventsAreIgnored()
 testDashboardLinesSummarizeRosterAndEvents()
 testDashboardLinesShowReadyPeerCompactly()
+testDashboardLinesShowVisibilitySnapshotCounts()
+testDashboardLinesUseReadableReadinessReasons()
 testDashboardLinesNameAuditEvents()
 testDashboardLinesShowPeerAuditContext()
 testDashboardLinesShowPartyRequestWatch()

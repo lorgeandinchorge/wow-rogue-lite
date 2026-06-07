@@ -85,6 +85,12 @@ local function readinessReasonLabel(reason)
     if reason == "missing state" then return "missing run state" end
     if reason == "missing readiness" then return "readiness details missing" end
     if reason == "local state missing" then return "your run state is unavailable" end
+    if reason == "version mismatch" then return "different WRL version" end
+    if reason == "different profile" then return "different rule profile" end
+    if reason == "different rules" then return "different enabled rules" end
+    if reason == "no bank set" then return "peer has no bank set" end
+    if reason == "your bank not set" then return "your bank is not set" end
+    if reason == "your run ended" then return "your run has ended" end
     return reason
 end
 
@@ -492,6 +498,12 @@ function M:DashboardLines()
     local lines = { "|cffc0a060Co-op Run|r" }
     local peers = self:RosterRows()
     local feed = self:EventRows()
+    if #peers > 0 or #feed > 0 then
+        lines[#lines + 1] = "Visibility snapshot:"
+        lines[#lines + 1] = ("Active WRL party peers: %d"):format(#peers)
+        lines[#lines + 1] = ("Recent party activity: %d"):format(#feed)
+        lines[#lines + 1] = "Local rules decide actions; this panel only reports party signals."
+    end
     if #peers == 0 then
         if #feed > 0 then
             lines[#lines + 1] = "No active WRL party peers right now; showing recent party activity only."
@@ -502,6 +514,7 @@ function M:DashboardLines()
     else
         lines[#lines + 1] = ("WRL players nearby: %d"):format(#peers)
         lines[#lines + 1] = "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit."
+        lines[#lines + 1] = "Ready/Warning/Unknown are visibility hints, not request gates."
         for i = 1, math.min(#peers, 5) do
             local p = peers[i]
             local readiness = p.readiness or "Unknown"
@@ -540,6 +553,7 @@ function M:DashboardLines()
         local watched = self:PartyRequestRows(3)
         if #watched > 0 then
             lines[#lines + 1] = "Party requests nearby (visibility only):"
+            lines[#lines + 1] = "Nearby request milestones only; act from your own request and bank rows."
             for i = 1, #watched do
                 lines[#lines + 1] = (" - %s: %s"):format(watched[i].subject, table.concat(watched[i].milestones, "; "))
             end
@@ -547,6 +561,7 @@ function M:DashboardLines()
         local contributions = self:PartyContributionRows(3)
         if #contributions > 0 then
             lines[#lines + 1] = "Party final contributions nearby (visibility only):"
+            lines[#lines + 1] = "Nearby contribution milestones only; each runner's local contribution credit still decides outcomes."
             for i = 1, #contributions do
                 lines[#lines + 1] = (" - %s: %s"):format(contributions[i].subject, table.concat(contributions[i].milestones, "; "))
             end
