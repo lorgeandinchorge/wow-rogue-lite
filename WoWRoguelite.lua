@@ -209,6 +209,18 @@ SlashCmdList["WRL"] = function(msg)
         elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
             ns.MainFrame:RefreshCurrentTab()
         end
+    elseif cmd == "simparty" then
+        if not (ns.Multiplayer and ns.Multiplayer.SimulateParty) then
+            ns:Print("Co-op simulation is not ready yet.")
+            return
+        end
+        local count = ns.Multiplayer:SimulateParty()
+        ns:Print("Simulated co-op dashboard data for %d local test peer(s).", count or 0)
+        if ns.MainFrame and ns.MainFrame.ShowTab then
+            ns.MainFrame:ShowTab("Run")
+        elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+            ns.MainFrame:RefreshCurrentTab()
+        end
     elseif cmd == "simresale" or cmd == "simresell" then
         if not (ns.BankResale and ns.BankResale.SimulateStock) then
             ns:Print("Bank resale desk is not ready yet.")
@@ -573,6 +585,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl bankreport     - print banker summary lines")
         ns:Print("  /wrl needed         - print aggregate needed supplies")
         ns:Print("  /wrl simrequest C-R IDS - simulate a pending bank request")
+        ns:Print("  /wrl simparty       - simulate local co-op Dashboard data")
         ns:Print("  /wrl simresale IDS  - simulate resale stock, e.g. 769:4,723:2")
         ns:Print("  /wrl simloan C-R GOLD - simulate a manual loan")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")

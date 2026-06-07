@@ -526,6 +526,71 @@ function M:PartyContributionRows(limit)
     return order
 end
 
+function M:SimulateParty()
+    local localSummary = self:_CurrentSummary() or {}
+    local version = localSummary.version or ns.version or "?"
+    local profile = localSummary.profile or profileId()
+    local rules = localSummary.rules or rulesFingerprint()
+    local bank = localSummary.bankReady
+    if bank == nil then bank = bankReady() end
+
+    local peers = {
+        {
+            key = "Alaia-Realm",
+            version = version,
+            class = "PRIEST",
+            level = 24,
+            lives = 1,
+            state = localSummary.state or "active",
+            profile = profile == "banked_hardcore" and "casual_roguelite" or "banked_hardcore",
+            rules = rules,
+            bankReady = bank,
+            finalDeath = false,
+        },
+        {
+            key = "Borin-Realm",
+            version = version,
+            class = "WARRIOR",
+            level = 27,
+            lives = 2,
+            state = localSummary.state or "active",
+            profile = profile,
+            rules = rules,
+            bankReady = bank,
+            finalDeath = false,
+        },
+    }
+
+    for _, peer in ipairs(peers) do
+        peer.schema = SUMMARY_SCHEMA
+        self:_RememberPeer(peer, "PARTY")
+    end
+    self:_RememberPeer(self:_DecodeSummary(("Cato-Realm^%s^ROGUE^18^0^dead_pending_contribution"):format(clean(version))), "PARTY")
+
+    local function simEvent(key, kind, level, lives, state, detail)
+        self:_AddEvent(table.concat({
+            self:_NextEventId("simparty_" .. kind),
+            key,
+            kind,
+            tostring(level),
+            tostring(lives),
+            state,
+            detail,
+        }, FIELD), "PARTY")
+    end
+
+    simEvent("Alaia-Realm", "request_created", 24, 1, "active", "Rewards 101, 201 to Bank")
+    simEvent("Alaia-Realm", "request_confirmed", 24, 1, "active", "Rewards 101, 201 by Bank")
+    simEvent("Bank-Realm", "bank_fulfilled", 1, 0, "bank", "Rewards 101, 201 for Alaia")
+    simEvent("Borin-Realm", "soft_death", 27, 2, "active", "Razorfen Kraul")
+    simEvent("Cato-Realm", "contribution_prepared", 18, 0, "dead_pending_contribution", "Final tithe 105c")
+    simEvent("Cato-Realm", "contribution_completed", 18, 0, "retired", "Final tithe 105c")
+    simEvent("Bank-Realm", "contribution_received", 1, 0, "bank", "Final tithe 105c")
+
+    refreshUI()
+    return 3
+end
+
 function M:DashboardLines()
     local lines = { "|cffc0a060Co-op Run|r" }
     local peers = self:RosterRows()
