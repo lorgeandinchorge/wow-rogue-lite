@@ -38,6 +38,7 @@ WoW Roguelite turns your account into a run-based progression system:
 /wrl simrequest Character-Realm 101,201
 /wrl simresale
 /wrl simresale clear
+/wrl simparty clear
 /wrl resale
 /wrl resale sold 769 1 Tester-Realm
 /wrl settings

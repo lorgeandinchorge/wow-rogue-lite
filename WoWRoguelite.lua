@@ -214,6 +214,20 @@ SlashCmdList["WRL"] = function(msg)
             ns:Print("Co-op simulation is not ready yet.")
             return
         end
+        if rest:lower() == "clear" then
+            local removed = ns.Multiplayer.ClearSimulatedParty and ns.Multiplayer:ClearSimulatedParty() or { peers = 0, events = 0 }
+            ns:Print("Cleared simulated co-op dashboard data (%d peer%s, %d event%s).",
+                removed.peers or 0,
+                (removed.peers == 1) and "" or "s",
+                removed.events or 0,
+                (removed.events == 1) and "" or "s")
+            if ns.MainFrame and ns.MainFrame.ShowTab then
+                ns.MainFrame:ShowTab("Run")
+            elseif ns.MainFrame and ns.MainFrame.RefreshCurrentTab then
+                ns.MainFrame:RefreshCurrentTab()
+            end
+            return
+        end
         local count = ns.Multiplayer:SimulateParty()
         ns:Print("Simulated co-op dashboard data for %d local test peer(s).", count or 0)
         if ns.MainFrame and ns.MainFrame.ShowTab then
@@ -586,6 +600,7 @@ SlashCmdList["WRL"] = function(msg)
         ns:Print("  /wrl needed         - print aggregate needed supplies")
         ns:Print("  /wrl simrequest C-R IDS - simulate a pending bank request")
         ns:Print("  /wrl simparty       - simulate local co-op Dashboard data")
+        ns:Print("  /wrl simparty clear - clear simulated co-op Dashboard data")
         ns:Print("  /wrl simresale IDS  - simulate resale stock, e.g. 769:4,723:2")
         ns:Print("  /wrl simloan C-R GOLD - simulate a manual loan")
         ns:Print("  /wrl contribute     - prepare pending final contribution mail")

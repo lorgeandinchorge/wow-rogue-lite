@@ -11,6 +11,7 @@ local loanRowsPrinted = 0
 local bankReportPrinted = 0
 local neededPrinted = 0
 local simulatedPartyCount = nil
+local simulatedPartyCleared = nil
 
 _G.DEFAULT_CHAT_FRAME = { AddMessage = function() end }
 _G.SlashCmdList = {}
@@ -154,6 +155,11 @@ function ns.Multiplayer:SimulateParty()
     return simulatedPartyCount
 end
 
+function ns.Multiplayer:ClearSimulatedParty()
+    simulatedPartyCleared = true
+    return { peers = 3, events = 8 }
+end
+
 function ns.MainFrame:ShowTab(tab)
     self.lastTab = tab
 end
@@ -210,6 +216,17 @@ if ns.MainFrame.lastTab ~= "Run" then
 end
 if simulatedPartyCount ~= 3 then
     error(("expected /wrl simparty to seed three test peers, got %s"):format(tostring(simulatedPartyCount)), 2)
+end
+
+-- /wrl simparty clear removes local co-op dashboard sample data.
+simulatedPartyCleared = nil
+ns.MainFrame.lastTab = nil
+SlashCmdList.WRL("simparty clear")
+if ns.MainFrame.lastTab ~= "Run" then
+    error("expected /wrl simparty clear to open Dashboard", 2)
+end
+if simulatedPartyCleared ~= true then
+    error("expected /wrl simparty clear to clear simulated party data", 2)
 end
 
 -- /wrl simresale seeds resale stock and opens Dashboard.

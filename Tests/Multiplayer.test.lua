@@ -153,6 +153,12 @@ local function assertContains(text, needle, message)
     end
 end
 
+local function assertNotContains(text, needle, message)
+    if tostring(text):find(needle, 1, true) then
+        error(string.format("%s: expected '%s' not to contain '%s'", message, tostring(text), tostring(needle)), 2)
+    end
+end
+
 local function assertBefore(text, first, second, message)
     local firstPos = tostring(text):find(first, 1, true)
     local secondPos = tostring(text):find(second, 1, true)
@@ -505,6 +511,22 @@ local function testSimulatedPartySeedsDashboardRosterAndActivity()
     assertContains(joined, "Final tithe 105c", "simparty contribution activity includes final-run context")
 end
 
+local function testClearSimulatedPartyRemovesSeededDashboardData()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:SimulateParty()
+    local removed = ns.Multiplayer:ClearSimulatedParty()
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertEqual(removed.peers, 3, "clear simparty removes three seeded test peers")
+    assertEqual(removed.events, 8, "clear simparty removes seeded test events")
+    assertContains(joined, "No WRL co-op signals from your party yet.", "dashboard returns to empty co-op state")
+    assertNotContains(joined, "Simulated/test dashboard data from /wrl simparty; visibility only.", "clear simparty removes simulated data label")
+    assertNotContains(joined, "Alaia", "clear simparty removes seeded peer rows")
+    assertNotContains(joined, "Final tithe 105c", "clear simparty removes seeded contribution activity")
+end
+
 testInitRegistersMultiplayerOps()
 testGroupHelloBroadcastUsesCompactRunSummary()
 testGuildDiscoverySendsLightweightHello()
@@ -530,5 +552,6 @@ testDashboardLinesShowPartyContributionWatch()
 testDashboardLinesExplainEmptyCoopVisibility()
 testDashboardLinesExplainStaleRosterWithRecentActivity()
 testSimulatedPartySeedsDashboardRosterAndActivity()
+testClearSimulatedPartyRemovesSeededDashboardData()
 
 print("Multiplayer.test.lua: ok")

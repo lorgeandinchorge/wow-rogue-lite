@@ -9,6 +9,8 @@ local BANK_SECTION_WIDTH = BANK_DASHBOARD_WIDTH - BANK_SCROLLBAR_GUTTER
 local BANK_TOP_SECTION_WIDTH = math.floor((BANK_SECTION_WIDTH - 10) / 2)
 local BANK_ROW_ACTION_GAP = 10
 local BANK_ROW_TARGET_WIDTH = BANK_SECTION_WIDTH - 196
+local BANK_RESALE_ROW_TARGET_WIDTH = BANK_SECTION_WIDTH - 136
+local BANK_RESALE_SECTION_BOTTOM_PADDING = 14
 local BANK_CLEAR_BUTTON_RIGHT_INSET = -(BANK_SCROLLBAR_GUTTER + 8)
 local BANK_LEDGER_CONTENT_WIDTH = BANK_SECTION_WIDTH - BANK_SCROLLBAR_GUTTER - 10
 local LEDGER_COLUMNS = {
@@ -1464,7 +1466,7 @@ end
 
 local function createResaleTableRow(section, isHeader)
     local button = CreateFrame("Button", nil, section)
-    button:SetSize(BANK_ROW_TARGET_WIDTH, 18)
+    button:SetSize(BANK_RESALE_ROW_TARGET_WIDTH, 18)
     local color = isHeader and ns.Theme.c.fg or ns.Theme.c.fg2
     button.item = ns.Theme:Text(button, 10, color)
     button.who = ns.Theme:Text(button, 10, color)
@@ -1637,7 +1639,8 @@ local function setResaleSection(section, lines, rows, owner)
             if button.cancelButton then button.cancelButton:Hide() end
         end
     end
-    section:SetHeight(math.max(72, 46 + (shownRows * 22)))
+    local resaleHeight = math.max(72, 46 + (shownRows * 22) + BANK_RESALE_SECTION_BOTTOM_PADDING)
+    section:SetHeight(resaleHeight)
     section:Show()
     return section:GetHeight()
 end

@@ -17,6 +17,12 @@ local seenEvents = {}
 local lastSentAt = {}
 local seq = 0
 local simulatedSampleActive = false
+local SIMULATED_PARTY_KEYS = {
+    ["Alaia-Realm"] = true,
+    ["Borin-Realm"] = true,
+    ["Cato-Realm"] = true,
+    ["Bank-Realm"] = true,
+}
 
 local function now()
     return time and time() or 0
@@ -586,9 +592,12 @@ function M:SimulateParty()
 
     for _, peer in ipairs(peers) do
         peer.schema = SUMMARY_SCHEMA
+        peer.simulatedPartySample = true
         self:_RememberPeer(peer, "PARTY")
     end
-    self:_RememberPeer(self:_DecodeSummary(("Cato-Realm^%s^ROGUE^18^0^dead_pending_contribution"):format(clean(version))), "PARTY")
+    local cato = self:_DecodeSummary(("Cato-Realm^%s^ROGUE^18^0^dead_pending_contribution"):format(clean(version)))
+    if cato then cato.simulatedPartySample = true end
+    self:_RememberPeer(cato, "PARTY")
 
     local function simEvent(key, kind, level, lives, state, detail)
         self:_AddEvent(table.concat({
@@ -613,6 +622,29 @@ function M:SimulateParty()
 
     refreshUI()
     return 3
+end
+
+function M:ClearSimulatedParty()
+    local removed = { peers = 0, events = 0 }
+    for key, row in pairs(roster) do
+        if (row and row.simulatedPartySample) or SIMULATED_PARTY_KEYS[key] then
+            roster[key] = nil
+            removed.peers = removed.peers + 1
+        end
+    end
+    for i = #events, 1, -1 do
+        local row = events[i]
+        local id = row and row.id or ""
+        local key = row and row.key
+        if tostring(id):find("simparty_", 1, true) or SIMULATED_PARTY_KEYS[key] then
+            if id ~= "" then seenEvents[id] = nil end
+            table.remove(events, i)
+            removed.events = removed.events + 1
+        end
+    end
+    simulatedSampleActive = false
+    refreshUI()
+    return removed
 end
 
 function M:DashboardLines()

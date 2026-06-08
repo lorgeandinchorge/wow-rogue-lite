@@ -35,7 +35,7 @@ so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addo
 3. Type `/wrl` to open the main window.
 4. Use the **Legacy** tab to spend any available budget, the **Rewards** tab to prepare a starter-kit request mail, and the **Dashboard** tab to track in-progress state.
 
-For Requisitions Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simparty` seeds local co-op Dashboard roster/readiness/activity data without a second client and labels that sample as simulated/test data. `/wrl simresale` creates simulated resale stock for the Resale Desk, `/wrl simloan Tester-Realm 1` creates a local 1g loan record, `/wrl bankreport` prints compact bank status, `/wrl needed` prints aggregate missing supplies, and the Dashboard clear buttons ask before hiding ledger rows or removing simulated resale stock.
+For Requisitions Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simparty` seeds local co-op Dashboard roster/readiness/activity data without a second client and labels that sample as simulated/test data; `/wrl simparty clear` removes that local sample. `/wrl simresale` creates simulated resale stock for the Resale Desk, `/wrl simloan Tester-Realm 1` creates a local 1g loan record, `/wrl bankreport` prints compact bank status, `/wrl needed` prints aggregate missing supplies, and the Dashboard clear buttons ask before hiding ledger rows or removing simulated resale stock.
 
 For co-op testing, group with other players who have WRL enabled. The Dashboard automatically shows a compact **Co-op Run** section with nearby WRL party/raid members, their run state, level, lives, readiness hints, party request milestones, contribution milestones, and recent soft-death/final-death/revive events. This is visibility and co-op awareness, not shared party authority: each player's local rules decide death outcomes, each runner confirms request fulfillment locally, and the bank/economy model remains local or bank-based. Guild discovery is lightweight presence only; gold, unlocks, and economy progression are not shared across clients.
 
@@ -98,6 +98,7 @@ Bank identity
                         record a manual loan repayment
   /wrl simloan C-R AMT  simulate a manual loan for testing
   /wrl simparty         simulate co-op Dashboard data for testing
+  /wrl simparty clear   clear simulated co-op Dashboard data
   /wrl simresale        simulate resale stock for testing
   /wrl simresale IDS    simulate stock, e.g. 769:4,723:2
   /wrl resale           show bank resale catalog inventory
