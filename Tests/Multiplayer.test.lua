@@ -468,7 +468,8 @@ local function testDashboardLinesExplainEmptyCoopVisibility()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertContains(joined, "No WRL co-op signals from your party yet.", "dashboard gives a clearer empty co-op state")
-    assertContains(joined, "Waiting for party HELLO, STATE, or EVENT traffic; solo play is unchanged.", "dashboard explains what empty co-op visibility means")
+    assertContains(joined, "Waiting for party...", "dashboard keeps empty waiting copy player-facing")
+    assertNotContains(joined, "HELLO, STATE, or EVENT", "dashboard does not expose protocol traffic in empty state")
     assertContains(joined, "Visibility only. Local rules still decide outcomes.", "dashboard states co-op visibility is non-authoritative")
 end
 

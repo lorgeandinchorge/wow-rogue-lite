@@ -691,7 +691,7 @@ function M:DashboardLines()
             lines[#lines + 1] = "No nearby roster right now; recent signals are still shown."
         else
             lines[#lines + 1] = "No WRL co-op signals from your party yet."
-            lines[#lines + 1] = "Waiting for party HELLO, STATE, or EVENT traffic; solo play is unchanged."
+            lines[#lines + 1] = "Waiting for party..."
         end
     else
         lines[#lines + 1] = "Roster:"
