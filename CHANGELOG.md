@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.5.1
+
+- Condense the Dashboard co-op block into a compact **Team Pulse** summary with nearby party count, readiness buckets, recent signal count, and warning-first roster rows.
+- Promote the most recent important party signal to a single **Last critical** line for quick-glance deaths, revives, requests, and contribution milestones.
+- Keep request and contribution milestones compact under **Requests** and **Contrib**, with one short visibility-only footer instead of repeated explanatory copy.
+- Simplify the empty co-op state to player-facing copy: **Waiting for party...**
+
 ## v0.5.0
 
 - Cut the first 0.5 multiplayer tester build around co-op visibility and shared awareness rather than shared party authority.

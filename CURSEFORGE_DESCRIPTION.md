@@ -6,12 +6,12 @@ Pick one character as your **bank**. Every other character is a hardcore **run**
 
 It is part hardcore challenge, part account progression, and part self-made metagame.
 
-## Latest Update: v0.5.0
+## Latest Update: v0.5.1
 
-- Cuts the first 0.5 multiplayer tester build around co-op visibility and shared awareness rather than shared party authority.
-- Expands the Dashboard co-op panel with readiness hints, party request milestones, contribution milestones, soft-death/final-death signals, and warning-first roster ordering.
-- Keeps reward fulfillment runner-authoritative through ACK2 verification: valid banker receipts can auto-confirm locally, while mismatches and unsupported clients stay reviewable.
-- Adds clearer `/wrl simparty` sample data for local tester inspection without a second client.
+- Condenses the Dashboard co-op panel into a quick-glance **Team Pulse** with nearby count, readiness buckets, warning-first roster rows, and recent signal count.
+- Promotes the newest important party update into **Last critical** for deaths, revives, requests, and contribution milestones.
+- Keeps request and contribution milestones compact under **Requests** and **Contrib**, with one short visibility-only footer.
+- Keeps `/wrl simparty` useful for local tester inspection without a second client.
 - Known limit: co-op visibility does not provide shared bank ownership, formal sessions, party-wide rule enforcement, or cross-client control.
 
 ## Core Loop
@@ -41,7 +41,7 @@ The final path should be:
 ...\AddOns\WoWRoguelite\WoWRoguelite.toc
 ```
 
-Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.0 loaded.` in chat.
+Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.1 loaded.` in chat.
 
 ## Quick Start
 
@@ -64,7 +64,7 @@ After final death, the character is marked **retired**. Retirement is soft: the 
 
 ## Co-op Awareness
 
-Group with other players who have WRL enabled. The Dashboard automatically shows a compact **Co-op Run** section with nearby WRL party/raid members, their run state, level, lives, readiness hints, party request milestones, contribution milestones, and recent soft-death/final-death/revive events.
+Group with other players who have WRL enabled. The Dashboard automatically shows a compact **Team Pulse** section with nearby WRL party/raid members, readiness buckets, warning-first roster rows, request milestones, contribution milestones, and a **Last critical** party signal for quick-glance deaths, revives, requests, or contribution updates.
 
 This is visibility and co-op awareness, not shared party authority. Each player's local rules decide death outcomes, each runner confirms request fulfillment locally, and the bank/economy model remains local or bank-based. Guild discovery is lightweight presence only. Gold, unlock ownership, banking, loans, resale, and economy progression are not shared across clients.
 
@@ -185,7 +185,7 @@ Theme changes apply immediately to open addon windows.
 - **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
 - **Contribution value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value. The vendor-only **WRL: Sell All** button can sell vendorable bags plus equipped gear after confirmation. Mail contribution remains currency-only and reserves 30c for postage.
 - **Cross-realm addon whispers are not guaranteed in TBC.** The mail fallback path exists for this reason.
-- **Co-op is visibility-only in v0.5.0.** Party members can see readiness, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
+- **Co-op is visibility-only in v0.5.1.** Party members can see readiness, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
 - **Retirement is soft.** The addon marks a character retired but does not delete them or block play; it just stops crediting further contributions.
 
 ## Good Fit If You Want
