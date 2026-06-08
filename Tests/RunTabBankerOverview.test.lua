@@ -341,8 +341,8 @@ local function testRunnerDashboardShowsLoanSummary()
     tab._testNS.Multiplayer = {
         DashboardLines = function()
             return {
-                "|cffc0a060Co-op Run|r",
-                "WRL players nearby: 1",
+                "|cffc0a060Team Pulse|r",
+                "Team: 1 nearby | 1 ready / 0 warning / 0 unknown | 1 signal",
                 " - Friend lvl 31 | 2 lives | active",
             }
         end,
@@ -354,8 +354,8 @@ local function testRunnerDashboardShowsLoanSummary()
     assertContains(text, "Outstanding loan:", "runner dashboard shows outstanding debt")
     assertContains(text, "Borrow available:", "runner dashboard shows available borrow amount")
     assertContains(text, "1g", "runner dashboard renders loan values in gold")
-    assertContains(text, "|cffc0a060Co-op Run|r", "runner dashboard includes co-op section")
-    assertContains(text, "WRL players nearby: 1", "runner dashboard includes co-op roster summary")
+    assertContains(text, "|cffc0a060Team Pulse|r", "runner dashboard includes co-op section")
+    assertContains(text, "Team: 1 nearby", "runner dashboard includes co-op roster summary")
 end
 
 local function testRunnerSnapshotShowsRecentOutgoingRequestStatuses()
@@ -816,7 +816,7 @@ local function testCharacterDashboardWiresCoopSummary()
     mpFile:close()
 
     assertContains(src, "ns.Multiplayer:DashboardLines()", "character dashboard should render multiplayer summary")
-    assertContains(multiplayer, "|cffc0a060Co-op Run|r", "multiplayer module should provide Co-op Run heading")
+    assertContains(multiplayer, "|cffc0a060Team Pulse|r", "multiplayer module should provide Team Pulse heading")
 end
 
 testBankerOverviewReplacesRunSnapshotCopy()

@@ -107,7 +107,7 @@ local function readinessRank(readiness)
     return 3
 end
 
-local function readinessSummary(peers)
+local function readinessCounts(peers)
     local ready, warning, unknown = 0, 0, 0
     for _, peer in ipairs(peers or {}) do
         if peer.readiness == "Ready" then
@@ -118,6 +118,11 @@ local function readinessSummary(peers)
             unknown = unknown + 1
         end
     end
+    return ready, warning, unknown
+end
+
+local function readinessSummary(peers)
+    local ready, warning, unknown = readinessCounts(peers)
     return ("Readiness hints: %d ready / %d warning / %d unknown"):format(ready, warning, unknown)
 end
 
@@ -161,6 +166,19 @@ end
 local function isDeathSignalEvent(kind)
     return kind == "soft_death"
         or kind == "final_death"
+end
+
+local function isPulseCriticalEvent(kind)
+    return kind == "soft_death"
+        or kind == "final_death"
+        or kind == "revive"
+        or isAuditEvent(kind)
+end
+
+local function criticalLine(event)
+    if not event then return nil end
+    local detail = event.detail and event.detail ~= "" and (" - " .. event.detail) or ""
+    return ("Last critical: %s %s%s"):format(shortName(event.key), eventLabel(event.kind), detail)
 end
 
 local function requestSubject(detail)
@@ -648,40 +666,35 @@ function M:ClearSimulatedParty()
 end
 
 function M:DashboardLines()
-    local lines = { "|cffc0a060Co-op Run|r" }
+    local lines = { "|cffc0a060Team Pulse|r" }
     local peers = self:RosterRows()
     local feed = self:EventRows()
     local watched = self:PartyRequestRows(3)
     local contributions = self:PartyContributionRows(3)
-    local deaths = self:PartyDeathRows(3)
+    local ready, warning, unknown = readinessCounts(peers)
     if #peers > 0 or #feed > 0 then
-        lines[#lines + 1] = ("Visibility snapshot: %s / %s / %s / %s"):format(
-            countLabel(#peers, "peer"),
-            countLabel(#feed, "recent signal"),
-            countLabel(#watched, "request watch", "request watches"),
-            countLabel(#contributions, "contribution watch", "contribution watches"))
-        lines[#lines + 1] = ("Active WRL party peers: %d"):format(#peers)
-        lines[#lines + 1] = ("Recent party activity: %d"):format(#feed)
-        lines[#lines + 1] = "Local rules decide actions; this panel only reports party signals."
+        lines[#lines + 1] = ("Team: %d nearby | %d ready / %d warning / %d unknown | %d signals"):format(
+            #peers, ready, warning, unknown, #feed)
         if simulatedSampleActive then
-            lines[#lines + 1] = "Simulated/test dashboard data from /wrl simparty; visibility only."
+            lines[#lines + 1] = "Sim sample from /wrl simparty."
+        end
+        for i = 1, #feed do
+            local critical = feed[i]
+            if isPulseCriticalEvent(critical.kind) then
+                lines[#lines + 1] = criticalLine(critical)
+                break
+            end
         end
     end
     if #peers == 0 then
         if #feed > 0 then
-            lines[#lines + 1] = "No active WRL party peers right now; showing recent party activity only."
-            lines[#lines + 1] = "Roster can go stale before audit events expire."
+            lines[#lines + 1] = "No nearby roster right now; recent signals are still shown."
         else
             lines[#lines + 1] = "No WRL co-op signals from your party yet."
             lines[#lines + 1] = "Waiting for party HELLO, STATE, or EVENT traffic; solo play is unchanged."
-            lines[#lines + 1] = "Requests, bank mail, deaths, and contributions still follow your local rules."
         end
     else
-        lines[#lines + 1] = ("WRL players nearby: %d"):format(#peers)
-        lines[#lines + 1] = "Readiness check (warnings first):"
-        lines[#lines + 1] = readinessSummary(peers)
-        lines[#lines + 1] = "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit."
-        lines[#lines + 1] = "Ready/Warning/Unknown are visibility hints, not request gates."
+        lines[#lines + 1] = "Roster:"
         local displayPeers = sortedDashboardPeers(peers)
         for i = 1, math.min(#displayPeers, 5) do
             local p = displayPeers[i]
@@ -699,49 +712,20 @@ function M:DashboardLines()
         end
     end
     if #feed > 0 then
-        lines[#lines + 1] = "Recent co-op events (last 4):"
-        for i = 1, math.min(#feed, 4) do
-            local e = feed[i]
-            local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
-            lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
-        end
-        local auditShown = 0
-        for i = 1, #feed do
-            local e = feed[i]
-            if isAuditEvent(e.kind) then
-                if auditShown == 0 then
-                    lines[#lines + 1] = "Peer audit context (last 3 request/contribution signals):"
-                end
-                local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
-                lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
-                auditShown = auditShown + 1
-                if auditShown >= 3 then break end
-            end
-        end
         if #watched > 0 then
-            lines[#lines + 1] = "Party request milestones (visibility only):"
-            lines[#lines + 1] = "Audit context only; fulfill from your local request and Requisitions rows."
+            lines[#lines + 1] = "Requests:"
             for i = 1, #watched do
                 lines[#lines + 1] = (" - %s: %s"):format(watched[i].subject, table.concat(watched[i].milestones, "; "))
             end
         end
-        if #deaths > 0 then
-            lines[#lines + 1] = "Party death signals (visibility only):"
-            lines[#lines + 1] = "Awareness only; each runner's local death rules still decide outcomes."
-            for i = 1, #deaths do
-                local e = deaths[i]
-                local detail = e.detail and e.detail ~= "" and (" - " .. e.detail) or ""
-                lines[#lines + 1] = (" - %s: %s%s"):format(shortName(e.key), eventLabel(e.kind), detail)
-            end
-        end
         if #contributions > 0 then
-            lines[#lines + 1] = "Party contribution milestones (visibility only):"
-            lines[#lines + 1] = "Audit context only; each runner's local contribution credit still decides outcomes."
+            lines[#lines + 1] = "Contrib:"
             for i = 1, #contributions do
                 lines[#lines + 1] = (" - %s: %s"):format(contributions[i].subject, table.concat(contributions[i].milestones, "; "))
             end
         end
     end
+    lines[#lines + 1] = "Visibility only. Local rules still decide outcomes."
     return lines
 end
 

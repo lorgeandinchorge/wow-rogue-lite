@@ -333,11 +333,11 @@ local function testDashboardLinesSummarizeRosterAndEvents()
     local lines = ns.Multiplayer:DashboardLines()
     local joined = table.concat(lines, "\n")
 
-    assertContains(joined, "Co-op Run", "dashboard has co-op heading")
+    assertContains(joined, "Team Pulse", "dashboard has compact team pulse heading")
     assertContains(joined, "Friend", "dashboard includes short player name")
     assertContains(joined, "lvl 31", "dashboard includes level")
     assertContains(joined, "Unknown - older WRL client; details may be limited", "dashboard includes legacy readiness")
-    assertContains(joined, "final death", "dashboard includes readable event kind")
+    assertContains(joined, "Last critical: Friend final death - Wailing Caverns", "dashboard elevates the latest critical signal")
 end
 
 local function testDashboardLinesShowReadyPeerCompactly()
@@ -349,8 +349,8 @@ local function testDashboardLinesShowReadyPeerCompactly()
 
     assertContains(joined, "Friend lvl 31", "dashboard keeps compact peer row")
     assertContains(joined, "Ready - aligned", "dashboard includes ready status")
-    assertContains(joined, "Co-op visibility only; local rules still decide requests, claims, deaths, and contribution credit.", "dashboard explains peer visibility is non-authoritative")
-    assertContains(joined, "Ready/Warning/Unknown are visibility hints, not request gates.", "dashboard explains readiness labels are informational")
+    assertContains(joined, "Visibility only. Local rules still decide outcomes.", "dashboard keeps one short visibility footer")
+    assertNotContains(joined, "Ready/Warning/Unknown are visibility hints, not request gates.", "dashboard removes repeated readiness explainer")
 end
 
 local function testDashboardLinesShowVisibilitySnapshotCounts()
@@ -362,11 +362,10 @@ local function testDashboardLinesShowVisibilitySnapshotCounts()
     ns.Multiplayer:Receive("EVENT", "evt-snapshot-2^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101 for Friend", "PARTY", "Bank-Realm")
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "Visibility snapshot:", "dashboard adds compact visibility snapshot")
-    assertContains(joined, "Visibility snapshot: 1 peer / 3 recent signals / 1 request watch / 0 contribution watch", "dashboard rolls counts into one scan line")
-    assertContains(joined, "Active WRL party peers: 1", "dashboard summarizes active peer count")
-    assertContains(joined, "Recent party activity: 3", "dashboard summarizes recent activity count including join/event feed")
-    assertContains(joined, "Local rules decide actions; this panel only reports party signals.", "dashboard keeps snapshot non-authoritative")
+    assertContains(joined, "Team: 1 nearby | 1 ready / 0 warning / 0 unknown | 3 signals", "dashboard rolls team counts into one scan line")
+    assertNotContains(joined, "Active WRL party peers:", "dashboard removes separate active peer count")
+    assertNotContains(joined, "Recent party activity:", "dashboard removes separate activity count")
+    assertContains(joined, "Visibility only. Local rules still decide outcomes.", "dashboard keeps snapshot non-authoritative")
 end
 
 local function testDashboardLinesSummarizeReadinessAndShowWarningsFirst()
@@ -378,8 +377,8 @@ local function testDashboardLinesSummarizeReadinessAndShowWarningsFirst()
     ns.Multiplayer:Receive("STATE", "Legacy-Realm^0.4.1c^PRIEST^31^3^active", "PARTY", "Legacy-Realm")
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "Readiness hints: 1 ready / 1 warning / 1 unknown", "dashboard summarizes readiness labels")
-    assertContains(joined, "Readiness check (warnings first):", "dashboard labels the peer roster as warning-first")
+    assertContains(joined, "Team: 3 nearby | 1 ready / 1 warning / 1 unknown", "dashboard summarizes readiness labels in team pulse")
+    assertContains(joined, "Roster:", "dashboard labels compact peer roster")
     assertBefore(joined, "Warning lvl 31", "Ready lvl 31", "dashboard lists warning peers before ready peers")
     assertBefore(joined, "Ready lvl 31", "Legacy lvl 31", "dashboard lists unknown peers after ready peers")
 end
@@ -428,10 +427,10 @@ local function testDashboardLinesShowPeerAuditContext()
     ns.Multiplayer:Receive("EVENT", "evt-7^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101, 201 for Friend", "PARTY", "Bank-Realm")
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "Recent co-op events (last 4):", "dashboard names the short recent event feed")
-    assertContains(joined, "Peer audit context (last 3 request/contribution signals):", "dashboard separates peer audit context from the raw event feed")
-    assertContains(joined, "Bank: bank fulfilled - Rewards 101, 201 for Friend", "dashboard shows bank fulfillment context")
-    assertContains(joined, "Friend: request created - Rewards 101, 201 to Bank", "dashboard shows peer request context")
+    assertContains(joined, "Last critical: Bank bank fulfilled - Rewards 101, 201 for Friend", "dashboard highlights the latest relevant audit signal")
+    assertContains(joined, "Requests:", "dashboard keeps request context compact")
+    assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Friend request created", "dashboard shows peer request context")
+    assertNotContains(joined, "Peer audit context", "dashboard removes long audit context section")
 end
 
 local function testDashboardLinesShowPartyRequestWatch()
@@ -443,8 +442,8 @@ local function testDashboardLinesShowPartyRequestWatch()
     ns.Multiplayer:Receive("EVENT", "evt-10^Bank-Realm^bank_fulfilled^1^0^bank^Rewards 101, 201 for Friend", "PARTY", "Bank-Realm")
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "Party request milestones (visibility only):", "dashboard groups peer request milestones")
-    assertContains(joined, "Audit context only; fulfill from your local request and Requisitions rows.", "dashboard clarifies request watch is not an action queue")
+    assertContains(joined, "Requests:", "dashboard groups peer request milestones compactly")
+    assertNotContains(joined, "Audit context only; fulfill from your local request and Requisitions rows.", "dashboard avoids repeated request disclaimer")
     assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Friend request confirmed; Friend request created", "dashboard shows recent party request timeline")
 end
 
@@ -457,8 +456,8 @@ local function testDashboardLinesShowPartyContributionWatch()
     ns.Multiplayer:Receive("EVENT", "evt-13^Bank-Realm^contribution_received^1^0^bank^Final tithe 105c", "PARTY", "Bank-Realm")
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "Party contribution milestones (visibility only):", "dashboard groups peer contribution milestones")
-    assertContains(joined, "Audit context only; each runner's local contribution credit still decides outcomes.", "dashboard clarifies contribution watch is not shared credit")
+    assertContains(joined, "Contrib:", "dashboard groups peer contribution milestones compactly")
+    assertNotContains(joined, "Audit context only; each runner's local contribution credit still decides outcomes.", "dashboard avoids repeated contribution disclaimer")
     assertContains(joined, "Final tithe 105c: Bank contribution received; Friend contribution completed; Friend contribution prepared", "dashboard shows recent party contribution timeline")
 end
 
@@ -470,7 +469,7 @@ local function testDashboardLinesExplainEmptyCoopVisibility()
 
     assertContains(joined, "No WRL co-op signals from your party yet.", "dashboard gives a clearer empty co-op state")
     assertContains(joined, "Waiting for party HELLO, STATE, or EVENT traffic; solo play is unchanged.", "dashboard explains what empty co-op visibility means")
-    assertContains(joined, "Requests, bank mail, deaths, and contributions still follow your local rules.", "dashboard states co-op visibility is non-authoritative")
+    assertContains(joined, "Visibility only. Local rules still decide outcomes.", "dashboard states co-op visibility is non-authoritative")
 end
 
 local function testDashboardLinesExplainStaleRosterWithRecentActivity()
@@ -482,9 +481,9 @@ local function testDashboardLinesExplainStaleRosterWithRecentActivity()
     setNow(1095)
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
-    assertContains(joined, "No active WRL party peers right now; showing recent party activity only.", "dashboard explains stale roster with live event history")
-    assertContains(joined, "Roster can go stale before audit events expire.", "dashboard explains stale roster timing without implying a mechanic")
-    assertContains(joined, "Party request milestones (visibility only):", "stale roster still keeps request watch visible")
+    assertContains(joined, "Team: 0 nearby", "dashboard shows stale roster as zero nearby")
+    assertContains(joined, "Last critical: Friend request created - Rewards 101 to Bank", "dashboard still highlights recent event activity")
+    assertContains(joined, "Requests:", "stale roster still keeps request watch visible")
 end
 
 local function testSimulatedPartySeedsDashboardRosterAndActivity()
@@ -495,18 +494,16 @@ local function testSimulatedPartySeedsDashboardRosterAndActivity()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertEqual(count, 3, "simparty creates three local test peers")
-    assertContains(joined, "Active WRL party peers: 3", "simparty dashboard shows seeded roster count")
-    assertContains(joined, "Simulated/test dashboard data from /wrl simparty; visibility only.", "simparty dashboard labels the sample as simulated")
-    assertContains(joined, "Readiness hints: 1 ready / 1 warning / 1 unknown", "simparty seeds varied readiness")
+    assertContains(joined, "Team: 3 nearby | 1 ready / 1 warning / 1 unknown | 8 signals", "simparty dashboard shows seeded roster and signal counts")
+    assertContains(joined, "Sim sample from /wrl simparty.", "simparty dashboard labels the sample compactly")
     assertContains(joined, "Alaia lvl 24 | 1 life | active | Warning - different rule profile", "simparty warning peer looks believable")
     assertContains(joined, "Borin lvl 27 | 2 lives | active | Ready - aligned", "simparty ready peer looks believable")
     assertContains(joined, "Cato lvl 18 | 0 lives | dead_pending_contribution | Unknown - older WRL client; details may be limited", "simparty legacy peer looks believable")
-    assertContains(joined, "soft death - Razorfen Kraul", "simparty seeds a soft death dashboard signal")
-    assertContains(joined, "final death - Wailing Caverns", "simparty seeds a final death dashboard signal")
-    assertContains(joined, "Party request milestones (visibility only):", "simparty seeds request watch activity")
+    assertContains(joined, "Last critical: Bank contribution received - Final tithe 105c", "simparty highlights the latest critical signal")
+    assertContains(joined, "Requests:", "simparty seeds request watch activity")
     assertContains(joined, "Rewards 101, 201: Bank bank fulfilled; Alaia request confirmed; Alaia request created", "simparty includes created/confirmed/fulfilled request milestones")
     assertContains(joined, "Rewards 101, 201", "simparty request activity includes starter reward context")
-    assertContains(joined, "Party contribution milestones (visibility only):", "simparty seeds contribution watch activity")
+    assertContains(joined, "Contrib:", "simparty seeds contribution watch activity")
     assertContains(joined, "Final tithe 105c: Bank contribution received; Cato contribution completed; Cato contribution prepared", "simparty includes final contribution milestones")
     assertContains(joined, "Final tithe 105c", "simparty contribution activity includes final-run context")
 end
@@ -522,7 +519,7 @@ local function testClearSimulatedPartyRemovesSeededDashboardData()
     assertEqual(removed.peers, 3, "clear simparty removes three seeded test peers")
     assertEqual(removed.events, 8, "clear simparty removes seeded test events")
     assertContains(joined, "No WRL co-op signals from your party yet.", "dashboard returns to empty co-op state")
-    assertNotContains(joined, "Simulated/test dashboard data from /wrl simparty; visibility only.", "clear simparty removes simulated data label")
+    assertNotContains(joined, "Sim sample from /wrl simparty.", "clear simparty removes simulated data label")
     assertNotContains(joined, "Alaia", "clear simparty removes seeded peer rows")
     assertNotContains(joined, "Final tithe 105c", "clear simparty removes seeded contribution activity")
 end
