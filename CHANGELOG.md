@@ -1,5 +1,12 @@
 # WoW Roguelite Changelog
 
+## v0.5.2
+
+- Add session-only **Group stats** to Team Pulse for biggest heal, biggest crit, and latest elite final blow seen from party signals.
+- Broadcast local personal-best heal and critical hit events through the existing visibility-only multiplayer event feed.
+- Seed `/wrl simparty` with group-stat sample rows so testers can inspect the new dashboard section without a second client.
+- Keep group stats non-authoritative and unsaved; local rules, requests, claims, deaths, contributions, and ACK2 behavior are unchanged.
+
 ## v0.5.1
 
 - Condense the Dashboard co-op block into a compact **Team Pulse** summary with nearby party count, readiness buckets, recent signal count, and warning-first roster rows.

@@ -461,6 +461,80 @@ local function testDashboardLinesShowPartyContributionWatch()
     assertContains(joined, "Final tithe 105c: Bank contribution received; Friend contribution completed; Friend contribution prepared", "dashboard shows recent party contribution timeline")
 end
 
+local function testGroupStatRowsSummarizeBestHealCritAndLatestEliteSlay()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("EVENT", "evt-stat-1^Alaia-Realm^big_heal^24^1^active^1842", "PARTY", "Alaia-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-2^Borin-Realm^big_crit^27^2^active^2110", "PARTY", "Borin-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-3^Borin-Realm^big_crit^27^2^active^2611", "PARTY", "Borin-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-4^Cato-Realm^elite_slay^18^0^active^Overseer Maltorius", "PARTY", "Cato-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-5^Friend-Realm^elite_slay^31^3^active^Venture Co. Taskmaster", "PARTY", "Friend-Realm")
+
+    local rows = ns.Multiplayer:GroupStatRows()
+
+    assertEqual(#rows, 3, "group stats include three compact rows")
+    assertEqual(rows[1], "Biggest heal: Alaia 1,842", "group stats show biggest heal")
+    assertEqual(rows[2], "Biggest crit: Borin 2,611", "group stats choose largest crit")
+    assertEqual(rows[3], "Elite final blow: Friend slew Venture Co. Taskmaster", "group stats choose latest elite slay")
+end
+
+local function testDashboardLinesShowGroupStatsBeforeRequestContext()
+    local ns = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:Receive("EVENT", "evt-stat-6^Alaia-Realm^big_heal^24^1^active^1842", "PARTY", "Alaia-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-7^Borin-Realm^big_crit^27^2^active^2611", "PARTY", "Borin-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-8^Cato-Realm^elite_slay^18^0^active^Venture Co. Taskmaster", "PARTY", "Cato-Realm")
+    ns.Multiplayer:Receive("EVENT", "evt-stat-9^Friend-Realm^request_created^31^3^active^Rewards 101 to Bank", "PARTY", "Friend-Realm")
+    local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
+
+    assertContains(joined, "Group stats:", "dashboard includes group stats section")
+    assertContains(joined, "Biggest heal: Alaia 1,842", "dashboard shows biggest heal row")
+    assertContains(joined, "Biggest crit: Borin 2,611", "dashboard shows biggest crit row")
+    assertContains(joined, "Elite final blow: Cato slew Venture Co. Taskmaster", "dashboard shows elite final blow row")
+    assertBefore(joined, "Group stats:", "Requests:", "dashboard shows group stats before request context")
+    assertContains(joined, "Visibility only. Local rules still decide outcomes.", "dashboard remains visibility-only")
+end
+
+local function testCombatLogBroadcastsOnlyNewPersonalBestHealAndCrit()
+    local ns, sent = resetHarness()
+    ns.Multiplayer:Init()
+
+    ns.Multiplayer:OnCombatLogEvent(1000, "SPELL_HEAL", nil, "Player-1", "Runner", nil, nil, "Player-1", "Runner", nil, nil,
+        2061, "Flash Heal", 2, 1200, 0, 0, false)
+    ns.Multiplayer:OnCombatLogEvent(1001, "SPELL_HEAL", nil, "Player-1", "Runner", nil, nil, "Player-1", "Runner", nil, nil,
+        2061, "Flash Heal", 2, 900, 0, 0, false)
+    ns.Multiplayer:OnCombatLogEvent(1002, "SPELL_HEAL", nil, "Player-1", "Runner", nil, nil, "Player-1", "Runner", nil, nil,
+        2061, "Flash Heal", 2, 1842, 0, 0, false)
+    ns.Multiplayer:OnCombatLogEvent(1003, "SPELL_DAMAGE", nil, "Player-1", "Runner", nil, nil, "Creature-1", "Murloc", nil, nil,
+        133, "Fireball", 4, 2100, 0, 4, 0, 0, 0, true)
+    ns.Multiplayer:OnCombatLogEvent(1004, "SPELL_DAMAGE", nil, "Player-1", "Runner", nil, nil, "Creature-1", "Murloc", nil, nil,
+        133, "Fireball", 4, 2000, 0, 4, 0, 0, 0, true)
+
+    assertEqual(#sent, 3, "combat stats broadcast only new personal bests")
+    assertEqual(sent[1].op, "EVENT", "heal uses event transport")
+    assertContains(sent[1].payload, "^big_heal^", "heal broadcasts group stat kind")
+    assertContains(sent[1].payload, "^1200", "first heal amount is sent")
+    assertContains(sent[2].payload, "^big_heal^", "larger heal broadcasts again")
+    assertContains(sent[2].payload, "^1842", "larger heal amount is sent")
+    assertContains(sent[3].payload, "^big_crit^", "critical damage broadcasts group stat kind")
+    assertContains(sent[3].payload, "^2100", "critical amount is sent")
+end
+
+local function testCombatLogBroadcastsEliteFinalBlowWhenClassificationIsSafe()
+    local ns, sent = resetHarness()
+    ns.Multiplayer:Init()
+
+    _G.UnitGUID = function(unit) return unit == "target" and "Creature-elite-1" or "Player-1" end
+    _G.UnitClassification = function(unit) return unit == "target" and "elite" or "normal" end
+    ns.Multiplayer:OnCombatLogEvent(1000, "PARTY_KILL", nil, "Player-1", "Runner", nil, nil, "Creature-elite-1", "Venture Co. Taskmaster", nil, nil)
+
+    assertEqual(#sent, 1, "elite final blow broadcasts when classification is safe")
+    assertContains(sent[1].payload, "^elite_slay^", "elite final blow uses group stat event")
+    assertContains(sent[1].payload, "Venture Co. Taskmaster", "elite final blow names slain mob")
+end
+
 local function testDashboardLinesExplainEmptyCoopVisibility()
     local ns = resetHarness()
     ns.Multiplayer:Init()
@@ -495,7 +569,7 @@ local function testSimulatedPartySeedsDashboardRosterAndActivity()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertEqual(count, 3, "simparty creates three local test peers")
-    assertContains(joined, "Team: 3 nearby | 1 ready / 1 warning / 1 unknown | 8 signals", "simparty dashboard shows seeded roster and signal counts")
+    assertContains(joined, "Team: 3 nearby | 1 ready / 1 warning / 1 unknown | 12 signals", "simparty dashboard shows seeded roster and signal counts")
     assertContains(joined, "Sim sample from /wrl simparty.", "simparty dashboard labels the sample compactly")
     assertContains(joined, "Alaia lvl 24 | 1 life | active | Warning - different rule profile", "simparty warning peer looks believable")
     assertContains(joined, "Borin lvl 27 | 2 lives | active | Ready - aligned", "simparty ready peer looks believable")
@@ -507,6 +581,10 @@ local function testSimulatedPartySeedsDashboardRosterAndActivity()
     assertContains(joined, "Contrib:", "simparty seeds contribution watch activity")
     assertContains(joined, "Final tithe 105c: Bank contribution received; Cato contribution completed; Cato contribution prepared", "simparty includes final contribution milestones")
     assertContains(joined, "Final tithe 105c", "simparty contribution activity includes final-run context")
+    assertContains(joined, "Group stats:", "simparty seeds group stat sample rows")
+    assertContains(joined, "Biggest heal: Alaia 1,842", "simparty includes a believable biggest heal")
+    assertContains(joined, "Biggest crit: Borin 2,611", "simparty includes a believable biggest crit")
+    assertContains(joined, "Elite final blow: Cato slew Venture Co. Taskmaster", "simparty includes elite final blow context")
 end
 
 local function testClearSimulatedPartyRemovesSeededDashboardData()
@@ -518,10 +596,11 @@ local function testClearSimulatedPartyRemovesSeededDashboardData()
     local joined = table.concat(ns.Multiplayer:DashboardLines(), "\n")
 
     assertEqual(removed.peers, 3, "clear simparty removes three seeded test peers")
-    assertEqual(removed.events, 8, "clear simparty removes seeded test events")
+    assertEqual(removed.events, 12, "clear simparty removes seeded test events")
     assertContains(joined, "No WRL co-op signals from your party yet.", "dashboard returns to empty co-op state")
     assertNotContains(joined, "Sim sample from /wrl simparty.", "clear simparty removes simulated data label")
     assertNotContains(joined, "Alaia", "clear simparty removes seeded peer rows")
+    assertNotContains(joined, "Venture Co. Taskmaster", "clear simparty removes seeded group stat activity")
     assertNotContains(joined, "Final tithe 105c", "clear simparty removes seeded contribution activity")
 end
 
@@ -547,6 +626,10 @@ testDashboardLinesNameAuditEvents()
 testDashboardLinesShowPeerAuditContext()
 testDashboardLinesShowPartyRequestWatch()
 testDashboardLinesShowPartyContributionWatch()
+testGroupStatRowsSummarizeBestHealCritAndLatestEliteSlay()
+testDashboardLinesShowGroupStatsBeforeRequestContext()
+testCombatLogBroadcastsOnlyNewPersonalBestHealAndCrit()
+testCombatLogBroadcastsEliteFinalBlowWhenClassificationIsSafe()
 testDashboardLinesExplainEmptyCoopVisibility()
 testDashboardLinesExplainStaleRosterWithRecentActivity()
 testSimulatedPartySeedsDashboardRosterAndActivity()

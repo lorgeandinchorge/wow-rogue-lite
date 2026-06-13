@@ -12,8 +12,8 @@ if interface ~= "20505" then
 end
 
 local tocVersion = toc:match("##%s*Version:%s*([^\r\n]+)")
-if tocVersion ~= "0.5.1" then
-    error(("expected WoWRoguelite.toc Version 0.5.1, got %s"):format(tostring(tocVersion)), 2)
+if tocVersion ~= "0.5.2" then
+    error(("expected WoWRoguelite.toc Version 0.5.2, got %s"):format(tostring(tocVersion)), 2)
 end
 
 local lua = readFile("WoWRoguelite.lua")

@@ -8,13 +8,15 @@ local FIELD = "^"
 local SUMMARY_SCHEMA = "R2"
 local ROSTER_TTL = 90
 local EVENT_TTL = 300
-local EVENT_LIMIT = 8
+local EVENT_LIMIT = 12
 local SEND_COOLDOWN = 2
 
 local roster = {}
 local events = {}
 local seenEvents = {}
 local lastSentAt = {}
+local localBestHeal = 0
+local localBestCrit = 0
 local seq = 0
 local simulatedSampleActive = false
 local SIMULATED_PARTY_KEYS = {
@@ -83,6 +85,9 @@ local function eventLabel(kind)
     if kind == "contribution_prepared" then return "contribution prepared" end
     if kind == "contribution_completed" then return "contribution completed" end
     if kind == "contribution_received" then return "contribution received" end
+    if kind == "big_heal" then return "biggest heal" end
+    if kind == "big_crit" then return "biggest crit" end
+    if kind == "elite_slay" then return "elite final blow" end
     return tostring(kind or "event")
 end
 
@@ -168,6 +173,12 @@ local function isDeathSignalEvent(kind)
         or kind == "final_death"
 end
 
+local function isGroupStatEvent(kind)
+    return kind == "big_heal"
+        or kind == "big_crit"
+        or kind == "elite_slay"
+end
+
 local function isPulseCriticalEvent(kind)
     return kind == "soft_death"
         or kind == "final_death"
@@ -192,6 +203,46 @@ end
 
 local function isFinalDeathState(state)
     return state == "dead_pending_contribution" or state == "retired"
+end
+
+local function commaNumber(value)
+    local n = math.max(0, math.floor(tonumber(value) or 0))
+    local s = tostring(n)
+    local left, num, right = s:match("^([^%d]*%d)(%d*)(.-)$")
+    if not left then return s end
+    return left .. (num:reverse():gsub("(%d%d%d)", "%1,"):reverse()) .. right
+end
+
+local function detailAmount(detail)
+    local digits = tostring(detail or ""):gsub(",", ""):match("(%d+)")
+    return tonumber(digits) or 0
+end
+
+local function isPlayerSource(srcGUID, srcName)
+    local playerGuid = UnitGUID and UnitGUID("player") or nil
+    if playerGuid and srcGUID and srcGUID == playerGuid then return true end
+    local playerName = UnitName and UnitName("player") or nil
+    return playerName and srcName and srcName == playerName
+end
+
+local function safeEliteUnitForGUID(guid)
+    if not guid or not UnitGUID or not UnitClassification then return nil end
+    local function isEliteUnit(unit)
+        if UnitGUID(unit) ~= guid then return false end
+        local classification = UnitClassification(unit)
+        return classification == "elite"
+            or classification == "rareelite"
+            or classification == "worldboss"
+    end
+    local fixedUnits = { "target", "mouseover", "focus" }
+    for _, unit in ipairs(fixedUnits) do
+        if isEliteUnit(unit) then return unit end
+    end
+    for i = 1, 40 do
+        local unit = "nameplate" .. tostring(i)
+        if isEliteUnit(unit) then return unit end
+    end
+    return nil
 end
 
 local function profileId()
@@ -572,6 +623,79 @@ function M:PartyDeathRows(limit)
     return rows
 end
 
+function M:GroupStatRows()
+    local bestHeal, bestCrit, latestElite
+    for _, event in ipairs(self:EventRows()) do
+        if isGroupStatEvent(event.kind) then
+            if event.kind == "big_heal" then
+                local amount = detailAmount(event.detail)
+                if amount > 0 and (not bestHeal or amount > bestHeal.amount) then
+                    bestHeal = { key = event.key, amount = amount }
+                end
+            elseif event.kind == "big_crit" then
+                local amount = detailAmount(event.detail)
+                if amount > 0 and (not bestCrit or amount > bestCrit.amount) then
+                    bestCrit = { key = event.key, amount = amount }
+                end
+            elseif event.kind == "elite_slay" and tostring(event.detail or "") ~= "" then
+                if not latestElite or (event.when or 0) > (latestElite.when or 0) then
+                    latestElite = { key = event.key, name = event.detail, when = event.when or 0 }
+                end
+            end
+        end
+    end
+
+    local rows = {}
+    if bestHeal then
+        rows[#rows + 1] = ("Biggest heal: %s %s"):format(shortName(bestHeal.key), commaNumber(bestHeal.amount))
+    end
+    if bestCrit then
+        rows[#rows + 1] = ("Biggest crit: %s %s"):format(shortName(bestCrit.key), commaNumber(bestCrit.amount))
+    end
+    if latestElite then
+        rows[#rows + 1] = ("Elite final blow: %s slew %s"):format(shortName(latestElite.key), latestElite.name)
+    end
+    return rows
+end
+
+function M:OnCombatLogEvent(timestamp, subevent, _hiddenArg,
+                             srcGUID, srcName, _srcFlags, _srcRaidFlags,
+                             dstGUID, dstName, _dstFlags, _dstRaidFlags, ...)
+    if not enabled() or not isPlayerSource(srcGUID, srcName) then return false end
+
+    if subevent == "SPELL_HEAL" or subevent == "SPELL_PERIODIC_HEAL" then
+        local amountArg = select(4, ...)
+        local amount = tonumber(amountArg) or 0
+        if amount > localBestHeal then
+            localBestHeal = amount
+            return self:BroadcastEvent("big_heal", tostring(math.floor(amount)))
+        end
+    elseif subevent == "SWING_DAMAGE" then
+        local amountArg = select(1, ...)
+        local amount = tonumber(amountArg) or 0
+        local critical = select(7, ...)
+        if critical and amount > localBestCrit then
+            localBestCrit = amount
+            return self:BroadcastEvent("big_crit", tostring(math.floor(amount)))
+        end
+    elseif subevent == "RANGE_DAMAGE"
+        or subevent == "SPELL_DAMAGE"
+        or subevent == "SPELL_PERIODIC_DAMAGE" then
+        local amountArg = select(4, ...)
+        local amount = tonumber(amountArg) or 0
+        local critical = select(10, ...)
+        if critical and amount > localBestCrit then
+            localBestCrit = amount
+            return self:BroadcastEvent("big_crit", tostring(math.floor(amount)))
+        end
+    elseif subevent == "PARTY_KILL" then
+        if safeEliteUnitForGUID(dstGUID) and dstName and dstName ~= "" then
+            return self:BroadcastEvent("elite_slay", dstName)
+        end
+    end
+    return false
+end
+
 function M:SimulateParty()
     simulatedSampleActive = true
     local localSummary = self:_CurrentSummary() or {}
@@ -637,6 +761,9 @@ function M:SimulateParty()
     simEvent("Cato-Realm", "contribution_prepared", 18, 0, "dead_pending_contribution", "Final tithe 105c")
     simEvent("Cato-Realm", "contribution_completed", 18, 0, "retired", "Final tithe 105c")
     simEvent("Bank-Realm", "contribution_received", 1, 0, "bank", "Final tithe 105c")
+    simEvent("Alaia-Realm", "big_heal", 24, 1, "active", "1842")
+    simEvent("Borin-Realm", "big_crit", 27, 2, "active", "2611")
+    simEvent("Cato-Realm", "elite_slay", 18, 0, "active", "Venture Co. Taskmaster")
 
     refreshUI()
     return 3
@@ -671,6 +798,7 @@ function M:DashboardLines()
     local feed = self:EventRows()
     local watched = self:PartyRequestRows(3)
     local contributions = self:PartyContributionRows(3)
+    local groupStats = self:GroupStatRows()
     local ready, warning, unknown = readinessCounts(peers)
     if #peers > 0 or #feed > 0 then
         lines[#lines + 1] = ("Team: %d nearby | %d ready / %d warning / %d unknown | %d signals"):format(
@@ -712,6 +840,12 @@ function M:DashboardLines()
         end
     end
     if #feed > 0 then
+        if #groupStats > 0 then
+            lines[#lines + 1] = "Group stats:"
+            for i = 1, #groupStats do
+                lines[#lines + 1] = " - " .. groupStats[i]
+            end
+        end
         if #watched > 0 then
             lines[#lines + 1] = "Requests:"
             for i = 1, #watched do
@@ -746,5 +880,13 @@ function M:Init()
         ns:On("GROUP_ROSTER_UPDATE", function() self:BroadcastHello() end)
         ns:On("PLAYER_LEVEL_UP", function() self:BroadcastState() end)
         ns:On("PLAYER_LEAVING_WORLD", function() self:BroadcastBye() end)
+    end
+    if CreateFrame and not self._combatFrame then
+        local combatFrame = CreateFrame("Frame")
+        combatFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+        combatFrame:SetScript("OnEvent", function(_, _event, ...)
+            self:OnCombatLogEvent(...)
+        end)
+        self._combatFrame = combatFrame
     end
 end
