@@ -2,7 +2,7 @@
 
 A rogue-lite progression layer for **WoW Classic: Burning Crusade Anniversary**. Pick one character as your **bank**; every other character is a hardcore **run**. Final death retires the run, but everything it contributes to the bank becomes spendable legacy budget that future runs can draw on for starter kits.
 
-> **Status:** v0.5.1 tester build. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, co-op visibility, runner-authoritative ACK2 request verification, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, Settings reset controls, optional dungeon/battleground death ignores, and previewable death-sound choices are in place. Multiplayer is currently co-op awareness only: the Dashboard can show party readiness, request milestones, contribution milestones, and death signals, but it does not create shared bank ownership, formal sessions, or cross-client control.
+> **Status:** v0.5.3 tester build. Core tracking, UI, run lifecycle, request pipeline, final-run vendor liquidation, mailbox contribution prep, character contribution board, co-op visibility, runner-authoritative ACK2 request verification, GW2 UI texture-backed theme loading, configurable resale pricing, manual loan accounting, bank reporting, post-retirement achievement lockout, Settings reset controls, optional dungeon/battleground death ignores, and previewable death-sound choices are in place. Multiplayer is currently co-op awareness only: the Dashboard can show party readiness, request milestones, contribution milestones, group stats, and death signals, but it does not create shared bank ownership, formal sessions, or cross-client control.
 
 > **Development note:** This project was built with AI assistance, with human direction, review, and testing throughout.
 
@@ -26,7 +26,7 @@ Install via CurseForge (recommended), or copy the `WoWRoguelite` folder into:
 World of Warcraft\_anniversary_\Interface\AddOns\
 ```
 
-so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.1 loaded.` in chat.
+so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.3 loaded.` in chat.
 
 ### Quick start
 
@@ -37,7 +37,7 @@ so the final path is `...\AddOns\WoWRoguelite\WoWRoguelite.toc`. Enable the addo
 
 For Requisitions Desk testing, `/wrl simrequest Tester-Realm 101` creates a local simulated pending request without needing another player online. `/wrl simparty` seeds local co-op Dashboard roster/readiness/activity data without a second client and labels that sample as simulated/test data; `/wrl simparty clear` removes that local sample. `/wrl simresale` creates simulated resale stock for the Resale Desk, `/wrl simloan Tester-Realm 1` creates a local 1g loan record, `/wrl bankreport` prints compact bank status, `/wrl needed` prints aggregate missing supplies, and the Dashboard clear buttons ask before hiding ledger rows or removing simulated resale stock.
 
-For co-op testing, group with other players who have WRL enabled. The Dashboard automatically shows a compact **Team Pulse** section with nearby WRL party/raid members, readiness buckets, warning-first roster rows, request milestones, contribution milestones, and a **Last critical** party signal for quick-glance deaths, revives, requests, or contribution updates. This is visibility and co-op awareness, not shared party authority: each player's local rules decide death outcomes, each runner confirms request fulfillment locally, and the bank/economy model remains local or bank-based. Guild discovery is lightweight presence only; gold, unlocks, and economy progression are not shared across clients.
+For co-op testing, group with other players who have WRL enabled. The Dashboard automatically shows a compact **Team Pulse** section with nearby WRL party/raid members, readiness buckets, warning-first roster rows, group stats, request milestones, contribution milestones, and a **Last critical** party signal for quick-glance deaths, revives, requests, or contribution updates. This is visibility and co-op awareness, not shared party authority: each player's local rules decide death outcomes, each runner confirms request fulfillment locally, and the bank/economy model remains local or bank-based. Guild discovery is lightweight presence only; gold, unlocks, and economy progression are not shared across clients.
 
 ### How a run works
 
@@ -155,7 +155,7 @@ Theme changes apply immediately to open addon windows.
 - **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
 - **Contribution value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value. The vendor-only **WRL: Sell All** button can sell vendorable bags plus equipped gear after confirmation. Mail contribution remains currency-only and reserves 30c for postage.
 - **Cross-realm addon whispers** aren't guaranteed in TBC; the mail fallback path exists for this reason.
-- **Co-op is visibility-only in v0.5.1.** Party members can see readiness, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
+- **Co-op is visibility-only in v0.5.3.** Party members can see readiness, group stats, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
 - **Retirement is soft.** The addon marks a character retired but doesn't delete them or block play; it just stops crediting further contributions.
 
 ---

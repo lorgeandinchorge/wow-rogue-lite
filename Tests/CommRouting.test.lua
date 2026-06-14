@@ -1,4 +1,5 @@
-local function resetHarness()
+local function resetHarness(options)
+    options = options or {}
     local sent = {}
     _G.C2_ChatInfo = nil
     _G.C_ChatInfo = {
@@ -14,8 +15,16 @@ local function resetHarness()
         end,
     }
     _G.SendAddonMessage = nil
-    _G.GetNumRaidMembers = function() return 0 end
-    _G.GetNumPartyMembers = function() return 2 end
+    if options.legacyGroupApis == false then
+        _G.GetNumRaidMembers = nil
+        _G.GetNumPartyMembers = nil
+    else
+        _G.GetNumRaidMembers = function() return 0 end
+        _G.GetNumPartyMembers = function() return 2 end
+    end
+    _G.GetNumGroupMembers = options.groupMembers and function() return options.groupMembers end or nil
+    _G.IsInRaid = options.inRaid ~= nil and function() return options.inRaid end or nil
+    _G.IsInGroup = options.inGroup ~= nil and function() return options.inGroup end or nil
     _G.IsInGuild = function() return true end
 
     local handled
@@ -73,6 +82,26 @@ local function testSendGroupUsesPartyWhenNotInRaid()
     assertEqual(sent[1].text, "WRLv1|STATE|state", "group state payload")
 end
 
+local function testSendGroupUsesModernPartyApis()
+    local ns, sent = resetHarness({ legacyGroupApis = false, groupMembers = 2, inRaid = false })
+
+    local ok = ns.Comm:SendGroup("STATE", "state")
+
+    assertEqual(ok, true, "modern group send succeeds")
+    assertEqual(sent[1].channel, "PARTY", "modern group send chooses party")
+    assertEqual(sent[1].text, "WRLv1|STATE|state", "modern group state payload")
+end
+
+local function testSendGroupUsesModernRaidApis()
+    local ns, sent = resetHarness({ legacyGroupApis = false, groupMembers = 5, inRaid = true })
+
+    local ok = ns.Comm:SendGroup("STATE", "state")
+
+    assertEqual(ok, true, "modern raid send succeeds")
+    assertEqual(sent[1].channel, "RAID", "modern group send chooses raid")
+    assertEqual(sent[1].text, "WRLv1|STATE|state", "modern raid state payload")
+end
+
 local function testSendGuildUsesGuildChannel()
     local ns, sent = resetHarness()
 
@@ -96,6 +125,8 @@ end
 
 testSendScopedUsesRequestedChannel()
 testSendGroupUsesPartyWhenNotInRaid()
+testSendGroupUsesModernPartyApis()
+testSendGroupUsesModernRaidApis()
 testSendGuildUsesGuildChannel()
 testReceiveDispatchesRegisteredMultiplayerOpWithoutBreakingBankOps()
 

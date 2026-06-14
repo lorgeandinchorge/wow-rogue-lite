@@ -6,11 +6,11 @@ Pick one character as your **bank**. Every other character is a hardcore **run**
 
 It is part hardcore challenge, part account progression, and part self-made metagame.
 
-## Latest Update: v0.5.1
+## Latest Update: v0.5.3
 
-- Condenses the Dashboard co-op panel into a quick-glance **Team Pulse** with nearby count, readiness buckets, warning-first roster rows, and recent signal count.
-- Promotes the newest important party update into **Last critical** for deaths, revives, requests, and contribution milestones.
-- Keeps request and contribution milestones compact under **Requests** and **Contrib**, with one short visibility-only footer.
+- Fixes Team Pulse party/raid discovery on clients that use modern group APIs, so grouped WRL players can see each other's Dashboard roster signals again.
+- Keeps modern PARTY and RAID routing covered by regression tests while preserving the existing legacy Classic path.
+- Includes the v0.5.2 group-stat Team Pulse rows for biggest heal, biggest crit, and latest elite final blow seen from party signals.
 - Keeps `/wrl simparty` useful for local tester inspection without a second client.
 - Known limit: co-op visibility does not provide shared bank ownership, formal sessions, party-wide rule enforcement, or cross-client control.
 
@@ -41,7 +41,7 @@ The final path should be:
 ...\AddOns\WoWRoguelite\WoWRoguelite.toc
 ```
 
-Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.1 loaded.` in chat.
+Enable the addon at the character-select screen and `/reload` in-game to confirm. You should see `[Roguelite] v0.5.3 loaded.` in chat.
 
 ## Quick Start
 
@@ -185,7 +185,7 @@ Theme changes apply immediately to open addon windows.
 - **Send button not automated.** Blizzard does not let addons press Send on mail or Trade. The addon pre-fills everything and shows the shopping list; you confirm.
 - **Contribution value assumes sell-first.** On final death the addon snapshots carried currency plus vendor value. The vendor-only **WRL: Sell All** button can sell vendorable bags plus equipped gear after confirmation. Mail contribution remains currency-only and reserves 30c for postage.
 - **Cross-realm addon whispers are not guaranteed in TBC.** The mail fallback path exists for this reason.
-- **Co-op is visibility-only in v0.5.1.** Party members can see readiness, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
+- **Co-op is visibility-only in v0.5.3.** Party members can see readiness, group stats, request/contribution milestones, and death signals, but WRL does not provide shared bank ownership, formal session hosting, party-wide rule enforcement, or remote control of another client's requests, deaths, loans, resale, mail, or trades.
 - **Retirement is soft.** The addon marks a character retired but does not delete them or block play; it just stops crediting further contributions.
 
 ## Good Fit If You Want

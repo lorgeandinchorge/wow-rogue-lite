@@ -1,5 +1,11 @@
 # WoW Roguelite Changelog
 
+## v0.5.3
+
+- Fix party/raid Team Pulse discovery on clients that expose modern group APIs instead of the older party/raid count globals.
+- Keep WRL co-op broadcasts routed to PARTY or RAID correctly so grouped players can see each other's Dashboard roster signals again.
+- Add regression coverage for modern group API routing while keeping the existing legacy Classic path covered.
+
 ## v0.5.2
 
 - Add session-only **Group stats** to Team Pulse for biggest heal, biggest crit, and latest elite final blow seen from party signals.

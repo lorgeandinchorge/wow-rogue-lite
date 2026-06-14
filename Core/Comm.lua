@@ -114,13 +114,22 @@ function C:SendScoped(op, payload, channel, target)
     return sendAddon(channel, msg, target)
 end
 
+local function isInRaidGroup()
+    if IsInRaid then return IsInRaid() == true end
+    return GetNumRaidMembers and (GetNumRaidMembers() or 0) > 0
+end
+
+local function isInPartyGroup()
+    if IsInGroup then return IsInGroup() == true end
+    if GetNumGroupMembers then return (GetNumGroupMembers() or 0) > 0 end
+    return GetNumPartyMembers and (GetNumPartyMembers() or 0) > 0
+end
+
 function C:SendGroup(op, payload)
-    local raidSize = GetNumRaidMembers and (GetNumRaidMembers() or 0) or 0
-    if raidSize > 0 then
+    if isInRaidGroup() then
         return self:SendScoped(op, payload, "RAID")
     end
-    local partySize = GetNumPartyMembers and (GetNumPartyMembers() or 0) or 0
-    if partySize > 0 then
+    if isInPartyGroup() then
         return self:SendScoped(op, payload, "PARTY")
     end
     return false
